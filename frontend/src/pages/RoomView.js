@@ -513,6 +513,8 @@ const RoomView = ({ roomId, onBack }) => {
             {panel === 'games' && (
               <RoomGames
                 userId={user.id}
+                userAvatar={user.avatar}
+                userName={user.username}
                 userCoins={user.coins || 0}
                 onResult={(data) => {
                   if (data.new_balance !== undefined) updateUser({ coins: data.new_balance });
@@ -520,7 +522,6 @@ const RoomView = ({ roomId, onBack }) => {
                   setTimeout(() => setGameResult(null), 4000);
                 }}
                 onClose={() => setPanel(null)}
-                onPlayClassic={(gameId, cost) => playMiniGame(gameId, cost)}
                 onStartPK={() => {
                   const others = room.seats.filter(s => s && s.user_id !== user.id);
                   if (others.length === 0) { alert('No hay otros usuarios en la sala'); return; }
