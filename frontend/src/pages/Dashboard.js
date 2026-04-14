@@ -207,15 +207,21 @@ const Dashboard = ({ onNavigate }) => {
         </button>
 
         {/* Eventos Semanales */}
-        <div className="bg-gradient-to-b from-green-100 to-green-50 rounded-2xl p-4 text-center hover:scale-105 transition-transform">
+        <button onClick={() => onNavigate('games')} className="bg-gradient-to-b from-green-100 to-green-50 rounded-2xl p-4 text-center hover:scale-105 transition-transform cursor-pointer">
           <h4 className="font-bold text-gray-800 text-xs mb-2">Eventos</h4>
           <div className="flex justify-center -space-x-2 mb-2">
-            {users.slice(0, 3).map((u, i) => (
+            {users.slice(0, 3).length > 0 ? users.slice(0, 3).map((u, i) => (
               <img key={i} src={u.avatar} alt="" className="w-10 h-10 rounded-full border-2 border-yellow-400 object-cover" style={{animation: `fadeIn 0.3s ease ${i * 0.1}s both`}} />
-            ))}
+            )) : (
+              <>
+                <div className="w-10 h-10 rounded-full bg-green-300 border-2 border-yellow-400 flex items-center justify-center text-sm">🏆</div>
+                <div className="w-10 h-10 rounded-full bg-emerald-300 border-2 border-yellow-400 flex items-center justify-center text-sm">🎮</div>
+                <div className="w-10 h-10 rounded-full bg-lime-300 border-2 border-yellow-400 flex items-center justify-center text-sm">⭐</div>
+              </>
+            )}
           </div>
           <div className="text-xs font-bold text-green-600">🔥 TOP 3 🔥</div>
-        </div>
+        </button>
       </div>
 
       {/* Popular / Nuevo Sub-tabs */}

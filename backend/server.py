@@ -1156,15 +1156,21 @@ async def play_generic(play: GenericPlay):
         updated = await db.users.find_one({"id": play.user_id})
         return {"won": False, "prize": 0, "new_balance": updated['coins']}
     
-    elif play.game in ('ruleta', 'dados', 'rps'):
+    elif play.game in ('ruleta', 'dados', 'rps', 'slots', 'trivia', 'carta'):
         await db.users.update_one({"id": play.user_id}, {"$inc": {"coins": -play.bet}})
-        won = random.random() < 0.4
+        import random
+        # Slots has lower win chance but higher payouts
+        if play.game == 'slots':
+            won = random.random() < 0.25
+            mult = random.choice([3, 5, 10]) if won else 0
+        else:
+            won = random.random() < 0.4
+            mult = random.choice([2, 3, 5]) if won else 0
         if won:
-            mult = random.choice([2, 3, 5])
             prize = play.bet * mult
             await db.users.update_one({"id": play.user_id}, {"$inc": {"coins": prize}})
             updated = await db.users.find_one({"id": play.user_id})
-            return {"won": True, "prize": prize, "new_balance": updated['coins']}
+            return {"won": True, "prize": prize, "multiplier": mult, "new_balance": updated['coins']}
         updated = await db.users.find_one({"id": play.user_id})
         return {"won": False, "prize": 0, "new_balance": updated['coins']}
     

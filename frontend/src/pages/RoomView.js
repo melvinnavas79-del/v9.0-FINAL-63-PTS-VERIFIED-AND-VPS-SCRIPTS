@@ -32,6 +32,7 @@ const RoomView = ({ roomId, onBack }) => {
   const chatRef = useRef(null);
   const prevMsgCount = useRef(0);
   const photoRef = useRef(null);
+  const musicRef = useRef(null);
 
   useEffect(() => {
     leaveAgora();
@@ -143,6 +144,18 @@ const RoomView = ({ roomId, onBack }) => {
   const sendChat = async () => { if (!chatInput.trim()) return; try { await axios.post(`${API}/rooms/${roomId}/chat`, { user_id: user.id, text: chatInput }); setChatInput(''); loadChat(); } catch (e) {} };
   const sendPhoto = async (e) => { const f = e.target.files?.[0]; if (!f) return; try { const fd = new FormData(); fd.append('file', f); await axios.post(`${API}/rooms/${roomId}/chat-photo?user_id=${user.id}`, fd, { headers: { 'Content-Type': 'multipart/form-data' } }); loadChat(); } catch (e) { alert('Error'); } if (photoRef.current) photoRef.current.value = ''; };
 
+  const uploadMusic = async (e) => {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    try {
+      const fd = new FormData();
+      fd.append('file', f);
+      await axios.post(`${API}/rooms/${roomId}/music?owner_id=${user.id}`, fd, { headers: { 'Content-Type': 'multipart/form-data' } });
+      loadRoom();
+    } catch (err) { alert(err.response?.data?.detail || 'Error al subir musica'); }
+    if (musicRef.current) musicRef.current.value = '';
+  };
+
   const sendGift = async (type) => {
     if (!giftTarget) return;
     try {
@@ -222,7 +235,7 @@ const RoomView = ({ roomId, onBack }) => {
         <div className="absolute inset-0 z-50 bg-black/80 flex items-end" onClick={() => { setPanel(null); setGiftTarget(null); }}>
           <div className="w-full bg-gray-950 rounded-t-3xl p-4 max-h-[60vh] overflow-y-auto border-t border-white/10" onClick={e => e.stopPropagation()}>
             <div className="flex justify-between mb-3">
-              <h3 className="text-white font-bold text-sm">{panel === 'gifts' ? `Regalos → ${giftTarget?.username}` : panel === 'sobres' ? 'Lluvia de Oro' : panel === 'games' ? 'Juegos en Sala' : 'Cofres'}</h3>
+              <h3 className="text-white font-bold text-sm">{panel === 'gifts' ? `Regalos → ${giftTarget?.username}` : panel === 'gifts-all' ? 'Regalos' : panel === 'sobres' ? 'Lluvia de Oro' : panel === 'games' ? 'Juegos en Sala' : 'Cofres'}</h3>
               <button data-testid="close-panel" onClick={() => { setPanel(null); setGiftTarget(null); }} className="text-white/40">✕</button>
             </div>
 
@@ -236,6 +249,41 @@ const RoomView = ({ roomId, onBack }) => {
                   </button>
                 ))}
               </div>
+            )}
+
+            {panel === 'gifts-all' && (
+              <>
+                <p className="text-white/40 text-xs mb-2">Elige a quién enviar</p>
+                <div className="flex gap-2 mb-3 overflow-x-auto">
+                  {room.seats.filter(s => s && s.user_id !== user.id).map((s, i) => (
+                    <button key={i} onClick={() => { setGiftTarget(s); setPanel('gifts'); }}
+                      className="flex-shrink-0 bg-white/10 rounded-xl p-2 text-center hover:bg-white/20">
+                      <img src={s.avatar} alt="" className="w-10 h-10 rounded-full mx-auto mb-1" />
+                      <div className="text-white text-[9px]">{s.username}</div>
+                    </button>
+                  ))}
+                </div>
+                <p className="text-white/40 text-xs mb-2">Regalos</p>
+                <div className="grid grid-cols-4 gap-2 mb-3">
+                  {Object.entries(gifts).filter(([k]) => !k.startsWith('sobre_')).map(([k, g]) => (
+                    <div key={k} className="bg-white/5 rounded-xl p-2 text-center border border-white/5">
+                      <div className="text-xl">{g.emoji}</div>
+                      <div className="text-white text-[8px]">{g.name}</div>
+                      <div className="text-yellow-400 text-[8px]">{g.cost >= 1e6 ? `${(g.cost/1e6).toFixed(0)}M` : `${(g.cost/1e3).toFixed(0)}K`}</div>
+                    </div>
+                  ))}
+                </div>
+                <p className="text-white/40 text-xs mb-2">Sobres (Lluvia de Oro para todos)</p>
+                <div className="grid grid-cols-4 gap-2">
+                  {sobres.map(s => (
+                    <button key={s.id} onClick={() => throwSobre(s.id)} className="bg-red-900/30 border border-red-500/20 rounded-xl p-2 text-center active:scale-95">
+                      <div className="text-lg">{s.emoji}</div>
+                      <div className="text-white text-[8px]">{s.name}</div>
+                      <div className="text-red-300 text-[8px]">{s.amount >= 1e6 ? `${(s.amount/1e6).toFixed(0)}M` : `${(s.amount/1e3).toFixed(0)}K`}</div>
+                    </button>
+                  ))}
+                </div>
+              </>
             )}
 
             {panel === 'sobres' && (
@@ -303,7 +351,7 @@ const RoomView = ({ roomId, onBack }) => {
           </div>
           <div className="flex items-center gap-1.5">
             {/* Minimize */}
-            <button data-testid="minimize-btn" onClick={() => setMinimized(true)} className="bg-white/10 w-7 h-7 rounded-full flex items-center justify-center text-[10px]">⬇️</button>
+            <button data-testid="minimize-btn" onClick={() => onBack()} className="bg-white/10 w-7 h-7 rounded-full flex items-center justify-center text-[10px]">⬇️</button>
             {/* Bot ON/OFF */}
             {user.role === 'dueño' && (
               <button data-testid="bot-toggle-room" onClick={toggleBot} className={`w-7 h-7 rounded-full flex items-center justify-center text-[10px] ${botOn ? 'bg-green-500' : 'bg-gray-600'}`}>🤖</button>
@@ -384,8 +432,11 @@ const RoomView = ({ roomId, onBack }) => {
                 ) : m.type === 'photo' ? (
                   <div className="flex items-start gap-1">
                     <img src={m.avatar || ''} alt="" className="w-4 h-4 rounded-full mt-0.5" />
-                    <div><span className="text-pink-400 text-[9px] font-bold">{m.username}</span>
-                      <img src={m.image_url?.startsWith('/api') ? `${process.env.REACT_APP_BACKEND_URL}${m.image_url}` : m.image_url} alt="" className="mt-0.5 max-w-[100px] max-h-[60px] rounded-lg object-cover" />
+                    <div>
+                      <span className="text-pink-400 text-[9px] font-bold">{m.username}</span>
+                      <img src={m.image_url?.startsWith('/api') ? `${process.env.REACT_APP_BACKEND_URL}${m.image_url}` : m.image_url} alt=""
+                        onClick={e => { e.target.style.maxWidth = e.target.style.maxWidth === '300px' ? '150px' : '300px'; }}
+                        className="mt-0.5 max-w-[150px] rounded-lg object-cover cursor-pointer transition-all" />
                     </div>
                   </div>
                 ) : (
@@ -407,24 +458,45 @@ const RoomView = ({ roomId, onBack }) => {
         </div>
       </div>
 
-      {/* BOTTOM BAR - Always visible */}
-      <div className="flex-shrink-0 bg-black/90 border-t border-white/5 px-3 py-2">
-        <div className="flex items-center justify-center gap-3">
-          {/* Gift button - always visible */}
-          <button data-testid="gift-bottom-btn" onClick={() => {
-            const seated = room.seats.filter(s => s && s.user_id !== user.id);
-            if (seated.length > 0) { setGiftTarget(seated[0]); setPanel('gifts'); }
-            else { setPanel('sobres'); }
-          }} className="w-10 h-10 rounded-full bg-pink-500/80 flex items-center justify-center text-lg active:scale-90">🎁</button>
+      {/* BOTTOM BAR - ALWAYS VISIBLE */}
+      <div className="flex-shrink-0 bg-black/90 border-t border-white/5 px-2 py-2">
+        <div className="flex items-center justify-center gap-2">
+          {/* Gift */}
+          <button data-testid="gift-bottom-btn" onClick={() => setPanel('gifts-all')}
+            className="w-11 h-11 rounded-full bg-pink-500 flex items-center justify-center text-lg active:scale-90 shadow-lg shadow-pink-500/30">🎁</button>
 
+          {/* Music */}
+          <button data-testid="music-btn" onClick={() => musicRef.current?.click()}
+            className="w-9 h-9 rounded-full bg-purple-600/80 flex items-center justify-center text-sm active:scale-90">🎵</button>
+          <input ref={musicRef} type="file" accept="audio/*" onChange={uploadMusic} className="hidden" />
+
+          {/* Mic - always visible */}
+          <button data-testid="toggle-mute-btn" onClick={mySeat !== null ? toggleMute : () => {}}
+            className={`w-12 h-12 rounded-full flex items-center justify-center text-xl active:scale-90 shadow-lg ${
+              mySeat === null ? 'bg-gray-700 opacity-50' : isMuted ? 'bg-red-500 shadow-red-500/30' : 'bg-green-500 shadow-green-500/30'
+            }`}>{mySeat === null ? '🎤' : isMuted ? '🔇' : '🎤'}</button>
+
+          {/* Speaker */}
+          <button data-testid="toggle-deafen-btn" onClick={mySeat !== null ? toggleDeafen : () => {}}
+            className={`w-9 h-9 rounded-full flex items-center justify-center text-sm active:scale-90 ${
+              mySeat === null ? 'bg-gray-700 opacity-50' : isDeafened ? 'bg-orange-500' : 'bg-blue-500'
+            }`}>{isDeafened ? '🔕' : '🔊'}</button>
+
+          {/* Leave seat */}
           {mySeat !== null && (
-            <>
-              <button data-testid="toggle-mute-btn" onClick={toggleMute} className={`w-10 h-10 rounded-full flex items-center justify-center text-lg active:scale-90 ${isMuted ? 'bg-red-500/80' : 'bg-green-500/80'}`}>{isMuted ? '🔇' : '🎤'}</button>
-              <button data-testid="toggle-deafen-btn" onClick={toggleDeafen} className={`w-10 h-10 rounded-full flex items-center justify-center text-lg active:scale-90 ${isDeafened ? 'bg-orange-500/80' : 'bg-blue-500/80'}`}>{isDeafened ? '🔕' : '🔊'}</button>
-              <button data-testid="leave-seat-btn" onClick={leaveSeat} className="w-10 h-10 rounded-full bg-red-600/80 flex items-center justify-center text-lg active:scale-90">🚪</button>
-            </>
+            <button data-testid="leave-seat-btn" onClick={leaveSeat}
+              className="w-9 h-9 rounded-full bg-red-600 flex items-center justify-center text-sm active:scale-90">🚪</button>
+          )}
+
+          {/* Bot ON/OFF - only for dueño */}
+          {user.role === 'dueño' && (
+            <button data-testid="bot-toggle-bottom" onClick={toggleBot}
+              className={`w-9 h-9 rounded-full flex items-center justify-center text-sm active:scale-90 border-2 ${botOn ? 'bg-green-500 border-green-400' : 'bg-gray-700 border-gray-600'}`}>🤖</button>
           )}
         </div>
+        {room.music_url && (
+          <audio src={room.music_url.startsWith('/api') ? `${process.env.REACT_APP_BACKEND_URL}${room.music_url}` : room.music_url} autoPlay loop className="hidden" />
+        )}
       </div>
     </div>
   );
