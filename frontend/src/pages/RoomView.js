@@ -182,6 +182,8 @@ const RoomView = ({ roomId, onBack }) => {
   };
 
   const [gameResult, setGameResult] = useState(null);
+  const [zoomImg, setZoomImg] = useState(null);
+  const [eventPanel, setEventPanel] = useState(false);
 
   const playMiniGame = async (gameId, cost) => {
     setGameResult(null);
@@ -194,6 +196,24 @@ const RoomView = ({ roomId, onBack }) => {
       setGameResult({ won: false, error: e.response?.data?.detail || 'Error' });
       setTimeout(() => setGameResult(null), 3000);
     }
+  };
+
+  const triggerKingEvent = async (level) => {
+    if (!window.confirm(`Activar KING ${level}? Esto repartira monedas a todos en la sala.`)) return;
+    try {
+      const r = await axios.post(`${API}/events/king-room?admin_id=${user.id}&room_id=${roomId}&level=${level}`);
+      alert(`King ${level} activado! ${r.data.per_user.toLocaleString()} monedas para cada uno de ${r.data.users} usuarios.`);
+      loadChat(); loadRoom();
+    } catch (e) { alert(e.response?.data?.detail || 'Error'); }
+  };
+
+  const triggerCPEvent = async (level) => {
+    if (!window.confirm(`Activar CP Nivel ${level}? Esto dara 5M a cada usuario en la sala.`)) return;
+    try {
+      const r = await axios.post(`${API}/events/cp-room?admin_id=${user.id}&room_id=${roomId}&level=${level}`);
+      alert(`CP Nivel ${level} activado! 5M para cada uno de ${r.data.users} usuarios.`);
+      loadChat(); loadRoom();
+    } catch (e) { alert(e.response?.data?.detail || 'Error'); }
   };
 
   if (!room) return <div className="h-screen bg-gradient-to-b from-indigo-950 via-slate-900 to-gray-950 flex items-center justify-center"><div className="text-white">Cargando...</div></div>;
@@ -235,6 +255,59 @@ const RoomView = ({ roomId, onBack }) => {
   return (
     <div className="h-screen flex flex-col overflow-hidden relative" style={{background: 'linear-gradient(to bottom, #1e1b4b, #0f172a, #111827)', ...bgStyle}}>
       {entryAnim && <EntryAnimation animation={entryAnim.animation} username={entryAnim.username} onComplete={() => setEntryAnim(null)} />}
+
+      {/* PHOTO ZOOM MODAL */}
+      {zoomImg && (
+        <div className="absolute inset-0 z-[60] bg-black/90 flex items-center justify-center" onClick={() => setZoomImg(null)}>
+          <button className="absolute top-4 right-4 text-white text-2xl" onClick={() => setZoomImg(null)}>✕</button>
+          <img src={zoomImg} alt="" className="max-w-[90vw] max-h-[80vh] object-contain rounded-lg" />
+        </div>
+      )}
+
+      {/* EVENTS PANEL */}
+      {eventPanel && user.role === 'dueño' && (
+        <div className="absolute inset-0 z-50 bg-black/80 flex items-end" onClick={() => setEventPanel(false)}>
+          <div className="w-full bg-gray-950 rounded-t-3xl p-4 border-t border-white/10" onClick={e => e.stopPropagation()}>
+            <div className="flex justify-between mb-3">
+              <h3 className="text-white font-bold text-sm">Eventos en Sala</h3>
+              <button onClick={() => setEventPanel(false)} className="text-white/40">✕</button>
+            </div>
+            <div className="space-y-2">
+              <h4 className="text-yellow-400 text-xs font-bold">👑 King Events</h4>
+              <div className="grid grid-cols-3 gap-2">
+                <button onClick={() => triggerKingEvent(1)} className="bg-gradient-to-b from-yellow-600/30 to-amber-700/30 border border-yellow-500/20 rounded-xl p-3 text-center active:scale-95">
+                  <div className="text-xl">👑</div>
+                  <div className="text-white text-[10px] font-bold">King 1</div>
+                  <div className="text-yellow-300 text-[9px]">300M</div>
+                </button>
+                <button onClick={() => triggerKingEvent(2)} className="bg-gradient-to-b from-orange-600/30 to-red-700/30 border border-orange-500/20 rounded-xl p-3 text-center active:scale-95">
+                  <div className="text-xl">👑</div>
+                  <div className="text-white text-[10px] font-bold">King 2</div>
+                  <div className="text-orange-300 text-[9px]">500M</div>
+                </button>
+                <button onClick={() => triggerKingEvent(3)} className="bg-gradient-to-b from-red-600/30 to-rose-700/30 border border-red-500/20 rounded-xl p-3 text-center active:scale-95">
+                  <div className="text-xl">👑</div>
+                  <div className="text-white text-[10px] font-bold">King 3</div>
+                  <div className="text-red-300 text-[9px]">1B</div>
+                </button>
+              </div>
+              <h4 className="text-pink-400 text-xs font-bold mt-3">💖 CP Events</h4>
+              <div className="grid grid-cols-2 gap-2">
+                <button onClick={() => triggerCPEvent(6)} className="bg-gradient-to-b from-pink-600/30 to-rose-700/30 border border-pink-500/20 rounded-xl p-3 text-center active:scale-95">
+                  <div className="text-xl">💖</div>
+                  <div className="text-white text-[10px] font-bold">CP Nivel 6</div>
+                  <div className="text-pink-300 text-[9px]">5M c/u</div>
+                </button>
+                <button onClick={() => triggerCPEvent(7)} className="bg-gradient-to-b from-purple-600/30 to-indigo-700/30 border border-purple-500/20 rounded-xl p-3 text-center active:scale-95">
+                  <div className="text-xl">💍</div>
+                  <div className="text-white text-[10px] font-bold">CP Nivel 7</div>
+                  <div className="text-purple-300 text-[9px]">5M c/u</div>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* PANEL OVERLAY */}
       {panel && (
@@ -392,6 +465,10 @@ const RoomView = ({ roomId, onBack }) => {
             {user.role === 'dueño' && (
               <button data-testid="bot-toggle-room" onClick={toggleBot} className={`w-7 h-7 rounded-full flex items-center justify-center text-[10px] ${botOn ? 'bg-green-500' : 'bg-gray-600'}`}>🤖</button>
             )}
+            {/* Events trigger */}
+            {user.role === 'dueño' && (
+              <button data-testid="events-room-btn" onClick={() => setEventPanel(true)} className="w-7 h-7 rounded-full bg-yellow-600 flex items-center justify-center text-[10px]">👑</button>
+            )}
             <span className={`w-2 h-2 rounded-full ${audioStatus === 'on' ? 'bg-green-400' : 'bg-red-400'}`} />
             <span className="text-white/50 text-xs">{room.active_users}</span>
           </div>
@@ -474,8 +551,8 @@ const RoomView = ({ roomId, onBack }) => {
                     <div>
                       <span className="text-pink-400 text-[9px] font-bold">{m.username}</span>
                       <img src={m.image_url?.startsWith('/api') ? `${process.env.REACT_APP_BACKEND_URL}${m.image_url}` : m.image_url} alt=""
-                        onClick={e => { e.target.style.maxWidth = e.target.style.maxWidth === '300px' ? '150px' : '300px'; }}
-                        className="mt-0.5 max-w-[150px] rounded-lg object-cover cursor-pointer transition-all" />
+                        onClick={() => setZoomImg(m.image_url?.startsWith('/api') ? `${process.env.REACT_APP_BACKEND_URL}${m.image_url}` : m.image_url)}
+                        className="mt-0.5 max-w-[150px] rounded-lg object-cover cursor-pointer transition-all hover:opacity-80" />
                     </div>
                   </div>
                 ) : (

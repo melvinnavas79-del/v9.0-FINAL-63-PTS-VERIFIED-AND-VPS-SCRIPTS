@@ -134,6 +134,8 @@ async def search_user(query: str):
     user = await db.users.find_one({"$or": [{"numeric_id": query}, {"username": {"$regex": query, "$options": "i"}}]})
     if not user:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    if user.get('ghost_mode'):
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
     return serialize_user(user)
 
 @api_router.get("/tts/voices")
@@ -665,7 +667,7 @@ async def toggle_ghost_mode(user_id: str):
     if not user:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
     user_role = user.get('role', 'usuario')
-    if not has_permission(user_role, 'admin'):
+    if user_role not in ('dueño', 'admin'):
         raise HTTPException(status_code=403, detail="Solo admin o dueño puede usar Modo Fantasma")
     new_mode = not user.get('ghost_mode', False)
     await db.users.update_one({"id": user_id}, {"$set": {"ghost_mode": new_mode}})
@@ -918,6 +920,102 @@ async def get_events():
     events = await db.events.find().sort("created_at", -1).to_list(50)
     return [{k: v for k, v in e.items() if k != "_id"} for e in events]
 
+@api_router.post("/events/cashback")
+async def distribute_cashback(admin_id: str):
+    admin = await db.users.find_one({"id": admin_id})
+    if not admin or admin.get('role') != 'dueño':
+        raise HTTPException(status_code=403, detail="Solo el dueño")
+    # Cashback tiers: 100M spent = 10M back, 500M = 25M, 600M+ = 45M
+    tiers = [(600000000, 45000000), (500000000, 25000000), (100000000, 10000000)]
+    users = await db.users.find({"total_spent": {"$gte": 100000000}}).to_list(500)
+    results = []
+    for u in users:
+        spent = u.get('total_spent', 0)
+        cashback = 0
+        for threshold, reward in tiers:
+            if spent >= threshold:
+                cashback = reward
+                break
+        if cashback > 0:
+            await db.users.update_one({"id": u['id']}, {"$inc": {"coins": cashback}})
+            results.append({"username": u['username'], "spent": spent, "cashback": cashback})
+    await db.events.insert_one({
+        "id": str(uuid.uuid4()), "type": "cashback_weekly",
+        "results": results, "created_at": datetime.now(timezone.utc).isoformat()
+    })
+    return {"success": True, "results": results, "total_users": len(results)}
+
+@api_router.post("/events/king-room")
+async def king_room_event(admin_id: str, room_id: str, level: int = 1):
+    """King events 1/2/3 triggered from room. Level 1=300M, 2=500M, 3=1B"""
+    admin = await db.users.find_one({"id": admin_id})
+    if not admin or admin.get('role') != 'dueño':
+        raise HTTPException(status_code=403, detail="Solo el dueño")
+    room = await db.rooms.find_one({"id": room_id})
+    if not room:
+        raise HTTPException(status_code=404, detail="Sala no encontrada")
+    
+    king_prizes = {1: 300000000, 2: 500000000, 3: 1000000000}
+    prize = king_prizes.get(level, 300000000)
+    
+    # Get users in room
+    in_room = [s for s in room.get('seats', []) if s is not None]
+    if not in_room:
+        raise HTTPException(status_code=400, detail="No hay usuarios en la sala")
+    
+    per_user = prize // len(in_room)
+    results = []
+    for seat in in_room:
+        await db.users.update_one({"id": seat['user_id']}, {"$inc": {"coins": per_user}})
+        results.append({"username": seat['username'], "bonus": per_user})
+    
+    # Chat announcement
+    await db.room_chats.insert_one({
+        "id": str(uuid.uuid4()), "room_id": room_id,
+        "type": "event", "text": f"👑 KING {level} ACTIVADO! {prize//1000000}M repartidos entre {len(in_room)} usuarios!",
+        "created_at": datetime.now(timezone.utc).isoformat()
+    })
+    
+    await db.events.insert_one({
+        "id": str(uuid.uuid4()), "type": f"king_{level}", "room_id": room_id,
+        "prize": prize, "results": results,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    })
+    return {"success": True, "level": level, "prize": prize, "per_user": per_user, "users": len(in_room), "results": results}
+
+@api_router.post("/events/cp-room")
+async def cp_room_event(admin_id: str, room_id: str, level: int = 6):
+    """CP events level 6/7 triggered from room. Level 6=5M, 7=5M per person"""
+    admin = await db.users.find_one({"id": admin_id})
+    if not admin or admin.get('role') != 'dueño':
+        raise HTTPException(status_code=403, detail="Solo el dueño")
+    room = await db.rooms.find_one({"id": room_id})
+    if not room:
+        raise HTTPException(status_code=404, detail="Sala no encontrada")
+    
+    cp_prize = 5000000
+    in_room = [s for s in room.get('seats', []) if s is not None]
+    if not in_room:
+        raise HTTPException(status_code=400, detail="No hay usuarios en la sala")
+    
+    results = []
+    for seat in in_room:
+        await db.users.update_one({"id": seat['user_id']}, {"$inc": {"coins": cp_prize}})
+        results.append({"username": seat['username'], "bonus": cp_prize})
+    
+    await db.room_chats.insert_one({
+        "id": str(uuid.uuid4()), "room_id": room_id,
+        "type": "event", "text": f"💖 CP NIVEL {level} ACTIVADO! {cp_prize//1000000}M para cada uno!",
+        "created_at": datetime.now(timezone.utc).isoformat()
+    })
+    
+    await db.events.insert_one({
+        "id": str(uuid.uuid4()), "type": f"cp_level_{level}", "room_id": room_id,
+        "prize": cp_prize * len(in_room), "results": results,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    })
+    return {"success": True, "level": level, "prize_per_user": cp_prize, "users": len(in_room), "results": results}
+
 # ==================== ANIMATED ENTRIES ====================
 
 @api_router.get("/users/{user_id}/entry-animation")
@@ -1087,12 +1185,12 @@ async def like_photo(photo_id: str, user_id: str):
 
 @api_router.get("/rankings/coins")
 async def get_coins_ranking():
-    users = await db.users.find().sort("coins", -1).limit(50).to_list(50)
+    users = await db.users.find({"ghost_mode": {"$ne": True}}).sort("coins", -1).limit(50).to_list(50)
     return [serialize_user(u) for u in users]
 
 @api_router.get("/rankings/level")
 async def get_level_ranking():
-    users = await db.users.find().sort("level", -1).limit(50).to_list(50)
+    users = await db.users.find({"ghost_mode": {"$ne": True}}).sort("level", -1).limit(50).to_list(50)
     return [serialize_user(u) for u in users]
 
 # ==================== GAMES ====================

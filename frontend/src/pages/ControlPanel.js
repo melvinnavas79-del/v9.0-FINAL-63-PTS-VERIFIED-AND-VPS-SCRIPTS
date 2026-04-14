@@ -278,8 +278,8 @@ const ControlPanel = ({ onBack }) => {
             </div>
 
             {/* Quick Actions */}
-            <h3 className="text-lg font-bold text-yellow-400 mb-3">⚡ Acciones Rápidas</h3>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+            <h3 className="text-lg font-bold text-yellow-400 mb-3">⚡ Acciones Rapidas</h3>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               <button onClick={distributeWeekly} className="bg-gradient-to-r from-yellow-600 to-amber-600 p-4 rounded-xl font-bold text-sm">
                 🏆 Premios Semanales
               </button>
@@ -287,7 +287,17 @@ const ControlPanel = ({ onBack }) => {
                 🏷️ Premios Clanes
               </button>
               <button onClick={triggerBabyRobot} className="bg-gradient-to-r from-green-600 to-emerald-600 p-4 rounded-xl font-bold text-sm">
-                🤖 Bebé Robot
+                🤖 Bebe Robot
+              </button>
+              <button onClick={async () => {
+                if (!window.confirm('Repartir cashback semanal?')) return;
+                try {
+                  const r = await axios.post(`${API}/events/cashback?admin_id=${user.id}`);
+                  alert(`Cashback repartido a ${r.data.total_users} usuarios:\n${r.data.results.map(r => `${r.username}: +${r.cashback.toLocaleString()}`).join('\n') || 'Ningun usuario califica (min 100M gastados)'}`);
+                  loadAll();
+                } catch (err) { alert(err.response?.data?.detail || 'Error'); }
+              }} className="bg-gradient-to-r from-purple-600 to-pink-600 p-4 rounded-xl font-bold text-sm">
+                💸 Cashback Semanal
               </button>
             </div>
           </div>
