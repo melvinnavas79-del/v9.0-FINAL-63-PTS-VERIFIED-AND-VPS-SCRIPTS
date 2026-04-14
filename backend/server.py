@@ -2675,54 +2675,103 @@ async def bot_auto_reply(room_id: str, username: str, text: str):
     if not active:
         return
     
-    # Don't reply to every single message - only if someone talks to the bot or asks a question
-    text_lower = text.lower()
-    should_reply = (
-        'bot' in text_lower or
-        '?' in text or
-        'hola' in text_lower or
-        'hey' in text_lower or
-        'oye' in text_lower or
-        'alguien' in text_lower or
-        'ayuda' in text_lower or
-        'que' == text_lower.strip() or
-        len(text) > 5
-    )
+    text_lower = text.lower().strip()
     
-    if not should_reply:
+    # SILENCE COMMANDS - Bot shuts up immediately
+    silence_words = ['callate', 'cállate', 'silencio', 'no hables', 'callese', 'cállese', 'shh', 'shut up', 'ya no hables', 'deja de hablar', 'para de hablar', 'bot callate', 'bot silencio']
+    for sw in silence_words:
+        if sw in text_lower:
+            await db.bot_active_rooms.update_one({"room_id": room_id}, {"$set": {"paused": True}})
+            await db.room_chat.insert_one({
+                "id": str(uuid.uuid4()), "room_id": room_id,
+                "user_id": "bot", "username": "🤖 Bot Lluvia", "avatar": "",
+                "text": "Entendido, me quedo callado. Diganme 'bot habla' cuando me necesiten.",
+                "type": "message", "created_at": datetime.now(timezone.utc).isoformat()
+            })
+            return
+    
+    # RESUME COMMANDS - Bot starts talking again
+    resume_words = ['bot habla', 'habla bot', 'vuelve bot', 'despierta', 'bot vuelve', 'ya puedes hablar', 'habla']
+    for rw in resume_words:
+        if rw in text_lower:
+            await db.bot_active_rooms.update_one({"room_id": room_id}, {"$set": {"paused": False}})
+            await db.room_chat.insert_one({
+                "id": str(uuid.uuid4()), "room_id": room_id,
+                "user_id": "bot", "username": "🤖 Bot Lluvia", "avatar": "",
+                "text": "Ya estoy de vuelta! Que me cuentan?",
+                "type": "message", "created_at": datetime.now(timezone.utc).isoformat()
+            })
+            return
+    
+    # MODE COMMANDS
+    mode_map = {'locutor': 'locutor', 'animador': 'animador', 'normal': 'normal', 'serio': 'serio', 'divertido': 'animador'}
+    for key, mode in mode_map.items():
+        if f'modo {key}' in text_lower or f'se {key}' in text_lower or f'haz de {key}' in text_lower:
+            await db.bot_active_rooms.update_one({"room_id": room_id}, {"$set": {"mode": mode}})
+            mode_msgs = {
+                'locutor': "Damas y caballeros, bienvenidos! Aqui su locutor oficial de Lluvia Live!",
+                'animador': "EEEEPA! Que empiece la fiesta! Vamos a animar esto!",
+                'normal': "Listo, vuelvo a modo normal. Aqui andamos.",
+                'serio': "Entendido. Modo profesional activado.",
+            }
+            await db.room_chat.insert_one({
+                "id": str(uuid.uuid4()), "room_id": room_id,
+                "user_id": "bot", "username": "🤖 Bot Lluvia", "avatar": "",
+                "text": mode_msgs.get(mode, "Modo cambiado!"),
+                "type": "message", "created_at": datetime.now(timezone.utc).isoformat()
+            })
+            return
+    
+    # If paused, don't reply
+    if active.get('paused'):
         return
     
-    # Get recent chat for context
-    recent = await db.room_chat.find({"room_id": room_id}).sort("created_at", -1).limit(8).to_list(8)
+    # Only reply when someone talks TO the bot or asks a question
+    is_directed = ('bot' in text_lower or '🤖' in text_lower or 'lluvia' in text_lower)
+    is_question = '?' in text or text_lower.startswith(('que ', 'como ', 'quien ', 'donde ', 'cuando ', 'por que', 'cuanto'))
+    is_greeting = text_lower in ('hola', 'hey', 'oye', 'buenas', 'que hay')
+    
+    if not (is_directed or is_question or is_greeting):
+        return
+    
+    # Get bot mode for personality
+    bot_mode = active.get('mode', 'normal')
+    mode_prompts = {
+        'normal': "Eres amigable, casual, con humor. Hablas como amigo.",
+        'locutor': "Eres un locutor profesional de radio. Hablas con energia, presentas a la gente, haces comentarios tipo 'Y aqui tenemos a...' con estilo de presentador.",
+        'animador': "Eres el animador mas energico! Todo es INCREIBLE, ESPECTACULAR! Usas muchas exclamaciones, animas a la gente, creas emocion.",
+        'serio': "Eres profesional y serio. Respondes de forma directa y educada sin bromas.",
+    }
+    
+    recent = await db.room_chat.find({"room_id": room_id}).sort("created_at", -1).limit(6).to_list(6)
     recent.reverse()
     chat_context = "\n".join([f"{m.get('username','')}: {m.get('text','')}" for m in recent if m.get('text')])
     
     try:
         llm_key = os.environ.get('EMERGENT_LLM_KEY')
+        personality = mode_prompts.get(bot_mode, mode_prompts['normal'])
         chat = LlmChat(
             api_key=llm_key,
-            session_id=f"bot_auto_{room_id}_{datetime.now(timezone.utc).strftime('%H')}",
-            system_message=f"""Eres el Bot oficial de Lluvia Live, un asistente social divertido y amigable que esta en una sala de chat en vivo. 
-Te llamas Bot Lluvia. Hablas como una persona real, casual, con humor.
-Respondes en español. Se breve (1-2 oraciones max). 
-No repitas lo que otros dicen. Se original y entretenido.
-Si alguien pregunta algo que sabes, respondelo. Si no, di algo divertido.
-NO digas que eres una IA ni que no puedes hacer cosas. Actua como un amigo mas en la sala.
+            session_id=f"bot_auto_{room_id}_{bot_mode}",
+            system_message=f"""Eres Bot Lluvia en una sala de chat en vivo de Lluvia Live.
+{personality}
+Respondes en español. MAXIMO 1-2 oraciones. Se breve.
+NO digas que eres IA. Actua como persona real.
+Si te dicen que te calles, OBEDECE inmediatamente.
 
-Chat reciente en la sala:
+Chat reciente:
 {chat_context}
 
-{username} acaba de decir: {text}
-Responde de forma natural como si fueras parte de la conversacion."""
+{username} dice: {text}
+Responde brevemente:"""
         )
         chat.with_model("gemini", "gemini-2.5-flash")
-        response = await chat.send_message(UserMessage(text=f"{username} dice: {text}"))
+        response = await chat.send_message(UserMessage(text=f"{username}: {text}"))
         
         if response and response.strip():
             await db.room_chat.insert_one({
                 "id": str(uuid.uuid4()), "room_id": room_id,
-                "user_id": "bot", "username": "🤖 Bot Lluvia",
-                "avatar": "",
+                "user_id": "bot", "username": "🤖 Bot Lluvia", "avatar": "",
                 "text": response.strip(), "type": "message",
                 "created_at": datetime.now(timezone.utc).isoformat()
             })

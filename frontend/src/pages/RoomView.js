@@ -69,10 +69,8 @@ const RoomView = ({ roomId, onBack }) => {
       clientRef.current = client;
       client.on('user-published', async (u, m) => { if (m === 'audio') { await client.subscribe(u, 'audio'); u.audioTrack?.play(); } });
       await client.join(t.data.app_id, `room_${roomId}`, t.data.token, t.data.uid);
-      const track = await AgoraRTC.createMicrophoneAudioTrack();
-      localTrackRef.current = track;
-      track.setEnabled(false);
-      await client.publish([track]);
+      // DON'T create mic track yet - only when user unmutes
+      // This prevents the "recording" indicator on phone
       setAudioStatus('on'); setIsMuted(true);
       await axios.post(`${API}/rooms/${roomId}/welcome?user_id=${user.id}`);
       loadChat();
@@ -84,21 +82,36 @@ const RoomView = ({ roomId, onBack }) => {
     try { localTrackRef.current?.close(); localTrackRef.current = null; await clientRef.current?.leave(); clientRef.current = null; setAudioStatus('off'); clearTimeout(autoMuteRef.current); } catch (e) {}
   };
 
-  const toggleMute = () => {
-    if (localTrackRef.current) {
-      const m = !isMuted;
-      localTrackRef.current.setEnabled(!m);
-      setIsMuted(m);
-      clearTimeout(autoMuteRef.current);
-      if (!m) {
-        // Auto-mute after 2 minutes of having mic on
-        autoMuteRef.current = setTimeout(() => {
-          if (localTrackRef.current) {
-            localTrackRef.current.setEnabled(false);
-            setIsMuted(true);
-          }
-        }, 2 * 60 * 1000);
+  const toggleMute = async () => {
+    if (!clientRef.current) return;
+    const newMuted = !isMuted;
+    
+    if (!newMuted) {
+      // UNMUTING - create mic track if doesn't exist
+      if (!localTrackRef.current) {
+        try {
+          const track = await AgoraRTC.createMicrophoneAudioTrack();
+          localTrackRef.current = track;
+          await clientRef.current.publish([track]);
+        } catch (e) { console.error('Mic error:', e); return; }
+      } else {
+        localTrackRef.current.setEnabled(true);
       }
+      setIsMuted(false);
+      clearTimeout(autoMuteRef.current);
+      autoMuteRef.current = setTimeout(() => {
+        if (localTrackRef.current) {
+          localTrackRef.current.setEnabled(false);
+          setIsMuted(true);
+        }
+      }, 2 * 60 * 1000);
+    } else {
+      // MUTING - disable but don't destroy (keeps connection)
+      if (localTrackRef.current) {
+        localTrackRef.current.setEnabled(false);
+      }
+      setIsMuted(true);
+      clearTimeout(autoMuteRef.current);
     }
   };
   const toggleDeafen = () => { clientRef.current?.remoteUsers?.forEach(u => { u.audioTrack && (isDeafened ? u.audioTrack.play() : u.audioTrack.stop()); }); setIsDeafened(!isDeafened); };
