@@ -1526,7 +1526,123 @@ async def send_gift(gift: GiftSend):
         )
     
     gift_doc.pop('_id', None)
+    
+    # Accumulate gifts toward room cofres
+    if gift.room_id:
+        await db.rooms.update_one({"id": gift.room_id}, {"$inc": {"cofre_progress": g['cost']}})
+    
     return {"success": True, "gift": gift_doc, "new_balance": updated_sender['coins']}
+
+# ==================== SOBRES (LLUVIA DE ORO) ====================
+
+SOBRE_TIERS = [
+    {"id": "sobre_10k", "name": "Sobre 10K", "emoji": "💌", "amount": 10000},
+    {"id": "sobre_50k", "name": "Sobre 50K", "emoji": "💝", "amount": 50000},
+    {"id": "sobre_100k", "name": "Sobre 100K", "emoji": "🎁", "amount": 100000},
+    {"id": "sobre_500k", "name": "Sobre 500K", "emoji": "🎀", "amount": 500000},
+    {"id": "sobre_1m", "name": "Sobre 1M", "emoji": "🧧", "amount": 1000000},
+    {"id": "sobre_5m", "name": "Sobre 5M", "emoji": "💰", "amount": 5000000},
+    {"id": "sobre_10m", "name": "Sobre 10M", "emoji": "💎", "amount": 10000000},
+]
+
+class SobreData(BaseModel):
+    sender_id: str
+    room_id: str
+    sobre_id: str
+
+@api_router.get("/sobres")
+async def get_sobres():
+    return SOBRE_TIERS
+
+@api_router.post("/sobres/throw")
+async def throw_sobre(data: SobreData):
+    sobre = next((s for s in SOBRE_TIERS if s['id'] == data.sobre_id), None)
+    if not sobre:
+        raise HTTPException(status_code=400, detail="Sobre no valido")
+    sender = await db.users.find_one({"id": data.sender_id})
+    if not sender:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    if sender.get('coins', 0) < sobre['amount']:
+        raise HTTPException(status_code=400, detail="Monedas insuficientes")
+    room = await db.rooms.find_one({"id": data.room_id})
+    if not room:
+        raise HTTPException(status_code=404, detail="Sala no encontrada")
+    seated = [s for s in room.get('seats', []) if s and s.get('user_id') != data.sender_id]
+    if not seated:
+        raise HTTPException(status_code=400, detail="No hay nadie mas en la sala")
+    await db.users.update_one({"id": data.sender_id}, {"$inc": {"coins": -sobre['amount'], "total_spent": sobre['amount']}})
+    per_person = sobre['amount'] // len(seated)
+    recipients = []
+    for s in seated:
+        await db.users.update_one({"id": s['user_id']}, {"$inc": {"coins": per_person}})
+        recipients.append(s['username'])
+    await db.room_chat.insert_one({
+        "id": str(uuid.uuid4()), "room_id": data.room_id,
+        "user_id": data.sender_id, "username": sender['username'], "avatar": sender['avatar'],
+        "text": f"{sobre['emoji']} LLUVIA DE ORO! {sender['username']} lanzo {sobre['name']}! +{per_person:,} para cada uno! {sobre['emoji']}",
+        "type": "gift", "created_at": datetime.now(timezone.utc).isoformat()
+    })
+    await db.rooms.update_one({"id": data.room_id}, {"$inc": {"cofre_progress": sobre['amount']}})
+    updated = await db.users.find_one({"id": data.sender_id})
+    return {"success": True, "per_person": per_person, "recipients": recipients, "new_balance": updated['coins']}
+
+# ==================== COFRES ACUMULATIVOS ====================
+
+COFRE_THRESHOLDS = [
+    {"level": 1, "threshold": 300000, "label": "300K", "prize_pool": 200000},
+    {"level": 2, "threshold": 500000, "label": "500K", "prize_pool": 350000},
+    {"level": 3, "threshold": 1000000, "label": "1M", "prize_pool": 700000},
+    {"level": 4, "threshold": 2500000, "label": "2.5M", "prize_pool": 1750000},
+    {"level": 5, "threshold": 5000000, "label": "5M", "prize_pool": 3500000},
+    {"level": 6, "threshold": 7000000, "label": "7M", "prize_pool": 5000000},
+    {"level": 7, "threshold": 10000000, "label": "10M", "prize_pool": 7000000},
+    {"level": 8, "threshold": 15000000, "label": "15M", "prize_pool": 10000000},
+    {"level": 9, "threshold": 20000000, "label": "20M", "prize_pool": 14000000},
+    {"level": 10, "threshold": 20000000, "label": "20M", "prize_pool": 15000000},
+]
+
+@api_router.get("/rooms/{room_id}/cofres")
+async def get_room_cofres(room_id: str):
+    room = await db.rooms.find_one({"id": room_id})
+    if not room:
+        raise HTTPException(status_code=404, detail="Sala no encontrada")
+    progress = room.get('cofre_progress', 0)
+    opened = room.get('cofres_opened', 0)
+    return {"progress": progress, "cofres_opened": opened, "thresholds": COFRE_THRESHOLDS}
+
+@api_router.post("/rooms/{room_id}/open-cofre")
+async def try_open_cofre(room_id: str):
+    room = await db.rooms.find_one({"id": room_id})
+    if not room:
+        raise HTTPException(status_code=404, detail="Sala no encontrada")
+    progress = room.get('cofre_progress', 0)
+    opened = room.get('cofres_opened', 0)
+    if opened >= 10:
+        return {"opened": False, "message": "Todos los cofres abiertos"}
+    cofre = COFRE_THRESHOLDS[opened]
+    accumulated = sum(COFRE_THRESHOLDS[i]['threshold'] for i in range(opened))
+    needed = accumulated + cofre['threshold']
+    if progress < needed:
+        return {"opened": False, "progress": progress, "needed": needed}
+    seated = [s for s in room.get('seats', []) if s]
+    if not seated:
+        return {"opened": False, "message": "Nadie en la sala"}
+    pool = cofre['prize_pool']
+    prizes_split = [0.4, 0.25, 0.15] + [0.2 / max(len(seated) - 3, 1)] * max(len(seated) - 3, 0)
+    results = []
+    for i, s in enumerate(seated):
+        pct = prizes_split[i] if i < len(prizes_split) else 0.02
+        amt = int(pool * pct)
+        await db.users.update_one({"id": s['user_id']}, {"$inc": {"coins": amt}})
+        results.append(f"{s['username']}: +{amt:,}")
+    await db.rooms.update_one({"id": room_id}, {"$set": {"cofres_opened": opened + 1}})
+    await db.room_chat.insert_one({
+        "id": str(uuid.uuid4()), "room_id": room_id,
+        "user_id": "system", "username": "COFRE", "avatar": "",
+        "text": f"📦✨ COFRE #{opened + 1} ({cofre['label']}) ABIERTO! {' | '.join(results)}",
+        "type": "gift", "created_at": datetime.now(timezone.utc).isoformat()
+    })
+    return {"opened": True, "level": opened + 1, "label": cofre['label'], "results": results}
 
 # ==================== ID SYSTEM ====================
 
