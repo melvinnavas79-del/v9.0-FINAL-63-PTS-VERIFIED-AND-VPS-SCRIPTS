@@ -70,11 +70,21 @@ const BotFloating = ({ userId, userRole }) => {
     window.speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = 'es-ES';
-    utterance.rate = 1.05;
-    utterance.pitch = 1.0;
+    // Get saved voice preference from localStorage
+    const voicePref = localStorage.getItem('bot_voice') || 'hombre';
+    const voiceConfigs = {
+      hombre: { pitch: 0.9, rate: 1.0, lang: 'es-ES' },
+      mujer: { pitch: 1.3, rate: 1.0, lang: 'es-ES' },
+      animador: { pitch: 1.1, rate: 1.15, lang: 'es-MX' },
+      serio: { pitch: 0.8, rate: 0.95, lang: 'es-ES' },
+    };
+    const cfg = voiceConfigs[voicePref] || voiceConfigs.hombre;
+    utterance.pitch = cfg.pitch;
+    utterance.rate = cfg.rate;
+    utterance.lang = cfg.lang;
     utterance.volume = 1.0;
     const voices = window.speechSynthesis.getVoices();
-    const esVoice = voices.find(v => v.lang === 'es-ES' || v.lang === 'es-MX' || v.lang.startsWith('es'));
+    const esVoice = voices.find(v => v.lang === cfg.lang || v.lang.startsWith('es'));
     if (esVoice) utterance.voice = esVoice;
     utterance.onstart = () => setSpeaking(true);
     utterance.onend = () => setSpeaking(false);

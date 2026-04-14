@@ -50,7 +50,12 @@ const RoomView = ({ roomId, onBack }) => {
     try { const r = await axios.get(`${API}/rooms/${roomId}`); setRoom(r.data); const s = r.data.seats.findIndex(s => s?.user_id === user.id); setMySeat(s >= 0 ? s : null); } catch (e) {}
   };
   const loadChat = async () => {
-    try { const r = await axios.get(`${API}/rooms/${roomId}/chat?limit=30&user_id=${user.id}`); setChatMessages(r.data); } catch (e) {}
+    try {
+      // Ensure join record exists
+      await axios.post(`${API}/rooms/${roomId}/mark-join?user_id=${user.id}`).catch(() => {});
+      const r = await axios.get(`${API}/rooms/${roomId}/chat?limit=30&user_id=${user.id}`);
+      setChatMessages(r.data);
+    } catch (e) {}
   };
   const loadGifts = async () => { try { const r = await axios.get(`${API}/gifts`); setGifts(r.data); } catch (e) {} };
   const loadSobres = async () => { try { const r = await axios.get(`${API}/sobres`); setSobres(r.data); } catch (e) {} };
@@ -79,7 +84,23 @@ const RoomView = ({ roomId, onBack }) => {
     try { localTrackRef.current?.close(); localTrackRef.current = null; await clientRef.current?.leave(); clientRef.current = null; setAudioStatus('off'); clearTimeout(autoMuteRef.current); } catch (e) {}
   };
 
-  const toggleMute = () => { if (localTrackRef.current) { const m = !isMuted; localTrackRef.current.setEnabled(!m); setIsMuted(m); } };
+  const toggleMute = () => {
+    if (localTrackRef.current) {
+      const m = !isMuted;
+      localTrackRef.current.setEnabled(!m);
+      setIsMuted(m);
+      clearTimeout(autoMuteRef.current);
+      if (!m) {
+        // Auto-mute after 2 minutes of having mic on
+        autoMuteRef.current = setTimeout(() => {
+          if (localTrackRef.current) {
+            localTrackRef.current.setEnabled(false);
+            setIsMuted(true);
+          }
+        }, 2 * 60 * 1000);
+      }
+    }
+  };
   const toggleDeafen = () => { clientRef.current?.remoteUsers?.forEach(u => { u.audioTrack && (isDeafened ? u.audioTrack.play() : u.audioTrack.stop()); }); setIsDeafened(!isDeafened); };
   const joinSeat = async (i) => { try { await axios.post(`${API}/rooms/${roomId}/join`, null, { params: { user_id: user.id, seat_index: i } }); await joinAgora(); loadRoom(); } catch (e) { alert(e.response?.data?.detail || 'Error'); } };
   const leaveSeat = async () => { try { await axios.post(`${API}/rooms/${roomId}/leave`, null, { params: { user_id: user.id } }); await leaveAgora(); setMySeat(null); loadRoom(); } catch (e) {} };
@@ -323,16 +344,25 @@ const RoomView = ({ roomId, onBack }) => {
         </div>
       </div>
 
-      {/* AUDIO CONTROLS */}
-      {mySeat !== null && (
-        <div className="flex-shrink-0 bg-black border-t border-white/5 px-4 py-2">
-          <div className="flex items-center justify-center gap-5">
-            <button data-testid="toggle-mute-btn" onClick={toggleMute} className={`w-11 h-11 rounded-full flex items-center justify-center text-lg active:scale-90 ${isMuted ? 'bg-red-500/80' : 'bg-green-500/80'}`}>{isMuted ? '🔇' : '🎤'}</button>
-            <button data-testid="toggle-deafen-btn" onClick={toggleDeafen} className={`w-11 h-11 rounded-full flex items-center justify-center text-lg active:scale-90 ${isDeafened ? 'bg-orange-500/80' : 'bg-blue-500/80'}`}>{isDeafened ? '🔕' : '🔊'}</button>
-            <button data-testid="leave-seat-btn" onClick={leaveSeat} className="w-11 h-11 rounded-full bg-red-600/80 flex items-center justify-center text-lg active:scale-90">🚪</button>
-          </div>
+      {/* BOTTOM BAR - Always visible */}
+      <div className="flex-shrink-0 bg-black/90 border-t border-white/5 px-3 py-2">
+        <div className="flex items-center justify-center gap-3">
+          {/* Gift button - always visible */}
+          <button data-testid="gift-bottom-btn" onClick={() => {
+            const seated = room.seats.filter(s => s && s.user_id !== user.id);
+            if (seated.length > 0) { setGiftTarget(seated[0]); setPanel('gifts'); }
+            else { setPanel('sobres'); }
+          }} className="w-10 h-10 rounded-full bg-pink-500/80 flex items-center justify-center text-lg active:scale-90">🎁</button>
+
+          {mySeat !== null && (
+            <>
+              <button data-testid="toggle-mute-btn" onClick={toggleMute} className={`w-10 h-10 rounded-full flex items-center justify-center text-lg active:scale-90 ${isMuted ? 'bg-red-500/80' : 'bg-green-500/80'}`}>{isMuted ? '🔇' : '🎤'}</button>
+              <button data-testid="toggle-deafen-btn" onClick={toggleDeafen} className={`w-10 h-10 rounded-full flex items-center justify-center text-lg active:scale-90 ${isDeafened ? 'bg-orange-500/80' : 'bg-blue-500/80'}`}>{isDeafened ? '🔕' : '🔊'}</button>
+              <button data-testid="leave-seat-btn" onClick={leaveSeat} className="w-10 h-10 rounded-full bg-red-600/80 flex items-center justify-center text-lg active:scale-90">🚪</button>
+            </>
+          )}
         </div>
-      )}
+      </div>
     </div>
   );
 

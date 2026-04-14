@@ -147,21 +147,21 @@ const Dashboard = ({ onNavigate }) => {
 
     return (
     <div className="p-4">
-      {/* Weekly Family Star Banner - ANIMATED */}
-      <div className="bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 rounded-3xl p-6 mb-6 text-center overflow-hidden relative">
+      {/* Weekly Family Star Banner - COMPACT */}
+      <div className="bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 rounded-2xl p-4 mb-4 text-center overflow-hidden relative">
         <div className="absolute inset-0 opacity-20" style={{background: 'radial-gradient(circle at 50% 30%, #fbbf24 0%, transparent 70%)'}} />
         <div className="relative">
-          <div className="text-5xl mb-2" style={{animation: 'pulse 2s infinite'}}>🦁</div>
-          <h2 className="text-2xl font-bold text-yellow-400 mb-3" style={{textShadow: '0 0 20px rgba(234,179,8,0.5)'}}>
-            {isWeekOne ? 'Monthly Family Star' : 'Weekly Family Star'}
-          </h2>
-          {/* Rotating Top 3 */}
-          <div className="flex justify-center gap-3 transition-all" key={showIdx}>
+          <div className="flex items-center justify-center gap-2 mb-2">
+            <span className="text-3xl" style={{animation: 'pulse 2s infinite'}}>🦁</span>
+            <h2 className="text-lg font-bold text-yellow-400" style={{textShadow: '0 0 15px rgba(234,179,8,0.5)'}}>
+              {isWeekOne ? 'Monthly Family Star' : 'Weekly Family Star'}
+            </h2>
+          </div>
+          <div className="flex justify-center gap-2" key={showIdx}>
             {(isWeekOne ? topMonthly : topWeekly).slice(0, 3).map((c, i) => (
-              <div key={i} className="bg-white/10 rounded-xl px-3 py-2 backdrop-blur" style={{animation: `fadeIn 0.5s ease ${i * 0.15}s both`}}>
-                <div className="text-lg">{i === 0 ? '🥇' : i === 1 ? '🥈' : '🥉'}</div>
-                <div className="text-white text-xs font-bold">{c.name || 'N/A'}</div>
-                <div className="text-yellow-300 text-[10px]">{(c.weekly_coins || c.monthly_coins || 0).toLocaleString()}</div>
+              <div key={i} className="bg-white/10 rounded-lg px-2 py-1 backdrop-blur" style={{animation: `fadeIn 0.5s ease ${i * 0.15}s both`}}>
+                <span className="text-sm">{i === 0 ? '🥇' : i === 1 ? '🥈' : '🥉'}</span>
+                <span className="text-white text-[10px] font-bold ml-1">{c.name || 'N/A'}</span>
               </div>
             ))}
           </div>

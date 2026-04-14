@@ -655,6 +655,29 @@ const BotTab = ({ userId }) => {
         <p className="text-white/60 text-xs">Pregúntame lo que quieras o dame órdenes</p>
       </div>
 
+      {/* Voice Selector */}
+      <div className="bg-gray-800 rounded-xl p-3 mb-4">
+        <h4 className="text-white/70 text-xs font-bold mb-2">Voz del Bot (TTS)</h4>
+        <div className="grid grid-cols-4 gap-2">
+          {[
+            { id: 'hombre', label: 'Hombre', icon: '👨' },
+            { id: 'mujer', label: 'Mujer', icon: '👩' },
+            { id: 'animador', label: 'Animador', icon: '🎙️' },
+            { id: 'serio', label: 'Serio', icon: '🎩' },
+          ].map(v => (
+            <button key={v.id} onClick={() => {
+              localStorage.setItem('bot_voice', v.id);
+              axios.post(`${API}/admin/tts-voice?admin_id=${userId}&voice_id=${v.id}`);
+            }} className={`p-2 rounded-lg text-center text-[10px] transition-all ${
+              (localStorage.getItem('bot_voice') || 'hombre') === v.id ? 'bg-purple-600 text-white' : 'bg-white/5 text-white/60'
+            }`}>
+              <div className="text-lg">{v.icon}</div>
+              <div>{v.label}</div>
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* Quick Commands */}
       <div className="flex gap-2 mb-4 overflow-x-auto pb-2">
         {quickCommands.map((cmd, i) => (

@@ -76,8 +76,14 @@ async def register(user_data: UserRegister):
         raise HTTPException(status_code=400, detail="Usuario ya existe")
     
     user_id = str(uuid.uuid4())
+    import random as _rnd
+    numeric_id = str(_rnd.randint(100000, 999999))
+    while await db.users.find_one({"numeric_id": numeric_id}):
+        numeric_id = str(_rnd.randint(100000, 999999))
+    
     user_doc = {
         "id": user_id,
+        "numeric_id": numeric_id,
         "username": user_data.username,
         "password": hash_password(user_data.password),
         "level": 1,
@@ -121,6 +127,36 @@ async def get_user(user_id: str):
     if not user:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
     return serialize_user(user)
+
+
+@api_router.get("/users/search/{query}")
+async def search_user(query: str):
+    user = await db.users.find_one({"$or": [{"numeric_id": query}, {"username": {"$regex": query, "$options": "i"}}]})
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    return serialize_user(user)
+
+@api_router.get("/tts/voices")
+async def get_tts_voices():
+    return [
+        {"id": "hombre", "name": "Hombre", "lang": "es-ES", "pitch": 0.9, "rate": 1.0},
+        {"id": "mujer", "name": "Mujer", "lang": "es-ES", "pitch": 1.3, "rate": 1.0},
+        {"id": "animador", "name": "Animador", "lang": "es-MX", "pitch": 1.1, "rate": 1.15},
+        {"id": "serio", "name": "Serio", "lang": "es-ES", "pitch": 0.8, "rate": 0.95},
+    ]
+
+@api_router.post("/admin/tts-voice")
+async def set_tts_voice(admin_id: str, voice_id: str):
+    admin = await db.users.find_one({"id": admin_id})
+    if not admin or admin.get('role') != 'dueño':
+        raise HTTPException(status_code=403, detail="Solo el dueño")
+    await db.system.update_one({"key": "tts_voice"}, {"$set": {"key": "tts_voice", "voice_id": voice_id}}, upsert=True)
+    return {"success": True, "voice_id": voice_id}
+
+@api_router.get("/admin/tts-voice")
+async def get_tts_voice():
+    doc = await db.system.find_one({"key": "tts_voice"})
+    return {"voice_id": doc.get("voice_id", "hombre") if doc else "hombre"}
 
 @api_router.put("/users/{user_id}")
 async def update_user(user_id: str, updates: Dict[str, Any]):
@@ -1930,6 +1966,16 @@ async def get_chat(room_id: str, limit: int = 50, user_id: str = None):
     msgs = await db.room_chat.find(query).sort("created_at", -1).limit(limit).to_list(limit)
     msgs.reverse()
     return [{k: v for k, v in m.items() if k != "_id"} for m in msgs]
+
+@api_router.post("/rooms/{room_id}/mark-join")
+async def mark_join(room_id: str, user_id: str):
+    existing = await db.room_joins.find_one({"user_id": user_id, "room_id": room_id})
+    if not existing:
+        await db.room_joins.insert_one({
+            "user_id": user_id, "room_id": room_id,
+            "joined_at": datetime.now(timezone.utc).isoformat()
+        })
+    return {"success": True}
 
 @api_router.post("/rooms/{room_id}/welcome")
 async def welcome_message(room_id: str, user_id: str):
