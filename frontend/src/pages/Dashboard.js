@@ -11,13 +11,18 @@ const Dashboard = ({ onNavigate }) => {
   const [users, setUsers] = useState([]);
   const [subTab, setSubTab] = useState('popular');
   const [unreadCount, setUnreadCount] = useState(0);
+  const [weeklyClans, setWeeklyClans] = useState([]);
+  const [monthlyClans, setMonthlyClans] = useState([]);
+  const [starIndex, setStarIndex] = useState(0);
 
   useEffect(() => {
     loadRooms();
     loadUsers();
     loadUnreadCount();
+    loadClansRankings();
     const n = setInterval(loadUnreadCount, 10000);
-    return () => clearInterval(n);
+    const s = setInterval(() => setStarIndex(p => p + 1), 3000);
+    return () => { clearInterval(n); clearInterval(s); };
   }, []);
 
   const loadRooms = async () => {
@@ -42,6 +47,17 @@ const Dashboard = ({ onNavigate }) => {
     try {
       const res = await axios.get(`${API}/notifications/${user.id}/unread-count`);
       setUnreadCount(res.data.count || 0);
+    } catch (err) { console.error(err); }
+  };
+
+  const loadClansRankings = async () => {
+    try {
+      const [w, m] = await Promise.all([
+        axios.get(`${API}/rankings/weekly-clans`),
+        axios.get(`${API}/rankings/monthly-clans`)
+      ]);
+      setWeeklyClans(w.data);
+      setMonthlyClans(m.data);
     } catch (err) { console.error(err); }
   };
 
@@ -123,45 +139,62 @@ const Dashboard = ({ onNavigate }) => {
     </div>
   );
 
-  const renderPopular = () => (
-    <div className="p-4">
-      {/* Weekly Family Star Banner */}
-      <div className="bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 rounded-3xl p-8 mb-6 text-center">
-        <div className="text-6xl mb-3">🦁</div>
-        <h2 className="text-3xl font-bold text-yellow-400" style={{textShadow: '0 0 20px rgba(234,179,8,0.5)'}}>
-          Weekly Family Star
-        </h2>
-      </div>
+  const renderPopular = () => {
+    const topWeekly = weeklyClans.length > 0 ? weeklyClans : [{name: 'Sin datos'}];
+    const topMonthly = monthlyClans.length > 0 ? monthlyClans : [{name: 'Sin datos'}];
+    const showIdx = starIndex % 3;
+    const isWeekOne = new Date().getDate() <= 7;
 
-      {/* Ranking Cards */}
+    return (
+    <div className="p-4">
+      {/* Weekly Family Star Banner - ANIMATED */}
+      <div className="bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 rounded-3xl p-6 mb-6 text-center overflow-hidden relative">
+        <div className="absolute inset-0 opacity-20" style={{background: 'radial-gradient(circle at 50% 30%, #fbbf24 0%, transparent 70%)'}} />
+        <div className="relative">
+          <div className="text-5xl mb-2" style={{animation: 'pulse 2s infinite'}}>🦁</div>
+          <h2 className="text-2xl font-bold text-yellow-400 mb-3" style={{textShadow: '0 0 20px rgba(234,179,8,0.5)'}}>
+            {isWeekOne ? 'Monthly Family Star' : 'Weekly Family Star'}
+          </h2>
+          {/* Rotating Top 3 */}
+          <div className="flex justify-center gap-3 transition-all" key={showIdx}>
+            {(isWeekOne ? topMonthly : topWeekly).slice(0, 3).map((c, i) => (
+              <div key={i} className="bg-white/10 rounded-xl px-3 py-2 backdrop-blur" style={{animation: `fadeIn 0.5s ease ${i * 0.15}s both`}}>
+                <div className="text-lg">{i === 0 ? '🥇' : i === 1 ? '🥈' : '🥉'}</div>
+                <div className="text-white text-xs font-bold">{c.name || 'N/A'}</div>
+                <div className="text-yellow-300 text-[10px]">{(c.weekly_coins || c.monthly_coins || 0).toLocaleString()}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+      <style>{`@keyframes fadeIn { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }`}</style>
+
+      {/* Ranking Cards - with hover animations */}
       <div className="grid grid-cols-3 gap-3 mb-6">
-        {/* Lista TOP 3 */}
-        <div className="bg-gradient-to-b from-cyan-100 to-cyan-50 rounded-2xl p-4 text-center">
+        <div className="bg-gradient-to-b from-cyan-100 to-cyan-50 rounded-2xl p-4 text-center hover:scale-105 transition-transform">
           <h4 className="font-bold text-gray-800 mb-2">lista</h4>
           <div className="flex justify-center -space-x-2 mb-2">
-            <div className="w-10 h-10 rounded-full bg-blue-300 border-2 border-yellow-400 flex items-center justify-center text-sm">👩</div>
-            <div className="w-10 h-10 rounded-full bg-pink-300 border-2 border-yellow-400 flex items-center justify-center text-sm">👸</div>
-            <div className="w-10 h-10 rounded-full bg-purple-300 border-2 border-yellow-400 flex items-center justify-center text-sm">👩</div>
+            {users.slice(0, 3).map((u, i) => (
+              <img key={i} src={u.avatar} alt="" className="w-10 h-10 rounded-full border-2 border-yellow-400 object-cover" style={{animation: `fadeIn 0.3s ease ${i * 0.1}s both`}} />
+            ))}
           </div>
           <div className="text-sm font-bold text-gray-800">🔥 TOP 3 🔥</div>
         </div>
 
-        {/* Pareja */}
         <button data-testid="nav-parejas-btn" onClick={() => onNavigate('parejas')} className="bg-gradient-to-b from-pink-100 to-pink-50 rounded-2xl p-4 text-center hover:scale-105 transition-transform cursor-pointer">
           <h4 className="font-bold text-gray-800 mb-2">Pareja</h4>
           <div className="flex justify-center items-center gap-1 mb-2">
             <div className="w-10 h-10 rounded-full bg-blue-300 border-2 border-yellow-400 flex items-center justify-center text-sm">👤</div>
-            <div className="text-xl">💖</div>
+            <div className="text-xl" style={{animation: 'pulse 1.5s infinite'}}>💖</div>
             <div className="w-10 h-10 rounded-full bg-pink-300 border-2 border-yellow-400 flex items-center justify-center text-sm">👩</div>
           </div>
           <div className="text-sm font-bold text-pink-600">🔥 PAREJA 🔥</div>
         </button>
 
-        {/* Clan */}
         <button data-testid="nav-clanes-btn" onClick={() => onNavigate('clanes')} className="bg-gradient-to-b from-blue-100 to-blue-50 rounded-2xl p-4 text-center hover:scale-105 transition-transform cursor-pointer">
           <h4 className="font-bold text-gray-800 mb-2">Clan</h4>
           <div className="flex justify-center -space-x-2 mb-2">
-            <div className="w-10 h-10 rounded-full bg-yellow-300 border-2 border-yellow-400 flex items-center justify-center text-sm">🦁</div>
+            <div className="w-10 h-10 rounded-full bg-yellow-300 border-2 border-yellow-400 flex items-center justify-center text-sm" style={{animation: 'pulse 2s infinite'}}>🦁</div>
             <div className="w-10 h-10 rounded-full bg-blue-300 border-2 border-yellow-400 flex items-center justify-center text-sm">👤</div>
             <div className="w-10 h-10 rounded-full bg-pink-300 border-2 border-yellow-400 flex items-center justify-center text-sm">👩</div>
           </div>
@@ -226,6 +259,7 @@ const Dashboard = ({ onNavigate }) => {
       </div>
     </div>
   );
+  };
 
   const renderDescubrir = () => (
     <div className="p-4">

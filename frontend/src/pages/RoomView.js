@@ -50,7 +50,7 @@ const RoomView = ({ roomId, onBack }) => {
     try { const r = await axios.get(`${API}/rooms/${roomId}`); setRoom(r.data); const s = r.data.seats.findIndex(s => s?.user_id === user.id); setMySeat(s >= 0 ? s : null); } catch (e) {}
   };
   const loadChat = async () => {
-    try { const r = await axios.get(`${API}/rooms/${roomId}/chat?limit=30`); setChatMessages(r.data); } catch (e) {}
+    try { const r = await axios.get(`${API}/rooms/${roomId}/chat?limit=30&user_id=${user.id}`); setChatMessages(r.data); } catch (e) {}
   };
   const loadGifts = async () => { try { const r = await axios.get(`${API}/gifts`); setGifts(r.data); } catch (e) {} };
   const loadSobres = async () => { try { const r = await axios.get(`${API}/sobres`); setSobres(r.data); } catch (e) {} };
@@ -111,7 +111,16 @@ const RoomView = ({ roomId, onBack }) => {
     } catch (e) { alert('Error'); }
   };
 
-  if (!room) return <div className="h-screen bg-black flex items-center justify-center"><div className="text-white">Cargando...</div></div>;
+  const playMiniGame = async (gameId, cost) => {
+    try {
+      const r = await axios.post(`${API}/games/play`, { user_id: user.id, game: gameId, bet: cost || 500 });
+      if (r.data.new_balance !== undefined) updateUser({ coins: r.data.new_balance });
+      const msg = r.data.won ? `🎉 Ganaste ${(r.data.prize || 0).toLocaleString()} monedas!` : '😔 Perdiste. Intenta de nuevo!';
+      alert(msg);
+    } catch (e) { alert(e.response?.data?.detail || 'Error'); }
+  };
+
+  if (!room) return <div className="h-screen bg-gradient-to-b from-indigo-950 via-slate-900 to-gray-950 flex items-center justify-center"><div className="text-white">Cargando...</div></div>;
 
   const opened = cofresData?.cofres_opened || 0;
   const progress = cofresData?.cofre_progress || 0;
@@ -121,8 +130,13 @@ const RoomView = ({ roomId, onBack }) => {
   const currentProgress = Math.max(0, progress - accumulated);
   const progressPct = nextThreshold > 0 ? Math.min(100, (currentProgress / nextThreshold) * 100) : 100;
 
+  const bgStyle = room.background ? {
+    backgroundImage: `url(${room.background.startsWith('/api') ? process.env.REACT_APP_BACKEND_URL + room.background : room.background})`,
+    backgroundSize: 'cover', backgroundPosition: 'center'
+  } : {};
+
   return (
-    <div className="h-screen flex flex-col bg-black overflow-hidden relative">
+    <div className="h-screen flex flex-col overflow-hidden relative" style={{background: 'linear-gradient(to bottom, #1e1b4b, #0f172a, #111827)', ...bgStyle}}>
       {entryAnim && <EntryAnimation animation={entryAnim.animation} username={entryAnim.username} onComplete={() => setEntryAnim(null)} />}
 
       {/* PANEL OVERLAY */}
@@ -130,7 +144,7 @@ const RoomView = ({ roomId, onBack }) => {
         <div className="absolute inset-0 z-50 bg-black/80 flex items-end" onClick={() => { setPanel(null); setGiftTarget(null); }}>
           <div className="w-full bg-gray-950 rounded-t-3xl p-4 max-h-[60vh] overflow-y-auto border-t border-white/10" onClick={e => e.stopPropagation()}>
             <div className="flex justify-between mb-3">
-              <h3 className="text-white font-bold text-sm">{panel === 'gifts' ? `Regalos → ${giftTarget?.username}` : panel === 'sobres' ? 'Lluvia de Oro' : 'Cofres'}</h3>
+              <h3 className="text-white font-bold text-sm">{panel === 'gifts' ? `Regalos → ${giftTarget?.username}` : panel === 'sobres' ? 'Lluvia de Oro' : panel === 'games' ? 'Juegos en Sala' : 'Cofres'}</h3>
               <button data-testid="close-panel" onClick={() => { setPanel(null); setGiftTarget(null); }} className="text-white/40">✕</button>
             </div>
 
@@ -176,6 +190,27 @@ const RoomView = ({ roomId, onBack }) => {
                 )}
               </div>
             )}
+
+            {panel === 'games' && (
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  { id: 'slots', name: 'Lucky 777', emoji: '🎰', cost: 1000, color: 'from-red-600/40 to-yellow-600/40' },
+                  { id: 'ruleta', name: 'Ruleta', emoji: '🎡', cost: 500, color: 'from-yellow-500/40 to-orange-600/40' },
+                  { id: 'dados', name: 'Dados', emoji: '🎲', cost: 500, color: 'from-red-500/40 to-pink-600/40' },
+                  { id: 'rps', name: 'PPT', emoji: '✊', cost: 500, color: 'from-green-500/40 to-emerald-600/40' },
+                  { id: 'trivia', name: 'Trivia', emoji: '❓', cost: 500, color: 'from-blue-500/40 to-indigo-600/40' },
+                  { id: 'carta', name: 'Carta Mayor', emoji: '🃏', cost: 500, color: 'from-purple-500/40 to-violet-600/40' },
+                ].map(g => (
+                  <button key={g.id} data-testid={`game-${g.id}`} onClick={() => playMiniGame(g.id, g.cost)}
+                    className={`bg-gradient-to-b ${g.color} border border-white/10 rounded-xl p-3 text-center active:scale-95 transition-all`}>
+                    <div className="text-3xl mb-1">{g.emoji}</div>
+                    <div className="text-white text-xs font-bold">{g.name}</div>
+                    <div className="text-yellow-300 text-[9px]">{g.cost.toLocaleString()} coins</div>
+                  </button>
+                ))}
+              </div>
+            )}
+
             <p className="text-yellow-400/50 text-[10px] text-center mt-2">Tus monedas: {(user.coins || 0).toLocaleString()}</p>
           </div>
         </div>

@@ -1586,19 +1586,80 @@ async def throw_sobre(data: SobreData):
     updated = await db.users.find_one({"id": data.sender_id})
     return {"success": True, "per_person": per_person, "recipients": recipients, "new_balance": updated['coins']}
 
+# ==================== ROOM BACKGROUND & MUSIC ====================
+
+@api_router.post("/rooms/{room_id}/background")
+async def set_room_background(room_id: str, owner_id: str, file: UploadFile = File(...)):
+    room = await db.rooms.find_one({"id": room_id})
+    if not room:
+        raise HTTPException(status_code=404, detail="Sala no encontrada")
+    if room.get('owner_id') != owner_id:
+        owner = await db.users.find_one({"id": owner_id})
+        if not owner or owner.get('role') != 'dueño':
+            raise HTTPException(status_code=403, detail="Solo el dueño de la sala")
+    ext = file.filename.split('.')[-1].lower() if '.' in file.filename else 'png'
+    if ext not in ['jpg', 'jpeg', 'png', 'webp', 'gif']:
+        raise HTTPException(status_code=400, detail="Solo imagenes")
+    fid = str(uuid.uuid4())
+    fname = f"bg_{fid}.{ext}"
+    content = await file.read()
+    with open(UPLOAD_DIR / fname, "wb") as f:
+        f.write(content)
+    bg_url = f"/api/uploads/{fname}"
+    await db.rooms.update_one({"id": room_id}, {"$set": {"background": bg_url}})
+    return {"success": True, "background": bg_url}
+
+@api_router.post("/rooms/{room_id}/music")
+async def set_room_music(room_id: str, owner_id: str, file: UploadFile = File(...)):
+    room = await db.rooms.find_one({"id": room_id})
+    if not room:
+        raise HTTPException(status_code=404, detail="Sala no encontrada")
+    if room.get('owner_id') != owner_id:
+        owner = await db.users.find_one({"id": owner_id})
+        if not owner or owner.get('role') != 'dueño':
+            raise HTTPException(status_code=403, detail="Solo el dueño de la sala")
+    ext = file.filename.split('.')[-1].lower() if '.' in file.filename else 'mp3'
+    if ext not in ['mp3', 'wav', 'ogg', 'aac', 'm4a']:
+        raise HTTPException(status_code=400, detail="Solo audio: mp3, wav, ogg")
+    fid = str(uuid.uuid4())
+    fname = f"music_{fid}.{ext}"
+    content = await file.read()
+    with open(UPLOAD_DIR / fname, "wb") as f:
+        f.write(content)
+    music_url = f"/api/uploads/{fname}"
+    await db.rooms.update_one({"id": room_id}, {"$set": {"music_url": music_url}})
+    return {"success": True, "music_url": music_url}
+
+@api_router.delete("/rooms/{room_id}/music")
+async def remove_room_music(room_id: str, owner_id: str):
+    await db.rooms.update_one({"id": room_id}, {"$unset": {"music_url": ""}})
+    return {"success": True}
+
+# ==================== WEEKLY/MONTHLY RANKINGS ====================
+
+@api_router.get("/rankings/weekly-clans")
+async def get_weekly_clans():
+    clans = await db.clanes.find().sort("weekly_coins", -1).limit(3).to_list(3)
+    return [{k: v for k, v in c.items() if k != "_id"} for c in clans]
+
+@api_router.get("/rankings/monthly-clans")
+async def get_monthly_clans():
+    clans = await db.clanes.find().sort("monthly_coins", -1).limit(3).to_list(3)
+    return [{k: v for k, v in c.items() if k != "_id"} for c in clans]
+
 # ==================== COFRES ACUMULATIVOS ====================
 
 COFRE_THRESHOLDS = [
-    {"level": 1, "threshold": 300000, "label": "300K", "prize_pool": 200000},
-    {"level": 2, "threshold": 500000, "label": "500K", "prize_pool": 350000},
-    {"level": 3, "threshold": 1000000, "label": "1M", "prize_pool": 700000},
-    {"level": 4, "threshold": 2500000, "label": "2.5M", "prize_pool": 1750000},
-    {"level": 5, "threshold": 5000000, "label": "5M", "prize_pool": 3500000},
-    {"level": 6, "threshold": 7000000, "label": "7M", "prize_pool": 5000000},
-    {"level": 7, "threshold": 10000000, "label": "10M", "prize_pool": 7000000},
-    {"level": 8, "threshold": 15000000, "label": "15M", "prize_pool": 10000000},
-    {"level": 9, "threshold": 20000000, "label": "20M", "prize_pool": 14000000},
-    {"level": 10, "threshold": 20000000, "label": "20M", "prize_pool": 15000000},
+    {"level": 1, "threshold": 300000, "label": "300K", "return_pct": 0.03},
+    {"level": 2, "threshold": 500000, "label": "500K", "return_pct": 0.04},
+    {"level": 3, "threshold": 1000000, "label": "1M", "return_pct": 0.03},
+    {"level": 4, "threshold": 2500000, "label": "2.5M", "return_pct": 0.05},
+    {"level": 5, "threshold": 5000000, "label": "5M", "return_pct": 0.06},
+    {"level": 6, "threshold": 7000000, "label": "7M", "return_pct": 0.06},
+    {"level": 7, "threshold": 10000000, "label": "10M", "return_pct": 0.07},
+    {"level": 8, "threshold": 15000000, "label": "15M", "return_pct": 0.08},
+    {"level": 9, "threshold": 20000000, "label": "20M", "return_pct": 0.09},
+    {"level": 10, "threshold": 20000000, "label": "20M", "return_pct": 0.10},
 ]
 
 @api_router.get("/rooms/{room_id}/cofres")
@@ -1627,7 +1688,7 @@ async def try_open_cofre(room_id: str):
     seated = [s for s in room.get('seats', []) if s]
     if not seated:
         return {"opened": False, "message": "Nadie en la sala"}
-    pool = cofre['prize_pool']
+    pool = int(cofre['threshold'] * cofre['return_pct'])
     prizes_split = [0.4, 0.25, 0.15] + [0.2 / max(len(seated) - 3, 1)] * max(len(seated) - 3, 0)
     results = []
     for i, s in enumerate(seated):
@@ -1860,8 +1921,13 @@ async def send_chat(room_id: str, msg: ChatMessage):
     return chat_doc
 
 @api_router.get("/rooms/{room_id}/chat")
-async def get_chat(room_id: str, limit: int = 50):
-    msgs = await db.room_chat.find({"room_id": room_id}).sort("created_at", -1).limit(limit).to_list(limit)
+async def get_chat(room_id: str, limit: int = 50, user_id: str = None):
+    query = {"room_id": room_id}
+    if user_id:
+        join_record = await db.room_joins.find_one({"user_id": user_id, "room_id": room_id})
+        if join_record and join_record.get("joined_at"):
+            query["created_at"] = {"$gte": join_record["joined_at"]}
+    msgs = await db.room_chat.find(query).sort("created_at", -1).limit(limit).to_list(limit)
     msgs.reverse()
     return [{k: v for k, v in m.items() if k != "_id"} for m in msgs]
 
@@ -1902,6 +1968,13 @@ async def welcome_message(room_id: str, user_id: str):
         "created_at": datetime.now(timezone.utc).isoformat()
     }
     await db.room_chat.insert_one(welcome_doc)
+    
+    # Save join time so user only sees messages from now
+    await db.room_joins.update_one(
+        {"user_id": user_id, "room_id": room_id},
+        {"$set": {"joined_at": datetime.now(timezone.utc).isoformat()}},
+        upsert=True
+    )
     
     # Notification hook: invitation strategy - notify others that someone is live
     room = await db.rooms.find_one({"id": room_id})

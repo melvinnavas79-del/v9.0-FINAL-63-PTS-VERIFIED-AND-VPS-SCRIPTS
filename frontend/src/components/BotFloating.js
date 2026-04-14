@@ -26,15 +26,20 @@ const BotFloating = ({ userId, userRole }) => {
     if (SR) {
       const recog = new SR();
       recog.lang = 'es-ES';
-      recog.continuous = false;
+      recog.continuous = true;
       recog.interimResults = false;
       recog.onresult = (e) => {
-        const text = e.results[0][0].transcript;
+        const text = e.results[e.results.length - 1][0].transcript;
         setListening(false);
         handleSend(text);
       };
-      recog.onerror = () => setListening(false);
-      recog.onend = () => setListening(false);
+      recog.onerror = (ev) => { if (ev.error !== 'no-speech') setListening(false); };
+      recog.onend = () => {
+        // Auto restart if in continuous mode
+        if (recognitionRef.current?._keepListening) {
+          try { recognitionRef.current.start(); } catch(e) {}
+        } else { setListening(false); }
+      };
       recognitionRef.current = recog;
     }
   }, []);
@@ -102,6 +107,7 @@ const BotFloating = ({ userId, userRole }) => {
       try {
         window.speechSynthesis.cancel();
         setSpeaking(false);
+        recognitionRef.current._keepListening = true;
         recognitionRef.current.start();
         setListening(true);
       } catch (e) { console.error(e); }
@@ -109,7 +115,8 @@ const BotFloating = ({ userId, userRole }) => {
   };
 
   const stopListening = () => {
-    if (recognitionRef.current && listening) {
+    if (recognitionRef.current) {
+      recognitionRef.current._keepListening = false;
       recognitionRef.current.stop();
       setListening(false);
     }
