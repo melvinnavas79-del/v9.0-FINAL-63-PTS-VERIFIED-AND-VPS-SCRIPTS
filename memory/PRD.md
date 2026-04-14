@@ -1,25 +1,29 @@
 # Lluvia Live - PRD
 
 ## Implementado
-- [x] Agora.io Audio (mic muted por defecto al sentarse)
-- [x] Sala profesional con Cofres, Juegos, Sobres dentro
-- [x] 10 Cofres del Tesoro: 300K, 500K, 1M, 2.5M, 5M, 7M, 10M, 15M, 20M, 20M
-- [x] 7 Sobres de regalo: 10K a 10M
-- [x] 8 Regalos clasicos + 7 Sobres = 15 regalos totales
-- [x] Mini juegos dentro de sala (Ruleta, Dados, PPT)
-- [x] Bot autonomo en salas (habla solo con la gente)
-- [x] Bot amigo personal (cualquier tema como Gemini)
-- [x] Bot con memoria persistente (finanzas, notas)
-- [x] Bot habla en salas por chat
-- [x] Bot vigila palabras clave + alertas
-- [x] Clanes, Parejas CP, Notificaciones
-- [x] Panel de Control, Tienda Stripe
-- [x] PWA, iOS, Android, VPS scripts
+- [x] Agora.io Audio (mic muted, auto-mute 2 min)
+- [x] Sala profesional con fondo azul oscuro
+- [x] 10 Cofres acumulativos: 3%, 4%, 3%, 5%, 6%, 6%, 7%, 8%, 9%, 10%
+- [x] 7 Sobres lluvia de oro (10K-10M)
+- [x] 15 regalos totales + boton 🎁 siempre visible
+- [x] 6 juegos en sala: Lucky 777, Ruleta, Dados, PPT, Trivia, Carta Mayor
+- [x] Chat se borra al entrar (privado)
+- [x] Fondos personalizados y musica en salas
+- [x] ID unico por usuario (#6 digitos) + busqueda
+- [x] Selector de voces TTS (Hombre/Mujer/Animador/Serio) en Panel
+- [x] Bot autonomo, amigo personal, memoria, voz continua
+- [x] Dashboard animado con Weekly/Monthly Family Star compacto
+- [x] Clanes, Parejas, Notificaciones
+- [x] Panel de Control con voces
 - [x] Marca Emergent eliminada
 
-## Backlog
-- P0: Ludo WebView
-- P2: Refactorizar server.py
+## Pendiente (siguiente ronda)
+- Eventos King 1/2/3 (tragamonedas)
+- Eventos CP nivel 6/7
+- Sistema de aprobacion de eventos
+- Evento rapido sin aprobacion
+- Panel para cambiar pagos/tiempos/retornos
+- Sistema retorno semanal
 
 ## Credenciales
-- Melvin_Live / test123
+- Melvin_Live / test123 (ID #464599)
