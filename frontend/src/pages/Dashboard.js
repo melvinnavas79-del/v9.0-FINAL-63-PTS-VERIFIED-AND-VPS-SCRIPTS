@@ -238,12 +238,12 @@ const Dashboard = ({ onNavigate }) => {
                 alt={u.username}
                 className="w-14 h-14 rounded-full border-2 border-blue-200 object-cover"
               />
-              <div className="flex-1">
-                <div className="flex items-center gap-2 mb-1">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-1 mb-1 flex-wrap">
                   <span className="text-blue-500">🦋</span>
-                  <span className="font-bold text-gray-800">{u.username}</span>
+                  <span className="font-bold text-gray-800 text-sm truncate max-w-[120px]">{u.username}</span>
                   <span className="text-blue-500">🦋</span>
-                  <span className="bg-orange-400 text-white text-xs px-2 py-0.5 rounded-full font-bold">FRIENDS</span>
+                  <span className="bg-orange-400 text-white text-[10px] px-1.5 py-0.5 rounded-full font-bold">FRIENDS</span>
                 </div>
                 <div className="flex gap-1 mb-1">
                   <span>🇨🇴</span>
@@ -252,9 +252,10 @@ const Dashboard = ({ onNavigate }) => {
                 </div>
                 <p className="text-gray-500 text-sm truncate">Nunca hagas cosas que después ...</p>
               </div>
-              <div className="text-right">
-                <div className="text-blue-500 font-bold flex items-center gap-1">
-                  <span className="text-lg">📊</span> {u.coins?.toLocaleString() || 0}
+              <div className="text-right flex-shrink-0">
+                <div className="text-blue-500 font-bold flex items-center gap-1 text-sm">
+                  <span className="text-base">📊</span>
+                  <span className="whitespace-nowrap">{u.coins >= 1e9 ? `${(u.coins/1e9).toFixed(1)}B` : u.coins >= 1e6 ? `${(u.coins/1e6).toFixed(1)}M` : u.coins?.toLocaleString() || 0}</span>
                 </div>
               </div>
             </div>
