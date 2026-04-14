@@ -1092,6 +1092,48 @@ TRIVIA_QUESTIONS = [
     {"question": "¿Cuál es el país más grande del mundo?", "options": ["China", "Canadá", "Rusia", "EE.UU."], "correct": 2},
 ]
 
+class GenericPlay(BaseModel):
+    user_id: str
+    game: str
+    bet: int = 500
+
+@api_router.post("/games/play")
+async def play_generic(play: GenericPlay):
+    user = await db.users.find_one({"id": play.user_id})
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    if user.get('coins', 0) < play.bet:
+        raise HTTPException(status_code=400, detail="Monedas insuficientes")
+    
+    import random
+    
+    if play.game == 'cofre':
+        # Cofres: 35% chance to win 1.5x-3x the cost
+        await db.users.update_one({"id": play.user_id}, {"$inc": {"coins": -play.bet}})
+        won = random.random() < 0.35
+        if won:
+            multiplier = random.choice([1.5, 2.0, 2.5, 3.0])
+            prize = int(play.bet * multiplier)
+            await db.users.update_one({"id": play.user_id}, {"$inc": {"coins": prize}})
+            updated = await db.users.find_one({"id": play.user_id})
+            return {"won": True, "prize": prize, "multiplier": multiplier, "new_balance": updated['coins']}
+        updated = await db.users.find_one({"id": play.user_id})
+        return {"won": False, "prize": 0, "new_balance": updated['coins']}
+    
+    elif play.game in ('ruleta', 'dados', 'rps'):
+        await db.users.update_one({"id": play.user_id}, {"$inc": {"coins": -play.bet}})
+        won = random.random() < 0.4
+        if won:
+            mult = random.choice([2, 3, 5])
+            prize = play.bet * mult
+            await db.users.update_one({"id": play.user_id}, {"$inc": {"coins": prize}})
+            updated = await db.users.find_one({"id": play.user_id})
+            return {"won": True, "prize": prize, "new_balance": updated['coins']}
+        updated = await db.users.find_one({"id": play.user_id})
+        return {"won": False, "prize": 0, "new_balance": updated['coins']}
+    
+    raise HTTPException(status_code=400, detail="Juego no válido")
+
 @api_router.post("/games/ruleta")
 async def play_ruleta(bet: GameBet):
     user = await db.users.find_one({"id": bet.user_id})
@@ -1401,13 +1443,20 @@ class GiftSend(BaseModel):
 
 GIFTS = {
     "rosa": {"name": "Rosa", "emoji": "🌹", "cost": 100, "value": 80},
-    "corazon": {"name": "Corazón", "emoji": "❤️", "cost": 500, "value": 400},
+    "corazon": {"name": "Corazon", "emoji": "❤️", "cost": 500, "value": 400},
     "diamante": {"name": "Diamante", "emoji": "💎", "cost": 5000, "value": 4000},
     "corona": {"name": "Corona", "emoji": "👑", "cost": 10000, "value": 8000},
-    "dragon": {"name": "Dragón", "emoji": "🐉", "cost": 50000, "value": 40000},
+    "dragon": {"name": "Dragon", "emoji": "🐉", "cost": 50000, "value": 40000},
     "castillo": {"name": "Castillo", "emoji": "🏰", "cost": 100000, "value": 80000},
     "lluvia_oro": {"name": "Lluvia de Oro", "emoji": "🌧️💰", "cost": 500000, "value": 400000},
     "mega_crown": {"name": "Mega Corona", "emoji": "👑💎", "cost": 1000000, "value": 800000},
+    "sobre_10k": {"name": "Sobre 10K", "emoji": "💌", "cost": 10000, "value": 8000},
+    "sobre_50k": {"name": "Sobre 50K", "emoji": "💝", "cost": 50000, "value": 40000},
+    "sobre_100k": {"name": "Sobre 100K", "emoji": "🎁", "cost": 100000, "value": 80000},
+    "sobre_500k": {"name": "Sobre 500K", "emoji": "🎀", "cost": 500000, "value": 400000},
+    "sobre_1m": {"name": "Sobre 1M", "emoji": "🧧", "cost": 1000000, "value": 800000},
+    "sobre_5m": {"name": "Sobre 5M", "emoji": "💰", "cost": 5000000, "value": 4000000},
+    "sobre_10m": {"name": "Sobre 10M", "emoji": "💎", "cost": 10000000, "value": 8000000},
 }
 
 @api_router.get("/gifts")
