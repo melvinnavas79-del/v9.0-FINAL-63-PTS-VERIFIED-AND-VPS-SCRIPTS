@@ -3,6 +3,7 @@ import axios from 'axios';
 import AgoraRTC from 'agora-rtc-sdk-ng';
 import { useUser } from '../contexts/UserContext';
 import { EntryAnimation, ProfileFrame } from '../components/Animations';
+import RoomGames from '../components/RoomGames';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -36,7 +37,7 @@ const RoomView = ({ roomId, onBack }) => {
 
   useEffect(() => {
     leaveAgora();
-    loadRoom(); loadChat(); loadGifts(); loadSobres(); loadCofres(); checkBotActive(); loadMyEvents(); loadPendingRequests();
+    loadRoom(); loadChat(); loadGifts(); loadSobres(); loadCofres(); checkBotActive(); loadMyEvents(); loadPendingRequests(); loadPK();
     const r = setInterval(loadRoom, 3000);
     const c = setInterval(loadChat, 2000);
     const cf = setInterval(loadCofres, 5000);
@@ -186,6 +187,7 @@ const RoomView = ({ roomId, onBack }) => {
   const [eventPanel, setEventPanel] = useState(false);
   const [myEvents, setMyEvents] = useState([]);
   const [pendingRequests, setPendingRequests] = useState([]);
+  const [pkBattle, setPkBattle] = useState(null);
 
   const playMiniGame = async (gameId, cost) => {
     setGameResult(null);
@@ -230,6 +232,38 @@ const RoomView = ({ roomId, onBack }) => {
       alert('Evento rechazado.');
       loadPendingRequests();
     } catch (e) { alert(e.response?.data?.detail || 'Error'); }
+  };
+
+  const startPK = async (opponentSeat) => {
+    const betStr = prompt('Apuesta para PK Battle (monedas):');
+    if (!betStr) return;
+    const betAmt = parseInt(betStr);
+    if (isNaN(betAmt) || betAmt < 1000) return alert('Minimo 1000 monedas');
+    try {
+      const r = await axios.post(`${API}/games/pk-battle`, {
+        room_id: roomId, challenger_id: user.id,
+        opponent_id: opponentSeat.user_id, bet_amount: betAmt
+      });
+      setPkBattle(r.data.battle);
+      loadChat();
+    } catch (e) { alert(e.response?.data?.detail || 'Error'); }
+  };
+
+  const endPK = async () => {
+    if (!pkBattle) return;
+    try {
+      const r = await axios.post(`${API}/games/pk-battle/${pkBattle.id}/end`);
+      alert(r.data.result === 'tie' ? 'Empate! Se devolvieron las apuestas.' : `${r.data.winner} gana +${r.data.prize?.toLocaleString()}`);
+      setPkBattle(null);
+      loadChat();
+    } catch (e) { alert(e.response?.data?.detail || 'Error'); }
+  };
+
+  const loadPK = async () => {
+    try {
+      const r = await axios.get(`${API}/games/pk-battle/${roomId}`);
+      if (r.data) setPkBattle(r.data);
+    } catch (e) {}
   };
 
   if (!room) return <div className="h-screen bg-gradient-to-b from-indigo-950 via-slate-900 to-gray-950 flex items-center justify-center"><div className="text-white">Cargando...</div></div>;
@@ -477,33 +511,17 @@ const RoomView = ({ roomId, onBack }) => {
             )}
 
             {panel === 'games' && (
-              <>
-                {gameResult && (
-                  <div className={`text-center p-3 rounded-xl mb-3 ${gameResult.won ? 'bg-yellow-500/20 border border-yellow-500/30' : 'bg-red-500/20 border border-red-500/30'}`}>
-                    <div className="text-2xl mb-1">{gameResult.won ? '🏆' : '💨'}</div>
-                    <div className={`font-bold text-sm ${gameResult.won ? 'text-yellow-300' : 'text-red-300'}`}>
-                      {gameResult.error || (gameResult.won ? `+${(gameResult.prize || 0).toLocaleString()} (x${gameResult.multiplier})` : 'Perdiste! Intenta')}
-                    </div>
-                  </div>
-                )}
-                <div className="grid grid-cols-3 gap-2">
-                {[
-                  { id: 'slots', name: 'Lucky 777', emoji: '🎰', cost: 1000, color: 'from-red-600/40 to-yellow-600/40' },
-                  { id: 'ruleta', name: 'Ruleta', emoji: '🎡', cost: 500, color: 'from-yellow-500/40 to-orange-600/40' },
-                  { id: 'dados', name: 'Dados', emoji: '🎲', cost: 500, color: 'from-red-500/40 to-pink-600/40' },
-                  { id: 'rps', name: 'PPT', emoji: '✊', cost: 500, color: 'from-green-500/40 to-emerald-600/40' },
-                  { id: 'trivia', name: 'Trivia', emoji: '❓', cost: 500, color: 'from-blue-500/40 to-indigo-600/40' },
-                  { id: 'carta', name: 'Carta Mayor', emoji: '🃏', cost: 500, color: 'from-purple-500/40 to-violet-600/40' },
-                ].map(g => (
-                  <button key={g.id} data-testid={`game-${g.id}`} onClick={() => playMiniGame(g.id, g.cost)}
-                    className={`bg-gradient-to-b ${g.color} border border-white/10 rounded-xl p-3 text-center active:scale-95 transition-all`}>
-                    <div className="text-3xl mb-1">{g.emoji}</div>
-                    <div className="text-white text-xs font-bold">{g.name}</div>
-                    <div className="text-yellow-300 text-[9px]">{g.cost.toLocaleString()} coins</div>
-                  </button>
-                ))}
-                </div>
-              </>
+              <RoomGames
+                userId={user.id}
+                userCoins={user.coins || 0}
+                onResult={(data) => {
+                  if (data.new_balance !== undefined) updateUser({ coins: data.new_balance });
+                  setGameResult(data);
+                  setTimeout(() => setGameResult(null), 4000);
+                }}
+                onClose={() => setPanel(null)}
+                onPlayClassic={(gameId, cost) => playMiniGame(gameId, cost)}
+              />
             )}
 
             {/* TIENDA */}
@@ -586,6 +604,27 @@ const RoomView = ({ roomId, onBack }) => {
           </div>
         </div>
       </div>
+
+      {/* PK BATTLE BANNER */}
+      {pkBattle && pkBattle.status === 'active' && (
+        <div className="flex-shrink-0 px-3 mb-1">
+          <div className="bg-gradient-to-r from-red-600/30 to-orange-600/30 border border-red-500/30 rounded-xl p-2 flex items-center justify-between" style={{animation: 'pulse 1.5s infinite'}}>
+            <div className="flex items-center gap-2">
+              <span className="text-lg">⚔️</span>
+              <div>
+                <div className="text-white text-[10px] font-bold">PK BATTLE</div>
+                <div className="text-white/60 text-[8px]">{pkBattle.challenger_name} vs {pkBattle.opponent_name}</div>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="text-yellow-400 text-[10px] font-bold">{pkBattle.challenger_gifts?.toLocaleString()} vs {pkBattle.opponent_gifts?.toLocaleString()}</div>
+              {user.role === 'dueño' && (
+                <button onClick={endPK} className="bg-red-600 text-white px-2 py-1 rounded-lg text-[9px] font-bold">Finalizar</button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* SEATS */}
       <div className="flex-shrink-0 px-3 mb-1 overflow-y-auto" style={{maxHeight: '32vh'}}>
@@ -687,6 +726,14 @@ const RoomView = ({ roomId, onBack }) => {
             <button data-testid="bot-toggle-bottom" onClick={toggleBot}
               className={`w-9 h-9 rounded-full flex items-center justify-center text-sm active:scale-90 border-2 ${botOn ? 'bg-green-500 border-green-400' : 'bg-gray-700 border-gray-600'}`}>🤖</button>
           )}
+
+          {/* PK Battle */}
+          <button data-testid="pk-battle-btn" onClick={() => {
+            const others = room.seats.filter(s => s && s.user_id !== user.id);
+            if (others.length === 0) return alert('No hay otros usuarios en la sala');
+            startPK(others[0]);
+          }}
+            className="w-9 h-9 rounded-full bg-red-600 flex items-center justify-center text-sm active:scale-90 border-2 border-red-400">⚔️</button>
         </div>
         {room.music_url && (
           <audio src={room.music_url.startsWith('/api') ? `${process.env.REACT_APP_BACKEND_URL}${room.music_url}` : room.music_url} autoPlay loop className="hidden" />
