@@ -424,7 +424,7 @@ const Dashboard = ({ onNavigate }) => {
       </div>
 
       {/* Content */}
-      <div className="pb-24">
+      <div className="pb-28">
         {activeTab === 'mio' && renderMio()}
         {activeTab === 'popular' && renderPopular()}
         {activeTab === 'descubrir' && renderDescubrir()}
@@ -432,59 +432,59 @@ const Dashboard = ({ onNavigate }) => {
       </div>
 
       {/* Bottom Navigation */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-2 py-2 z-50">
+      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-2 py-3 z-50 safe-area-bottom">
         <div className="flex items-center justify-around max-w-lg mx-auto">
           <button
             data-testid="nav-sala-btn"
             onClick={openMyRoom}
-            className="flex flex-col items-center gap-1"
+            className="flex flex-col items-center gap-1 min-w-[60px] py-1"
           >
-            <div className="w-12 h-12 bg-gradient-to-r from-cyan-400 to-blue-500 rounded-full flex items-center justify-center">
-              <span className="text-white text-xl">🎤</span>
+            <div className="w-14 h-14 bg-gradient-to-r from-cyan-400 to-blue-500 rounded-full flex items-center justify-center shadow-md">
+              <span className="text-white text-2xl">🎤</span>
             </div>
-            <span className="text-xs text-cyan-500 font-medium">por la sala</span>
+            <span className="text-[11px] text-cyan-500 font-semibold">por la sala</span>
           </button>
 
           <button
             onClick={() => onNavigate('games')}
-            className="flex flex-col items-center gap-1"
+            className="flex flex-col items-center gap-1 min-w-[60px] py-1"
           >
-            <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center">
-              <span className="text-2xl">🎮</span>
+            <div className="w-14 h-14 bg-gray-100 rounded-full flex items-center justify-center">
+              <span className="text-3xl">🎮</span>
             </div>
-            <span className="text-xs text-gray-500">Juegos</span>
+            <span className="text-[11px] text-gray-600 font-medium">Juegos</span>
           </button>
 
           <button
             onClick={() => onNavigate('reels')}
-            className="flex flex-col items-center gap-1"
+            className="flex flex-col items-center gap-1 min-w-[60px] py-1"
           >
-            <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center">
-              <span className="text-2xl">🎬</span>
+            <div className="w-14 h-14 bg-gray-100 rounded-full flex items-center justify-center">
+              <span className="text-3xl">🎬</span>
             </div>
-            <span className="text-xs text-gray-500">Momento</span>
+            <span className="text-[11px] text-gray-600 font-medium">Momento</span>
           </button>
 
           <button
             onClick={() => onNavigate('photos')}
-            className="flex flex-col items-center gap-1 relative"
+            className="flex flex-col items-center gap-1 min-w-[60px] py-1"
           >
-            <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center">
-              <span className="text-2xl">📸</span>
+            <div className="w-14 h-14 bg-gray-100 rounded-full flex items-center justify-center">
+              <span className="text-3xl">📸</span>
             </div>
-            <span className="text-xs text-gray-500">Fotos</span>
+            <span className="text-[11px] text-gray-600 font-medium">Fotos</span>
           </button>
 
           <button
             onClick={() => onNavigate('profile')}
-            className="flex flex-col items-center gap-1"
+            className="flex flex-col items-center gap-1 min-w-[60px] py-1"
           >
             <img
               src={user.avatar}
               alt="yo"
-              className="w-12 h-12 rounded-full border-2 border-gray-200 object-cover"
+              className="w-14 h-14 rounded-full border-2 border-gray-200 object-cover"
             />
-            <span className="text-xs text-gray-500">yo</span>
+            <span className="text-[11px] text-gray-600 font-medium">yo</span>
           </button>
         </div>
       </div>
