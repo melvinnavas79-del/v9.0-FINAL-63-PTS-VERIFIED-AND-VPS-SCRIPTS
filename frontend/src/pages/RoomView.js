@@ -36,7 +36,7 @@ const RoomView = ({ roomId, onBack }) => {
 
   useEffect(() => {
     leaveAgora();
-    loadRoom(); loadChat(); loadGifts(); loadSobres(); loadCofres(); checkBotActive();
+    loadRoom(); loadChat(); loadGifts(); loadSobres(); loadCofres(); checkBotActive(); loadMyEvents(); loadPendingRequests();
     const r = setInterval(loadRoom, 3000);
     const c = setInterval(loadChat, 2000);
     const cf = setInterval(loadCofres, 5000);
@@ -184,6 +184,8 @@ const RoomView = ({ roomId, onBack }) => {
   const [gameResult, setGameResult] = useState(null);
   const [zoomImg, setZoomImg] = useState(null);
   const [eventPanel, setEventPanel] = useState(false);
+  const [myEvents, setMyEvents] = useState([]);
+  const [pendingRequests, setPendingRequests] = useState([]);
 
   const playMiniGame = async (gameId, cost) => {
     setGameResult(null);
@@ -198,21 +200,35 @@ const RoomView = ({ roomId, onBack }) => {
     }
   };
 
-  const triggerKingEvent = async (level) => {
-    if (!window.confirm(`Activar KING ${level}? Esto repartira monedas a todos en la sala.`)) return;
+  const loadMyEvents = async () => {
+    try { const r = await axios.get(`${API}/events/my-events/${user.id}`); setMyEvents(r.data); } catch (e) {}
+  };
+  const loadPendingRequests = async () => {
+    if (user.role !== 'dueño') return;
+    try { const r = await axios.get(`${API}/events/requests?admin_id=${user.id}&status=pending`); setPendingRequests(r.data); } catch (e) {}
+  };
+
+  const requestEvent = async (eventType) => {
     try {
-      const r = await axios.post(`${API}/events/king-room?admin_id=${user.id}&room_id=${roomId}&level=${level}`);
-      alert(`King ${level} activado! ${r.data.per_user.toLocaleString()} monedas para cada uno de ${r.data.users} usuarios.`);
-      loadChat(); loadRoom();
+      await axios.post(`${API}/events/request`, { user_id: user.id, event_type: eventType });
+      alert('Solicitud enviada! Espera la aprobacion del administrador.');
+      loadMyEvents();
     } catch (e) { alert(e.response?.data?.detail || 'Error'); }
   };
 
-  const triggerCPEvent = async (level) => {
-    if (!window.confirm(`Activar CP Nivel ${level}? Esto dara 5M a cada usuario en la sala.`)) return;
+  const approveRequest = async (reqId) => {
     try {
-      const r = await axios.post(`${API}/events/cp-room?admin_id=${user.id}&room_id=${roomId}&level=${level}`);
-      alert(`CP Nivel ${level} activado! 5M para cada uno de ${r.data.users} usuarios.`);
-      loadChat(); loadRoom();
+      await axios.post(`${API}/events/approve/${reqId}?admin_id=${user.id}`);
+      alert('Evento aprobado!');
+      loadPendingRequests();
+    } catch (e) { alert(e.response?.data?.detail || 'Error'); }
+  };
+
+  const rejectRequest = async (reqId) => {
+    try {
+      await axios.post(`${API}/events/reject/${reqId}?admin_id=${user.id}`);
+      alert('Evento rechazado.');
+      loadPendingRequests();
     } catch (e) { alert(e.response?.data?.detail || 'Error'); }
   };
 
@@ -264,47 +280,111 @@ const RoomView = ({ roomId, onBack }) => {
         </div>
       )}
 
-      {/* EVENTS PANEL */}
-      {eventPanel && user.role === 'dueño' && (
+      {/* EVENTS PANEL - Request based */}
+      {eventPanel && (
         <div className="absolute inset-0 z-50 bg-black/80 flex items-end" onClick={() => setEventPanel(false)}>
-          <div className="w-full bg-gray-950 rounded-t-3xl p-4 border-t border-white/10" onClick={e => e.stopPropagation()}>
+          <div className="w-full bg-gray-950 rounded-t-3xl p-4 max-h-[70vh] overflow-y-auto border-t border-white/10" onClick={e => e.stopPropagation()}>
             <div className="flex justify-between mb-3">
-              <h3 className="text-white font-bold text-sm">Eventos en Sala</h3>
+              <h3 className="text-white font-bold text-sm">Eventos</h3>
               <button onClick={() => setEventPanel(false)} className="text-white/40">✕</button>
             </div>
-            <div className="space-y-2">
-              <h4 className="text-yellow-400 text-xs font-bold">👑 King Events</h4>
-              <div className="grid grid-cols-3 gap-2">
-                <button onClick={() => triggerKingEvent(1)} className="bg-gradient-to-b from-yellow-600/30 to-amber-700/30 border border-yellow-500/20 rounded-xl p-3 text-center active:scale-95">
-                  <div className="text-xl">👑</div>
-                  <div className="text-white text-[10px] font-bold">King 1</div>
-                  <div className="text-yellow-300 text-[9px]">300M</div>
-                </button>
-                <button onClick={() => triggerKingEvent(2)} className="bg-gradient-to-b from-orange-600/30 to-red-700/30 border border-orange-500/20 rounded-xl p-3 text-center active:scale-95">
-                  <div className="text-xl">👑</div>
-                  <div className="text-white text-[10px] font-bold">King 2</div>
-                  <div className="text-orange-300 text-[9px]">500M</div>
-                </button>
-                <button onClick={() => triggerKingEvent(3)} className="bg-gradient-to-b from-red-600/30 to-rose-700/30 border border-red-500/20 rounded-xl p-3 text-center active:scale-95">
-                  <div className="text-xl">👑</div>
-                  <div className="text-white text-[10px] font-bold">King 3</div>
-                  <div className="text-red-300 text-[9px]">1B</div>
-                </button>
+
+            {/* ADMIN: Pending Requests */}
+            {user.role === 'dueño' && pendingRequests.length > 0 && (
+              <div className="mb-4">
+                <h4 className="text-yellow-400 text-xs font-bold mb-2">Solicitudes Pendientes ({pendingRequests.length})</h4>
+                <div className="space-y-2">
+                  {pendingRequests.map(r => (
+                    <div key={r.id} className="bg-yellow-500/10 border border-yellow-500/20 rounded-xl p-3 flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <img src={r.avatar} alt="" className="w-8 h-8 rounded-full" />
+                        <div>
+                          <div className="text-white text-xs font-bold">{r.username}</div>
+                          <div className="text-yellow-400 text-[10px]">{r.event_type.replace('_', ' ').toUpperCase()}</div>
+                        </div>
+                      </div>
+                      <div className="flex gap-1">
+                        <button onClick={() => approveRequest(r.id)} className="bg-green-600 text-white px-3 py-1 rounded-lg text-[10px] font-bold">Aprobar</button>
+                        <button onClick={() => rejectRequest(r.id)} className="bg-red-600 text-white px-2 py-1 rounded-lg text-[10px]">X</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
-              <h4 className="text-pink-400 text-xs font-bold mt-3">💖 CP Events</h4>
-              <div className="grid grid-cols-2 gap-2">
-                <button onClick={() => triggerCPEvent(6)} className="bg-gradient-to-b from-pink-600/30 to-rose-700/30 border border-pink-500/20 rounded-xl p-3 text-center active:scale-95">
-                  <div className="text-xl">💖</div>
-                  <div className="text-white text-[10px] font-bold">CP Nivel 6</div>
-                  <div className="text-pink-300 text-[9px]">5M c/u</div>
-                </button>
-                <button onClick={() => triggerCPEvent(7)} className="bg-gradient-to-b from-purple-600/30 to-indigo-700/30 border border-purple-500/20 rounded-xl p-3 text-center active:scale-95">
-                  <div className="text-xl">💍</div>
-                  <div className="text-white text-[10px] font-bold">CP Nivel 7</div>
-                  <div className="text-purple-300 text-[9px]">5M c/u</div>
-                </button>
-              </div>
+            )}
+
+            {/* Solicitar Evento - King */}
+            <h4 className="text-yellow-400 text-xs font-bold mb-2">👑 Solicitar Evento King</h4>
+            <p className="text-white/40 text-[9px] mb-2">1 vez al mes. Cumple la meta de juego para recibir tu pago.</p>
+            <div className="grid grid-cols-3 gap-2 mb-4">
+              <button data-testid="req-king" onClick={() => requestEvent('king')} className="bg-gradient-to-b from-yellow-600/30 to-amber-700/30 border border-yellow-500/20 rounded-xl p-3 text-center active:scale-95">
+                <div className="text-xl">👑</div>
+                <div className="text-white text-[10px] font-bold">King</div>
+                <div className="text-yellow-300 text-[8px]">Meta: 200M</div>
+                <div className="text-green-300 text-[8px]">Pago: 3M</div>
+              </button>
+              <button data-testid="req-king1" onClick={() => requestEvent('king_1')} className="bg-gradient-to-b from-orange-600/30 to-red-700/30 border border-orange-500/20 rounded-xl p-3 text-center active:scale-95">
+                <div className="text-xl">👑</div>
+                <div className="text-white text-[10px] font-bold">King 1</div>
+                <div className="text-orange-300 text-[8px]">Meta: 300M</div>
+                <div className="text-green-300 text-[8px]">Pago: 4M</div>
+              </button>
+              <button data-testid="req-king3" onClick={() => requestEvent('king_3')} className="bg-gradient-to-b from-red-600/30 to-rose-700/30 border border-red-500/20 rounded-xl p-3 text-center active:scale-95">
+                <div className="text-xl">👑</div>
+                <div className="text-white text-[10px] font-bold">King 3</div>
+                <div className="text-red-300 text-[8px]">Meta: 500M</div>
+                <div className="text-green-300 text-[8px]">Pago: 5M</div>
+              </button>
             </div>
+
+            {/* Solicitar Evento - CP */}
+            <h4 className="text-pink-400 text-xs font-bold mb-2">💖 Solicitar Evento CP</h4>
+            <p className="text-white/40 text-[9px] mb-2">Pago exclusivo para ti y tu pareja al subir de nivel.</p>
+            <div className="grid grid-cols-2 gap-2 mb-4">
+              <button data-testid="req-cp6" onClick={() => requestEvent('cp_6')} className="bg-gradient-to-b from-pink-600/30 to-rose-700/30 border border-pink-500/20 rounded-xl p-3 text-center active:scale-95">
+                <div className="text-xl">💖</div>
+                <div className="text-white text-[10px] font-bold">CP Nivel 6</div>
+                <div className="text-green-300 text-[8px]">5M c/u</div>
+              </button>
+              <button data-testid="req-cp7" onClick={() => requestEvent('cp_7')} className="bg-gradient-to-b from-purple-600/30 to-indigo-700/30 border border-purple-500/20 rounded-xl p-3 text-center active:scale-95">
+                <div className="text-xl">💍</div>
+                <div className="text-white text-[10px] font-bold">CP Nivel 7</div>
+                <div className="text-green-300 text-[8px]">7M c/u</div>
+              </button>
+            </div>
+
+            {/* My Events Status */}
+            {myEvents.length > 0 && (
+              <div>
+                <h4 className="text-white text-xs font-bold mb-2">Mis Eventos</h4>
+                <div className="space-y-2">
+                  {myEvents.map(ev => (
+                    <div key={ev.id} className={`rounded-xl p-3 border ${ev.status === 'completed' ? 'bg-green-500/10 border-green-500/20' : ev.status === 'approved' ? 'bg-blue-500/10 border-blue-500/20' : ev.status === 'rejected' ? 'bg-red-500/10 border-red-500/20' : 'bg-yellow-500/10 border-yellow-500/20'}`}>
+                      <div className="flex justify-between items-center">
+                        <div>
+                          <span className="text-white text-[10px] font-bold">{ev.label}</span>
+                          <span className={`ml-2 text-[9px] px-2 py-0.5 rounded-full ${ev.status === 'completed' ? 'bg-green-500/30 text-green-300' : ev.status === 'approved' ? 'bg-blue-500/30 text-blue-300' : ev.status === 'rejected' ? 'bg-red-500/30 text-red-300' : 'bg-yellow-500/30 text-yellow-300'}`}>
+                            {ev.status === 'pending' ? 'Pendiente' : ev.status === 'approved' ? 'Aprobado' : ev.status === 'completed' ? 'Completado' : 'Rechazado'}
+                          </span>
+                        </div>
+                        <span className="text-green-400 text-[10px] font-bold">+{(ev.reward / 1000000).toFixed(0)}M</span>
+                      </div>
+                      {ev.status === 'approved' && ev.goal > 0 && (
+                        <div className="mt-2">
+                          <div className="flex justify-between text-[9px] text-white/40 mb-1">
+                            <span>Progreso</span>
+                            <span>{((ev.game_progress || 0) / 1000000).toFixed(0)}M / {(ev.goal / 1000000).toFixed(0)}M</span>
+                          </div>
+                          <div className="h-2 bg-white/10 rounded-full overflow-hidden">
+                            <div className="h-full bg-blue-500 rounded-full" style={{width: `${Math.min(100, ((ev.game_progress || 0) / ev.goal) * 100)}%`}} />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -465,10 +545,8 @@ const RoomView = ({ roomId, onBack }) => {
             {user.role === 'dueño' && (
               <button data-testid="bot-toggle-room" onClick={toggleBot} className={`w-7 h-7 rounded-full flex items-center justify-center text-[10px] ${botOn ? 'bg-green-500' : 'bg-gray-600'}`}>🤖</button>
             )}
-            {/* Events trigger */}
-            {user.role === 'dueño' && (
-              <button data-testid="events-room-btn" onClick={() => setEventPanel(true)} className="w-7 h-7 rounded-full bg-yellow-600 flex items-center justify-center text-[10px]">👑</button>
-            )}
+            {/* Events trigger - visible for all users */}
+            <button data-testid="events-room-btn" onClick={() => { setEventPanel(true); loadMyEvents(); loadPendingRequests(); }} className="w-7 h-7 rounded-full bg-yellow-600 flex items-center justify-center text-[10px]">👑</button>
             <span className={`w-2 h-2 rounded-full ${audioStatus === 'on' ? 'bg-green-400' : 'bg-red-400'}`} />
             <span className="text-white/50 text-xs">{room.active_users}</span>
           </div>
