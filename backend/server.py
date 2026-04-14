@@ -106,7 +106,7 @@ async def register(user_data: UserRegister):
 
 @api_router.post("/login")
 async def login(credentials: UserLogin):
-    user = await db.users.find_one({"username": credentials.username})
+    user = await db.users.find_one({"username": {"$regex": f"^{credentials.username}$", "$options": "i"}})
     
     if not user or not verify_password(credentials.password, user['password']):
         raise HTTPException(status_code=401, detail="Credenciales inválidas")
