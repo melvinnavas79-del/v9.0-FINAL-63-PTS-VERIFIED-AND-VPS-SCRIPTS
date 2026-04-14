@@ -557,22 +557,22 @@ const RoomView = ({ roomId, onBack }) => {
       )}
 
       {/* HEADER */}
-      <div className="flex-shrink-0 px-3 pt-2 pb-1">
+      <div className="flex-shrink-0 px-3 pb-1" style={{paddingTop: 'max(12px, env(safe-area-inset-top, 12px))'}}>
         <div className="flex items-center justify-between">
-          <button data-testid="room-back-btn" onClick={() => { leaveAgora(); onBack(); }} className="bg-white/10 text-white px-3 py-1 rounded-full text-xs">← Salir</button>
-          <div className="text-center flex-1 mx-1">
+          <button data-testid="room-back-btn" onClick={() => { leaveAgora(); onBack(); }} className="bg-white/10 text-white px-4 py-2 rounded-full text-sm font-medium min-h-[36px]">← Salir</button>
+          <div className="text-center flex-1 mx-2">
             <h2 className="text-white text-sm font-bold truncate">{room.name}</h2>
           </div>
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-2">
             {/* Minimize */}
-            <button data-testid="minimize-btn" onClick={() => onBack()} className="bg-white/10 w-7 h-7 rounded-full flex items-center justify-center text-[10px]">⬇️</button>
+            <button data-testid="minimize-btn" onClick={() => onBack()} className="bg-white/10 w-8 h-8 rounded-full flex items-center justify-center text-sm">⬇️</button>
             {/* Bot ON/OFF */}
             {user.role === 'dueño' && (
-              <button data-testid="bot-toggle-room" onClick={toggleBot} className={`w-7 h-7 rounded-full flex items-center justify-center text-[10px] ${botOn ? 'bg-green-500' : 'bg-gray-600'}`}>🤖</button>
+              <button data-testid="bot-toggle-room" onClick={toggleBot} className={`w-8 h-8 rounded-full flex items-center justify-center text-sm ${botOn ? 'bg-green-500' : 'bg-gray-600'}`}>🤖</button>
             )}
             {/* Events trigger - visible for all users */}
-            <button data-testid="events-room-btn" onClick={() => { setEventPanel(true); loadMyEvents(); loadPendingRequests(); }} className="w-7 h-7 rounded-full bg-yellow-600 flex items-center justify-center text-[10px]">👑</button>
-            <span className={`w-2 h-2 rounded-full ${audioStatus === 'on' ? 'bg-green-400' : 'bg-red-400'}`} />
+            <button data-testid="events-room-btn" onClick={() => { setEventPanel(true); loadMyEvents(); loadPendingRequests(); }} className="w-8 h-8 rounded-full bg-yellow-600 flex items-center justify-center text-sm">👑</button>
+            <span className={`w-2.5 h-2.5 rounded-full ${audioStatus === 'on' ? 'bg-green-400' : 'bg-red-400'}`} />
             <span className="text-white/50 text-xs">{room.active_users}</span>
           </div>
         </div>
@@ -699,7 +699,7 @@ const RoomView = ({ roomId, onBack }) => {
       </div>
 
       {/* BOTTOM BAR - ALWAYS VISIBLE */}
-      <div className="flex-shrink-0 bg-black/90 border-t border-white/5 px-2 py-2">
+      <div className="flex-shrink-0 bg-black/90 border-t border-white/5 px-2" style={{paddingTop: '8px', paddingBottom: 'max(10px, env(safe-area-inset-bottom, 10px))'}}>
         <div className="flex items-center justify-center gap-2">
           {/* Gift */}
           <button data-testid="gift-bottom-btn" onClick={() => setPanel('gifts-all')}

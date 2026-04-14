@@ -5,53 +5,42 @@
 /* ========== ANDROID/MOBILE RESPONSIVE SCALING ========== */
 
 :root {
-  /* Base scale factor - adjusts with screen width */
-  --scale: 1;
-  /* Minimum touch target */
-  --touch-min: 44px;
-  /* Safe area insets */
   --sab: env(safe-area-inset-bottom, 0px);
   --sat: env(safe-area-inset-top, 0px);
 }
 
 /* Small Android phones (< 360px width) */
 @media screen and (max-width: 359px) {
-  :root { --scale: 0.85; }
-  html { font-size: 13px; }
+  html { font-size: 14px; }
 }
 
 /* Standard Android phones (360-410px) */
 @media screen and (min-width: 360px) and (max-width: 410px) {
-  :root { --scale: 0.95; }
-  html { font-size: 15px; }
+  html { font-size: 16px; }
 }
 
 /* Large Android/iPhone (411px+) */
-@media screen and (min-width: 411px) and (max-width: 479px) {
-  :root { --scale: 1; }
+@media screen and (min-width: 411px) {
   html { font-size: 16px; }
 }
 
-/* Tablets / large devices */
-@media screen and (min-width: 480px) {
-  :root { --scale: 1.05; }
-  html { font-size: 16px; }
-}
-
-/* High DPI Android scaling fix */
+/* High DPI Android - scale ALL tiny text up */
 @media screen and (-webkit-min-device-pixel-ratio: 2), screen and (min-resolution: 192dpi) {
-  .text-\[8px\] { font-size: 10px !important; }
-  .text-\[9px\] { font-size: 11px !important; }
-  .text-\[10px\] { font-size: 12px !important; }
-  .text-\[11px\] { font-size: 13px !important; }
-}
-
-/* Very high DPI (3x+) Android */
-@media screen and (-webkit-min-device-pixel-ratio: 3), screen and (min-resolution: 288dpi) {
   .text-\[8px\] { font-size: 11px !important; }
   .text-\[9px\] { font-size: 12px !important; }
   .text-\[10px\] { font-size: 13px !important; }
   .text-\[11px\] { font-size: 14px !important; }
+  .text-xs { font-size: 13px !important; }
+}
+
+/* Very high DPI (3x+) Android */
+@media screen and (-webkit-min-device-pixel-ratio: 3), screen and (min-resolution: 288dpi) {
+  .text-\[8px\] { font-size: 12px !important; }
+  .text-\[9px\] { font-size: 13px !important; }
+  .text-\[10px\] { font-size: 14px !important; }
+  .text-\[11px\] { font-size: 15px !important; }
+  .text-xs { font-size: 14px !important; }
+  .text-sm { font-size: 15px !important; }
 }
 
 /* Global minimum font sizes for readability */
@@ -68,44 +57,19 @@ body {
     overflow-x: hidden;
 }
 
-/* Ensure touch targets are minimum 44px on mobile */
-@media screen and (max-width: 768px) {
-  button, a, [role="button"], input, select, textarea {
-    min-height: 40px;
-    min-width: 40px;
-  }
-  
-  /* Exceptions for tiny inline elements */
-  .text-\[8px\], .text-\[9px\] {
-    min-height: auto;
-    min-width: auto;
-  }
-}
-
-/* Safe area padding for notch devices */
+/* Safe area padding for notch/home indicator */
 .safe-area-bottom {
-  padding-bottom: max(12px, env(safe-area-inset-bottom, 12px));
+  padding-bottom: max(16px, env(safe-area-inset-bottom, 16px));
 }
 
-.safe-area-top {
-  padding-top: max(8px, env(safe-area-inset-top, 8px));
-}
-
-/* Bottom nav specific - always reachable */
+/* Bottom nav - respect safe area */
 .fixed.bottom-0 {
-  padding-bottom: max(8px, env(safe-area-inset-bottom, 8px));
+  padding-bottom: max(12px, env(safe-area-inset-bottom, 12px));
 }
 
 /* Prevent text overflow on small screens */
 @media screen and (max-width: 410px) {
-  .truncate {
-    max-width: 120px;
-  }
-  
-  /* Scale down large text on small screens */
-  .text-3xl { font-size: 1.5rem !important; }
-  .text-2xl { font-size: 1.25rem !important; }
-  .text-xl { font-size: 1.1rem !important; }
+  .truncate { max-width: 120px; }
 }
 
 code {

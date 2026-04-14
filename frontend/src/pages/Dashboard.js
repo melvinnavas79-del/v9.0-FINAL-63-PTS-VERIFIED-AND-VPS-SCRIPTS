@@ -384,7 +384,7 @@ const Dashboard = ({ onNavigate }) => {
   return (
     <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white">
       {/* Status Bar */}
-      <div className="bg-blue-50 px-4 py-2 flex items-center justify-between">
+      <div className="bg-blue-50 px-4 flex items-center justify-between" style={{paddingTop: 'max(8px, env(safe-area-inset-top, 8px))', paddingBottom: '4px'}}>
         <span className="text-gray-600 text-sm font-medium">08:03</span>
         <div className="flex items-center gap-3">
           <span className="text-gray-600 text-sm">📶</span>
@@ -433,7 +433,7 @@ const Dashboard = ({ onNavigate }) => {
       </div>
 
       {/* Bottom Navigation */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-2 py-3 z-50 safe-area-bottom">
+      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-2 z-50" style={{paddingTop: '10px', paddingBottom: 'max(14px, env(safe-area-inset-bottom, 14px))'}}>
         <div className="flex items-center justify-around max-w-lg mx-auto">
           <button
             data-testid="nav-sala-btn"
