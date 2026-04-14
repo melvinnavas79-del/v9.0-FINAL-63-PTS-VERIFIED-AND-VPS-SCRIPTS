@@ -160,7 +160,7 @@ const BotFloating = ({ userId, userRole }) => {
                   <p className="text-xs mb-1">Habla o escribe</p>
                   <p className="text-[10px] text-white/20">Toca el microfono para hablarme por voz</p>
                   <div className="flex flex-wrap gap-1 mt-3 justify-center">
-                    {['¿Cuantos usuarios hay?', '¿Quien es el mas rico?', 'Regala 1M a todos'].map(q => (
+                    {['¿Cuantos usuarios hay?', 'Di hola en mi sala', 'Vigila mi sala por insultos', '¿Quien esta en las salas?'].map(q => (
                       <button key={q} onClick={() => handleSend(q)} className="bg-white/10 text-white/60 text-[10px] px-2 py-1 rounded-full hover:bg-white/20">{q}</button>
                     ))}
                   </div>

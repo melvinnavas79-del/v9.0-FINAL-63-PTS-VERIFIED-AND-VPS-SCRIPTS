@@ -1684,6 +1684,10 @@ async def send_chat(room_id: str, msg: ChatMessage):
     }
     await db.room_chat.insert_one(chat_doc)
     chat_doc.pop('_id', None)
+    
+    # Check against bot missions
+    await check_chat_against_missions(room_id, user['username'], msg.text)
+    
     return chat_doc
 
 @api_router.get("/rooms/{room_id}/chat")
@@ -1915,6 +1919,9 @@ Acciones:
 - pay_top: {{"action":"pay_top","params":{{"prizes":[N1,N2,N3]}}}} (paga premios al top 1,2,3)
 - mute_user: {{"action":"mute_user","params":{{"username":"X"}}}}
 - kick_user: {{"action":"kick_user","params":{{"username":"X"}}}} (saca de la sala)
+- say_in_room: {{"action":"say_in_room","params":{{"room_name":"X","message":"Y"}}}} (el bot habla en esa sala)
+- watch_room: {{"action":"watch_room","params":{{"room_name":"X","keywords":["palabra1","palabra2"]}}}} (vigila sala por palabras clave)
+- bot_answer_room: {{"action":"bot_answer_room","params":{{"room_name":"X"}}}} (bot atiende preguntas en la sala)
 
 REGLAS:
 1. Para acciones de PAGO, las monedas salen de MI cuenta de dueño
@@ -2051,6 +2058,45 @@ REGLAS:
                         ac = sum(1 for s in seats if s)
                         await db.rooms.update_one({"id": r['id']}, {"$set": {"seats": seats, "active_users": ac}})
                 action_result = f"{target_name} sacado de sala"
+            elif action == 'say_in_room':
+                room = await db.rooms.find_one({"name": {"$regex": params.get('room_name', ''), "$options": "i"}})
+                if room:
+                    bot_msg = params.get('message', '')
+                    await db.room_chat.insert_one({
+                        "id": str(uuid.uuid4()), "room_id": room['id'],
+                        "user_id": "bot", "username": "🤖 Bot Lluvia",
+                        "avatar": admin.get('avatar', ''), "text": bot_msg,
+                        "type": "message", "created_at": datetime.now(timezone.utc).isoformat()
+                    })
+                    action_result = f"Bot dijo en {room['name']}: {bot_msg}"
+                else:
+                    action_result = "Sala no encontrada"
+            elif action == 'watch_room':
+                room = await db.rooms.find_one({"name": {"$regex": params.get('room_name', ''), "$options": "i"}})
+                if room:
+                    keywords = params.get('keywords', [])
+                    mission_doc = {
+                        "id": str(uuid.uuid4()), "admin_id": msg.admin_id,
+                        "room_id": room['id'], "room_name": room['name'],
+                        "keywords": [k.lower() for k in keywords], "active": True,
+                        "label": f"Vigila {room['name']}", "alerts": [],
+                        "created_at": datetime.now(timezone.utc).isoformat()
+                    }
+                    await db.bot_missions.insert_one(mission_doc)
+                    action_result = f"Vigilando {room['name']} por: {', '.join(keywords)}"
+                else:
+                    action_result = "Sala no encontrada"
+            elif action == 'bot_answer_room':
+                room = await db.rooms.find_one({"name": {"$regex": params.get('room_name', ''), "$options": "i"}})
+                if room:
+                    await db.room_chat.insert_one({
+                        "id": str(uuid.uuid4()), "room_id": room['id'],
+                        "user_id": "bot", "username": "🤖 Bot Lluvia",
+                        "avatar": admin.get('avatar', ''),
+                        "text": "Hola! Soy el Bot de Lluvia Live. Estoy aqui para ayudarles. Pregunten lo que quieran!",
+                        "type": "message", "created_at": datetime.now(timezone.utc).isoformat()
+                    })
+                    action_result = f"Bot activado en {room['name']}"
     except Exception as e:
         action_result = f"Error: {str(e)}"
     
@@ -2074,6 +2120,143 @@ async def get_bot_history(admin_id: str):
     history = await db.bot_history.find({"admin_id": admin_id}).sort("created_at", -1).limit(20).to_list(20)
     history.reverse()
     return [{k: v for k, v in h.items() if k != "_id"} for h in history]
+
+# ==================== BOT IN ROOMS ====================
+
+@api_router.post("/bot/say-in-room")
+async def bot_say_in_room(admin_id: str, room_id: str, message: str):
+    """Bot sends a message in a room chat"""
+    admin = await db.users.find_one({"id": admin_id})
+    if not admin or admin.get('role') != 'dueño':
+        raise HTTPException(status_code=403, detail="Solo el dueño")
+    room = await db.rooms.find_one({"id": room_id})
+    if not room:
+        raise HTTPException(status_code=404, detail="Sala no encontrada")
+    chat_doc = {
+        "id": str(uuid.uuid4()), "room_id": room_id,
+        "user_id": "bot", "username": "🤖 Bot Lluvia",
+        "avatar": "/api/uploads/bot_avatar.png",
+        "text": message, "type": "message",
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    await db.room_chat.insert_one(chat_doc)
+    chat_doc.pop('_id', None)
+    return chat_doc
+
+@api_router.post("/bot/reply-in-room")
+async def bot_reply_in_room(admin_id: str, room_id: str, question: str):
+    """Bot replies intelligently to a question in room chat using Gemini"""
+    admin = await db.users.find_one({"id": admin_id})
+    if not admin or admin.get('role') != 'dueño':
+        raise HTTPException(status_code=403, detail="Solo el dueño")
+    room = await db.rooms.find_one({"id": room_id})
+    if not room:
+        raise HTTPException(status_code=404, detail="Sala no encontrada")
+    
+    llm_key = os.environ.get('EMERGENT_LLM_KEY')
+    chat = LlmChat(
+        api_key=llm_key,
+        session_id=f"bot_room_{room_id}",
+        system_message="Eres el Bot oficial de Lluvia Live. Eres amigable, divertido y ayudas a todos en la sala. Respondes en español, de forma corta y natural. No reveles informacion privada del dueño."
+    )
+    chat.with_model("gemini", "gemini-2.5-flash")
+    response = await chat.send_message(UserMessage(text=question))
+    
+    chat_doc = {
+        "id": str(uuid.uuid4()), "room_id": room_id,
+        "user_id": "bot", "username": "🤖 Bot Lluvia",
+        "avatar": "/api/uploads/bot_avatar.png",
+        "text": response, "type": "message",
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    await db.room_chat.insert_one(chat_doc)
+    chat_doc.pop('_id', None)
+    return {"response": response, "chat": chat_doc}
+
+# ==================== BOT WATCHDOG (VIGILANCIA) ====================
+
+class WatchMission(BaseModel):
+    room_id: str
+    keywords: list
+    label: str = ""
+
+@api_router.post("/bot/missions")
+async def create_watch_mission(admin_id: str, mission: WatchMission):
+    """Create a surveillance mission for a room"""
+    admin = await db.users.find_one({"id": admin_id})
+    if not admin or admin.get('role') != 'dueño':
+        raise HTTPException(status_code=403, detail="Solo el dueño")
+    room = await db.rooms.find_one({"id": mission.room_id})
+    if not room:
+        raise HTTPException(status_code=404, detail="Sala no encontrada")
+    
+    mission_doc = {
+        "id": str(uuid.uuid4()),
+        "admin_id": admin_id,
+        "room_id": mission.room_id,
+        "room_name": room.get('name', ''),
+        "keywords": [k.lower() for k in mission.keywords],
+        "label": mission.label or f"Vigila {room.get('name', '')}",
+        "active": True,
+        "alerts": [],
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    await db.bot_missions.insert_one(mission_doc)
+    mission_doc.pop('_id', None)
+    return mission_doc
+
+@api_router.get("/bot/missions")
+async def get_missions(admin_id: str):
+    admin = await db.users.find_one({"id": admin_id})
+    if not admin or admin.get('role') != 'dueño':
+        raise HTTPException(status_code=403, detail="Solo el dueño")
+    missions = await db.bot_missions.find({"admin_id": admin_id}).sort("created_at", -1).to_list(50)
+    return [{k: v for k, v in m.items() if k != "_id"} for m in missions]
+
+@api_router.delete("/bot/missions/{mission_id}")
+async def delete_mission(mission_id: str, admin_id: str):
+    admin = await db.users.find_one({"id": admin_id})
+    if not admin or admin.get('role') != 'dueño':
+        raise HTTPException(status_code=403, detail="Solo el dueño")
+    await db.bot_missions.delete_one({"id": mission_id})
+    return {"success": True}
+
+@api_router.get("/bot/alerts")
+async def get_bot_alerts(admin_id: str, limit: int = 20):
+    admin = await db.users.find_one({"id": admin_id})
+    if not admin or admin.get('role') != 'dueño':
+        raise HTTPException(status_code=403, detail="Solo el dueño")
+    alerts = await db.bot_alerts.find({"admin_id": admin_id}).sort("created_at", -1).limit(limit).to_list(limit)
+    return [{k: v for k, v in a.items() if k != "_id"} for a in alerts]
+
+# Hook into room chat to check missions
+async def check_chat_against_missions(room_id: str, username: str, text: str):
+    """Check if any chat message matches active mission keywords"""
+    missions = await db.bot_missions.find({"room_id": room_id, "active": True}).to_list(50)
+    text_lower = text.lower()
+    for mission in missions:
+        for keyword in mission.get('keywords', []):
+            if keyword in text_lower:
+                alert_doc = {
+                    "id": str(uuid.uuid4()),
+                    "admin_id": mission['admin_id'],
+                    "mission_id": mission['id'],
+                    "room_id": room_id,
+                    "room_name": mission.get('room_name', ''),
+                    "keyword": keyword,
+                    "username": username,
+                    "text": text,
+                    "created_at": datetime.now(timezone.utc).isoformat()
+                }
+                await db.bot_alerts.insert_one(alert_doc)
+                await create_notification(
+                    "invitacion",
+                    f"🤖 Alerta: '{keyword}'",
+                    f"{username} dijo '{text}' en {mission.get('room_name','')}",
+                    target_user_id=mission['admin_id'],
+                    data={"room_id": room_id, "keyword": keyword}
+                )
+                break
 
 # ==================== NOTIFICATIONS ====================
 
