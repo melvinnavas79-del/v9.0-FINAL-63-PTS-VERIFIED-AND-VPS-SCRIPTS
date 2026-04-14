@@ -1928,13 +1928,28 @@ Acciones:
 - bot_answer_room: {{"action":"bot_answer_room","params":{{"room_name":"X"}}}} (bot atiende preguntas en la sala)
 - activate_bot: {{"action":"activate_bot","params":{{"room_name":"X"}}}} (activa el bot autonomo en la sala, el bot habla solo con todos)
 - deactivate_bot: {{"action":"deactivate_bot","params":{{"room_name":"X"}}}} (desactiva el bot de la sala)
+- save_note: {{"action":"save_note","params":{{"category":"finanzas|notas|recordatorio|otro","title":"titulo","content":"contenido"}}}} (guarda una nota o dato para el dueño)
+- list_notes: {{"action":"list_notes","params":{{"category":"finanzas"}}}} (lista notas guardadas)
+- delete_note: {{"action":"delete_note","params":{{"title":"titulo"}}}} (borra una nota)
 
 REGLAS:
 1. Para acciones de PAGO, las monedas salen de MI cuenta de dueño
 2. SIEMPRE incluye "confirm_message" con un resumen de lo que vas a hacer
 3. Si es consulta, responde en texto normal SIN JSON
 4. Sé conciso y directo
+5. MEMORIA: Tienes acceso a las notas guardadas del dueño. Usalas para dar contexto.
+6. FINANZAS: El dueño te puede pedir que lleves conteo de sus finanzas. Guarda cada ingreso/gasto como nota categoria "finanzas".
 """
+
+    # Load owner's saved notes for context
+    notes = await db.bot_notes.find({"admin_id": msg.admin_id}).sort("created_at", -1).limit(30).to_list(30)
+    notes.reverse()
+    if notes:
+        notes_lines = []
+        for n in notes:
+            notes_lines.append(f"[{n.get('category','')}] {n.get('title','')}: {n.get('content','')}")
+        notes_text = "\n".join(notes_lines)
+        context += f"\n\nNOTAS GUARDADAS DEL DUEÑO:\n{notes_text}"
     
     llm_key = os.environ.get('EMERGENT_LLM_KEY')
     chat = LlmChat(
@@ -2133,6 +2148,32 @@ REGLAS:
                     action_result = f"Bot desactivado de {room['name']}"
                 else:
                     action_result = "Sala no encontrada"
+            elif action == 'save_note':
+                note_doc = {
+                    "id": str(uuid.uuid4()),
+                    "admin_id": msg.admin_id,
+                    "category": params.get('category', 'notas'),
+                    "title": params.get('title', ''),
+                    "content": params.get('content', ''),
+                    "created_at": datetime.now(timezone.utc).isoformat()
+                }
+                await db.bot_notes.insert_one(note_doc)
+                action_result = f"Nota guardada: [{note_doc['category']}] {note_doc['title']}"
+            elif action == 'list_notes':
+                cat = params.get('category', '')
+                query = {"admin_id": msg.admin_id}
+                if cat:
+                    query["category"] = cat
+                notes_list = await db.bot_notes.find(query).sort("created_at", -1).limit(20).to_list(20)
+                if notes_list:
+                    lines = [f"- [{n.get('category','')}] {n.get('title','')}: {n.get('content','')}" for n in notes_list]
+                    action_result = "Notas:\n" + "\n".join(lines)
+                else:
+                    action_result = "No hay notas guardadas"
+            elif action == 'delete_note':
+                title = params.get('title', '')
+                result = await db.bot_notes.delete_one({"admin_id": msg.admin_id, "title": {"$regex": title, "$options": "i"}})
+                action_result = f"Nota '{title}' eliminada" if result.deleted_count else "Nota no encontrada"
     except Exception as e:
         action_result = f"Error: {str(e)}"
     
