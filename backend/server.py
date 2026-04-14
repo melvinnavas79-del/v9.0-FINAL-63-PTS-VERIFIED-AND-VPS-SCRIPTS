@@ -2868,6 +2868,36 @@ async def update_notif_preferences(user_id: str, prefs: NotifPreferences):
     )
     return {"success": True, "prefs": prefs.dict()}
 
+
+# ==================== CONFIGURABLE PRIZES ====================
+
+DEFAULT_CONFIG = {
+    "recharge_monthly_prizes": {"1st": 45000000, "2nd": 35000000, "3rd": 25000000},
+    "event_weekly_return": {"100m": 10000000, "500m": 25000000, "600m": 45000000},
+    "event_auto_payout_threshold": 30000000,
+    "event_auto_payout_amount": 10000000,
+}
+
+@api_router.get("/admin/config")
+async def get_admin_config():
+    config = await db.system.find_one({"key": "admin_config"})
+    if config:
+        config.pop('_id', None)
+        return config
+    return {"key": "admin_config", **DEFAULT_CONFIG}
+
+@api_router.put("/admin/config")
+async def update_admin_config(admin_id: str, updates: dict):
+    admin = await db.users.find_one({"id": admin_id})
+    if not admin or admin.get('role') != 'dueño':
+        raise HTTPException(status_code=403, detail="Solo el dueño")
+    await db.system.update_one(
+        {"key": "admin_config"},
+        {"$set": {**updates, "key": "admin_config"}},
+        upsert=True
+    )
+    return {"success": True}
+
 # ==================== SETUP ====================
 
 app.include_router(api_router)

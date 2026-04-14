@@ -192,6 +192,7 @@ const ControlPanel = ({ onBack }) => {
     { id: 'clanes', label: '🏷️ Clanes', icon: '🏷️' },
     { id: 'rooms', label: '🏠 Salas', icon: '🏠' },
     { id: 'config', label: '⚙️ Config', icon: '⚙️' },
+    { id: 'prizes', label: '💰 Premios', icon: '💰' },
     { id: 'console', label: '💻 Consola', icon: '💻' },
     { id: 'bot', label: '🤖 Bot IA', icon: '🤖' },
   ];
@@ -473,6 +474,10 @@ const ControlPanel = ({ onBack }) => {
             </div>
           </div>
         )}
+        {/* PRIZES CONFIG */}
+        {activeTab === 'prizes' && (
+          <PrizesConfig userId={user.id} />
+        )}
         {/* CONSOLE */}
         {activeTab === 'console' && (
           <div>
@@ -731,5 +736,92 @@ const BotTab = ({ userId }) => {
     </div>
   );
 };
+
+const PrizesConfig = ({ userId }) => {
+  const [config, setConfig] = useState({
+    recharge_monthly_prizes: { '1st': 45000000, '2nd': 35000000, '3rd': 25000000 },
+    event_weekly_return: { '100m': 10000000, '500m': 25000000, '600m': 45000000 },
+    event_auto_payout_threshold: 30000000,
+    event_auto_payout_amount: 10000000,
+  });
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    axios.get(`${API}/admin/config`).then(r => {
+      if (r.data) setConfig(prev => ({ ...prev, ...r.data }));
+    }).catch(() => {});
+  }, []);
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      await axios.put(`${API}/admin/config?admin_id=${userId}`, config);
+      alert('Configuracion guardada!');
+    } catch (e) { alert('Error'); }
+    setSaving(false);
+  };
+
+  const updatePrize = (section, key, value) => {
+    setConfig(prev => ({
+      ...prev,
+      [section]: { ...prev[section], [key]: parseInt(value) || 0 }
+    }));
+  };
+
+  return (
+    <div>
+      <h3 className="text-lg font-bold text-yellow-400 mb-4">💰 Configuracion de Premios</h3>
+
+      {/* Monthly Recharge Prizes */}
+      <div className="bg-gray-800 rounded-xl p-4 mb-4">
+        <h4 className="text-white font-bold mb-3">🏆 Premios Recarga Mensual</h4>
+        {[['1st', '1er Lugar'], ['2nd', '2do Lugar'], ['3rd', '3er Lugar']].map(([key, label]) => (
+          <div key={key} className="flex items-center justify-between mb-2">
+            <span className="text-white/70 text-sm">{label}</span>
+            <input type="number" value={config.recharge_monthly_prizes?.[key] || 0}
+              onChange={e => updatePrize('recharge_monthly_prizes', key, e.target.value)}
+              className="bg-gray-700 text-white text-sm px-3 py-1 rounded-lg w-32 text-right" />
+          </div>
+        ))}
+      </div>
+
+      {/* Event Weekly Returns */}
+      <div className="bg-gray-800 rounded-xl p-4 mb-4">
+        <h4 className="text-white font-bold mb-3">📊 Retorno Semanal por Evento</h4>
+        {[['100m', 'Evento 100M'], ['500m', 'Evento 500M'], ['600m', 'Evento 600M']].map(([key, label]) => (
+          <div key={key} className="flex items-center justify-between mb-2">
+            <span className="text-white/70 text-sm">{label}</span>
+            <input type="number" value={config.event_weekly_return?.[key] || 0}
+              onChange={e => updatePrize('event_weekly_return', key, e.target.value)}
+              className="bg-gray-700 text-white text-sm px-3 py-1 rounded-lg w-32 text-right" />
+          </div>
+        ))}
+      </div>
+
+      {/* Auto Payout */}
+      <div className="bg-gray-800 rounded-xl p-4 mb-4">
+        <h4 className="text-white font-bold mb-3">⚡ Pago Automatico de Eventos</h4>
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-white/70 text-sm">Umbral (llegar a)</span>
+          <input type="number" value={config.event_auto_payout_threshold || 0}
+            onChange={e => setConfig(p => ({ ...p, event_auto_payout_threshold: parseInt(e.target.value) || 0 }))}
+            className="bg-gray-700 text-white text-sm px-3 py-1 rounded-lg w-32 text-right" />
+        </div>
+        <div className="flex items-center justify-between">
+          <span className="text-white/70 text-sm">Pago automatico</span>
+          <input type="number" value={config.event_auto_payout_amount || 0}
+            onChange={e => setConfig(p => ({ ...p, event_auto_payout_amount: parseInt(e.target.value) || 0 }))}
+            className="bg-gray-700 text-white text-sm px-3 py-1 rounded-lg w-32 text-right" />
+        </div>
+      </div>
+
+      <button onClick={save} disabled={saving}
+        className="w-full bg-gradient-to-r from-yellow-500 to-amber-600 text-white py-3 rounded-xl font-bold disabled:opacity-50">
+        {saving ? 'Guardando...' : 'Guardar Configuracion'}
+      </button>
+    </div>
+  );
+};
+
 
 export default ControlPanel;

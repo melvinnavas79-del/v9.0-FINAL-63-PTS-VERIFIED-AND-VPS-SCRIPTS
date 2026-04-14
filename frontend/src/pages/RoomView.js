@@ -23,6 +23,8 @@ const RoomView = ({ roomId, onBack }) => {
   const [gifts, setGifts] = useState({});
   const [sobres, setSobres] = useState([]);
   const [cofresData, setCofresData] = useState(null);
+  const [botOn, setBotOn] = useState(false);
+  const [minimized, setMinimized] = useState(false);
 
   const clientRef = useRef(null);
   const localTrackRef = useRef(null);
@@ -33,7 +35,7 @@ const RoomView = ({ roomId, onBack }) => {
 
   useEffect(() => {
     leaveAgora();
-    loadRoom(); loadChat(); loadGifts(); loadSobres(); loadCofres();
+    loadRoom(); loadChat(); loadGifts(); loadSobres(); loadCofres(); checkBotActive();
     const r = setInterval(loadRoom, 3000);
     const c = setInterval(loadChat, 2000);
     const cf = setInterval(loadCofres, 5000);
@@ -60,6 +62,27 @@ const RoomView = ({ roomId, onBack }) => {
   const loadGifts = async () => { try { const r = await axios.get(`${API}/gifts`); setGifts(r.data); } catch (e) {} };
   const loadSobres = async () => { try { const r = await axios.get(`${API}/sobres`); setSobres(r.data); } catch (e) {} };
   const loadCofres = async () => { try { const r = await axios.get(`${API}/rooms/${roomId}/cofres`); setCofresData(r.data); } catch (e) {} };
+
+  const checkBotActive = async () => {
+    try {
+      const r = await axios.get(`${API}/bot/active-rooms?admin_id=${user.id}`);
+      const active = r.data.find(rm => rm.room_id === roomId && rm.active);
+      setBotOn(!!active && !active.paused);
+    } catch (e) {}
+  };
+
+  const toggleBot = async () => {
+    try {
+      if (botOn) {
+        await axios.post(`${API}/bot/deactivate-room?admin_id=${user.id}&room_id=${roomId}`);
+        setBotOn(false);
+      } else {
+        await axios.post(`${API}/bot/activate-room?admin_id=${user.id}&room_id=${roomId}`);
+        setBotOn(true);
+      }
+      loadChat();
+    } catch (e) { console.error(e); }
+  };
 
   const joinAgora = async () => {
     try {
@@ -155,6 +178,27 @@ const RoomView = ({ roomId, onBack }) => {
   };
 
   if (!room) return <div className="h-screen bg-gradient-to-b from-indigo-950 via-slate-900 to-gray-950 flex items-center justify-center"><div className="text-white">Cargando...</div></div>;
+
+  // MINIMIZED VIEW - floating mini player
+  if (minimized) {
+    return (
+      <div className="fixed bottom-20 left-3 right-3 z-40 bg-gray-900/95 backdrop-blur rounded-2xl p-3 border border-white/10 shadow-2xl">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className={`w-2 h-2 rounded-full ${audioStatus === 'on' ? 'bg-green-400' : 'bg-red-400'}`} />
+            <span className="text-white text-sm font-bold truncate max-w-[120px]">{room.name}</span>
+            <span className="text-white/40 text-xs">{room.active_users}👥</span>
+          </div>
+          <div className="flex items-center gap-2">
+            {mySeat !== null && (
+              <button onClick={toggleMute} className={`w-8 h-8 rounded-full flex items-center justify-center text-sm ${isMuted ? 'bg-red-500' : 'bg-green-500'}`}>{isMuted ? '🔇' : '🎤'}</button>
+            )}
+            <button data-testid="maximize-btn" onClick={() => setMinimized(false)} className="bg-cyan-500 text-white px-3 py-1 rounded-full text-xs font-bold">Abrir</button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const opened = cofresData?.cofres_opened || 0;
   const progress = cofresData?.cofre_progress || 0;
@@ -254,10 +298,16 @@ const RoomView = ({ roomId, onBack }) => {
       <div className="flex-shrink-0 px-3 pt-2 pb-1">
         <div className="flex items-center justify-between">
           <button data-testid="room-back-btn" onClick={() => { leaveAgora(); onBack(); }} className="bg-white/10 text-white px-3 py-1 rounded-full text-xs">← Salir</button>
-          <div className="text-center flex-1 mx-2">
+          <div className="text-center flex-1 mx-1">
             <h2 className="text-white text-sm font-bold truncate">{room.name}</h2>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
+            {/* Minimize */}
+            <button data-testid="minimize-btn" onClick={() => setMinimized(true)} className="bg-white/10 w-7 h-7 rounded-full flex items-center justify-center text-[10px]">⬇️</button>
+            {/* Bot ON/OFF */}
+            {user.role === 'dueño' && (
+              <button data-testid="bot-toggle-room" onClick={toggleBot} className={`w-7 h-7 rounded-full flex items-center justify-center text-[10px] ${botOn ? 'bg-green-500' : 'bg-gray-600'}`}>🤖</button>
+            )}
             <span className={`w-2 h-2 rounded-full ${audioStatus === 'on' ? 'bg-green-400' : 'bg-red-400'}`} />
             <span className="text-white/50 text-xs">{room.active_users}</span>
           </div>

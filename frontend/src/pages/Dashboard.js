@@ -147,7 +147,7 @@ const Dashboard = ({ onNavigate }) => {
 
     return (
     <div className="p-4">
-      {/* Weekly Family Star Banner - MONTHLY WINNERS ON TOP */}
+      {/* Monthly Star Banner - ROUNDED CIRCLES */}
       <div className="bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 rounded-2xl p-3 mb-3 overflow-hidden relative">
         <div className="absolute inset-0 opacity-20" style={{background: 'radial-gradient(circle at 50% 30%, #fbbf24 0%, transparent 70%)'}} />
         <div className="relative">
@@ -155,56 +155,66 @@ const Dashboard = ({ onNavigate }) => {
             <span className="text-2xl" style={{animation: 'pulse 2s infinite'}}>🦁</span>
             <h2 className="text-base font-bold text-yellow-400">Monthly Star</h2>
           </div>
-          <div className="grid grid-cols-3 gap-1 text-center">
-            <div className="bg-white/10 rounded-lg p-1.5" style={{animation: 'fadeIn 0.5s ease'}}>
+          <div className="flex justify-center gap-4">
+            <div className="text-center" style={{animation: 'fadeIn 0.5s ease'}}>
+              <div className="w-14 h-14 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 border-2 border-yellow-400 flex items-center justify-center mx-auto mb-1">
+                <span className="text-lg">🏰</span>
+              </div>
               <div className="text-[9px] text-white/50">Clan Mensual</div>
-              <div className="text-xs font-bold text-yellow-300">{topMonthly[0]?.name || '---'}</div>
+              <div className="text-[10px] font-bold text-yellow-300 truncate max-w-[70px]">{topMonthly[0]?.name || '---'}</div>
             </div>
-            <div className="bg-white/10 rounded-lg p-1.5" style={{animation: 'fadeIn 0.5s ease 0.1s both'}}>
+            <div className="text-center" style={{animation: 'fadeIn 0.5s ease 0.1s both'}}>
+              <div className="w-14 h-14 rounded-full bg-gradient-to-br from-pink-400 to-rose-600 border-2 border-yellow-400 flex items-center justify-center mx-auto mb-1">
+                <span className="text-lg">💖</span>
+              </div>
               <div className="text-[9px] text-white/50">Pareja Mensual</div>
-              <div className="text-xs font-bold text-pink-300">TOP CP</div>
+              <div className="text-[10px] font-bold text-pink-300">TOP CP</div>
             </div>
-            <div className="bg-white/10 rounded-lg p-1.5" style={{animation: 'fadeIn 0.5s ease 0.2s both'}}>
-              <div className="text-[9px] text-white/50">Star Mensual</div>
-              <div className="text-xs font-bold text-cyan-300">{users[0]?.username || '---'}</div>
+            <div className="text-center" style={{animation: 'fadeIn 0.5s ease 0.2s both'}}>
+              <div className="w-14 h-14 rounded-full bg-gradient-to-br from-yellow-400 to-amber-600 border-2 border-yellow-400 flex items-center justify-center mx-auto mb-1">
+                <span className="text-lg">💰</span>
+              </div>
+              <div className="text-[9px] text-white/50">Recarga Mensual</div>
+              <div className="text-[10px] font-bold text-cyan-300">TOP 1</div>
             </div>
           </div>
         </div>
       </div>
       <style>{`@keyframes fadeIn { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }`}</style>
 
-      {/* WEEKLY CARDS - Scrollable */}
-      <div className="grid grid-cols-3 gap-2 mb-4">
+      {/* WEEKLY CARDS - Original style bigger */}
+      <div className="grid grid-cols-3 gap-3 mb-4">
         {/* Clan Semanal */}
-        <button data-testid="nav-clanes-btn" onClick={() => onNavigate('clanes')} className="bg-gradient-to-b from-blue-100 to-blue-50 rounded-2xl p-3 text-center hover:scale-105 transition-transform">
-          <h4 className="font-bold text-gray-700 text-xs mb-1">Clan Semanal</h4>
-          <div className="flex justify-center -space-x-2 mb-1">
-            <div className="w-8 h-8 rounded-full bg-yellow-300 border-2 border-yellow-400 flex items-center justify-center text-xs" style={{animation: 'pulse 2s infinite'}}>🦁</div>
-            <div className="w-8 h-8 rounded-full bg-blue-300 border-2 border-yellow-400 flex items-center justify-center text-xs">👤</div>
+        <button data-testid="nav-clanes-btn" onClick={() => onNavigate('clanes')} className="bg-gradient-to-b from-blue-100 to-blue-50 rounded-2xl p-4 text-center hover:scale-105 transition-transform">
+          <h4 className="font-bold text-gray-800 text-xs mb-2">Clan Semanal</h4>
+          <div className="flex justify-center -space-x-2 mb-2">
+            <div className="w-10 h-10 rounded-full bg-yellow-300 border-2 border-yellow-400 flex items-center justify-center text-sm" style={{animation: 'pulse 2s infinite'}}>🦁</div>
+            <div className="w-10 h-10 rounded-full bg-blue-300 border-2 border-yellow-400 flex items-center justify-center text-sm">👤</div>
+            <div className="w-10 h-10 rounded-full bg-pink-300 border-2 border-yellow-400 flex items-center justify-center text-sm">👩</div>
           </div>
-          <div className="text-[10px] font-bold text-blue-600">{topWeekly[0]?.name || 'TOP'}</div>
+          <div className="text-xs font-bold text-gray-800">🔥 TOP 2 🔥</div>
         </button>
 
         {/* Pareja CP Semanal */}
-        <button data-testid="nav-parejas-btn" onClick={() => onNavigate('parejas')} className="bg-gradient-to-b from-pink-100 to-pink-50 rounded-2xl p-3 text-center hover:scale-105 transition-transform">
-          <h4 className="font-bold text-gray-700 text-xs mb-1">Pareja CP</h4>
-          <div className="flex justify-center items-center gap-0.5 mb-1">
-            <div className="w-8 h-8 rounded-full bg-blue-300 border-2 border-yellow-400 flex items-center justify-center text-xs">👤</div>
-            <div className="text-sm" style={{animation: 'pulse 1.5s infinite'}}>💖</div>
-            <div className="w-8 h-8 rounded-full bg-pink-300 border-2 border-yellow-400 flex items-center justify-center text-xs">👩</div>
+        <button data-testid="nav-parejas-btn" onClick={() => onNavigate('parejas')} className="bg-gradient-to-b from-pink-100 to-pink-50 rounded-2xl p-4 text-center hover:scale-105 transition-transform">
+          <h4 className="font-bold text-gray-800 text-xs mb-2">Pareja CP</h4>
+          <div className="flex justify-center items-center gap-1 mb-2">
+            <div className="w-10 h-10 rounded-full bg-blue-300 border-2 border-yellow-400 flex items-center justify-center text-sm">👤</div>
+            <div className="text-xl" style={{animation: 'pulse 1.5s infinite'}}>💖</div>
+            <div className="w-10 h-10 rounded-full bg-pink-300 border-2 border-yellow-400 flex items-center justify-center text-sm">👩</div>
           </div>
-          <div className="text-[10px] font-bold text-pink-600">PAREJA</div>
+          <div className="text-xs font-bold text-pink-600">🔥 PAREJA 🔥</div>
         </button>
 
         {/* Eventos Semanales */}
-        <div className="bg-gradient-to-b from-green-100 to-green-50 rounded-2xl p-3 text-center hover:scale-105 transition-transform">
-          <h4 className="font-bold text-gray-700 text-xs mb-1">Eventos</h4>
-          <div className="flex justify-center -space-x-2 mb-1">
+        <div className="bg-gradient-to-b from-green-100 to-green-50 rounded-2xl p-4 text-center hover:scale-105 transition-transform">
+          <h4 className="font-bold text-gray-800 text-xs mb-2">Eventos</h4>
+          <div className="flex justify-center -space-x-2 mb-2">
             {users.slice(0, 3).map((u, i) => (
-              <img key={i} src={u.avatar} alt="" className="w-8 h-8 rounded-full border-2 border-yellow-400 object-cover" style={{animation: `fadeIn 0.3s ease ${i * 0.1}s both`}} />
+              <img key={i} src={u.avatar} alt="" className="w-10 h-10 rounded-full border-2 border-yellow-400 object-cover" style={{animation: `fadeIn 0.3s ease ${i * 0.1}s both`}} />
             ))}
           </div>
-          <div className="text-[10px] font-bold text-green-600">TOP 3</div>
+          <div className="text-xs font-bold text-green-600">🔥 TOP 3 🔥</div>
         </div>
       </div>
 
