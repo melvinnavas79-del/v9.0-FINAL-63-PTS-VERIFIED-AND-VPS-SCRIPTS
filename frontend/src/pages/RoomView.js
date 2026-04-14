@@ -521,6 +521,12 @@ const RoomView = ({ roomId, onBack }) => {
                 }}
                 onClose={() => setPanel(null)}
                 onPlayClassic={(gameId, cost) => playMiniGame(gameId, cost)}
+                onStartPK={() => {
+                  const others = room.seats.filter(s => s && s.user_id !== user.id);
+                  if (others.length === 0) { alert('No hay otros usuarios en la sala'); return; }
+                  setPanel(null);
+                  startPK(others[0]);
+                }}
               />
             )}
 
