@@ -299,10 +299,83 @@ const Dashboard = ({ onNavigate }) => {
   );
 
   const renderEvent = () => (
-    <div className="p-4 text-center py-12">
-      <div className="text-6xl mb-4">🎉</div>
-      <h3 className="text-xl font-bold text-gray-800 mb-2">Eventos</h3>
-      <p className="text-gray-500">Próximamente eventos especiales</p>
+    <div className="p-4">
+      {/* 3 Event cards - same style as lista/Pareja/Clan */}
+      <div className="grid grid-cols-3 gap-3 mb-4">
+        {/* King Event */}
+        <div className="bg-gradient-to-b from-yellow-200 to-yellow-100 rounded-2xl p-4 text-center shadow-sm">
+          <h4 className="font-bold text-gray-800 text-sm mb-2">King</h4>
+          <div className="flex justify-center -space-x-2 mb-2">
+            {users.slice(0, 3).length > 0 ? users.slice(0, 3).map((u, i) => (
+              <img key={i} src={u.avatar} alt="" className="w-11 h-11 rounded-full border-2 border-yellow-400 object-cover" />
+            )) : [1,2,3].map(i => (
+              <div key={i} className="w-11 h-11 rounded-full bg-yellow-300 border-2 border-yellow-400 flex items-center justify-center text-sm">👑</div>
+            ))}
+          </div>
+          <div className="text-sm font-bold text-gray-800">👑 TOP 3 👑</div>
+        </div>
+
+        {/* CP Event */}
+        <div className="bg-gradient-to-b from-pink-200 to-pink-100 rounded-2xl p-4 text-center shadow-sm">
+          <h4 className="font-bold text-gray-800 text-sm mb-2">CP Event</h4>
+          <div className="flex justify-center -space-x-2 mb-2">
+            {users.slice(0, 3).length > 0 ? users.slice(0, 3).map((u, i) => (
+              <img key={i} src={u.avatar} alt="" className="w-11 h-11 rounded-full border-2 border-yellow-400 object-cover" />
+            )) : [1,2,3].map(i => (
+              <div key={i} className="w-11 h-11 rounded-full bg-pink-300 border-2 border-yellow-400 flex items-center justify-center text-sm">💖</div>
+            ))}
+          </div>
+          <div className="text-sm font-bold text-pink-600">👑 TOP 3 👑</div>
+        </div>
+
+        {/* Recarga Event */}
+        <div className="bg-gradient-to-b from-green-200 to-green-100 rounded-2xl p-4 text-center shadow-sm">
+          <h4 className="font-bold text-gray-800 text-sm mb-2">Recarga</h4>
+          <div className="flex justify-center -space-x-2 mb-2">
+            {users.slice(0, 3).length > 0 ? users.slice(0, 3).map((u, i) => (
+              <img key={i} src={u.avatar} alt="" className="w-11 h-11 rounded-full border-2 border-yellow-400 object-cover" />
+            )) : [1,2,3].map(i => (
+              <div key={i} className="w-11 h-11 rounded-full bg-green-300 border-2 border-yellow-400 flex items-center justify-center text-sm">💰</div>
+            ))}
+          </div>
+          <div className="text-sm font-bold text-gray-800">👑 TOP 3 👑</div>
+        </div>
+      </div>
+
+      {/* Upcoming Events */}
+      <h3 className="text-lg font-bold text-gray-800 mb-3">🎉 Eventos Activos</h3>
+      <div className="space-y-3">
+        <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 bg-gradient-to-br from-yellow-400 to-amber-500 rounded-xl flex items-center justify-center text-white text-xl">👑</div>
+            <div className="flex-1">
+              <h4 className="font-bold text-gray-800">Evento King Semanal</h4>
+              <p className="text-gray-500 text-sm">Top 3 ganan hasta 45M monedas</p>
+            </div>
+            <span className="bg-green-100 text-green-600 text-xs px-2 py-1 rounded-full font-bold">ACTIVO</span>
+          </div>
+        </div>
+        <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 bg-gradient-to-br from-pink-400 to-rose-500 rounded-xl flex items-center justify-center text-white text-xl">💖</div>
+            <div className="flex-1">
+              <h4 className="font-bold text-gray-800">CP Nivel 6 & 7</h4>
+              <p className="text-gray-500 text-sm">Parejas compiten por 5M+</p>
+            </div>
+            <span className="bg-green-100 text-green-600 text-xs px-2 py-1 rounded-full font-bold">ACTIVO</span>
+          </div>
+        </div>
+        <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 bg-gradient-to-br from-green-400 to-emerald-500 rounded-xl flex items-center justify-center text-white text-xl">💰</div>
+            <div className="flex-1">
+              <h4 className="font-bold text-gray-800">Recarga Mensual</h4>
+              <p className="text-gray-500 text-sm">Top recargadores ganan premios</p>
+            </div>
+            <span className="bg-blue-100 text-blue-600 text-xs px-2 py-1 rounded-full font-bold">MENSUAL</span>
+          </div>
+        </div>
+      </div>
     </div>
   );
 

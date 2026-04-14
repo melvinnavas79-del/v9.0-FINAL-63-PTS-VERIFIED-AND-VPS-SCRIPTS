@@ -12,9 +12,11 @@ const BotFloating = ({ userId, userRole }) => {
   const [speaking, setSpeaking] = useState(false);
   const [voiceEnabled, setVoiceEnabled] = useState(true);
   const [voiceUnlocked, setVoiceUnlocked] = useState(false);
+  const [showVoicePanel, setShowVoicePanel] = useState(false);
+  const [voiceMode, setVoiceMode] = useState(localStorage.getItem('bot_voice') || 'mujer');
+  const [availableVoices, setAvailableVoices] = useState([]);
   const chatRef = useRef(null);
   const recognitionRef = useRef(null);
-  const pendingSpeechRef = useRef(null);
 
   useEffect(() => {
     if (chatRef.current) chatRef.current.scrollTop = chatRef.current.scrollHeight;
@@ -44,15 +46,51 @@ const BotFloating = ({ userId, userRole }) => {
     }
   }, []);
 
-  // Load voices
+  // Load voices and find best ones
   useEffect(() => {
+    const loadVoices = () => {
+      if (!window.speechSynthesis) return;
+      const voices = window.speechSynthesis.getVoices();
+      if (voices.length > 0) setAvailableVoices(voices);
+    };
+    loadVoices();
     if (window.speechSynthesis) {
-      window.speechSynthesis.getVoices();
-      window.speechSynthesis.onvoiceschanged = () => window.speechSynthesis.getVoices();
+      window.speechSynthesis.onvoiceschanged = loadVoices;
     }
   }, []);
 
   if (userRole !== 'dueño') return null;
+
+  // Find the best voice for a given profile
+  const findBestVoice = (profile) => {
+    const voices = availableVoices.length > 0 ? availableVoices : (window.speechSynthesis?.getVoices() || []);
+    const esVoices = voices.filter(v => v.lang.startsWith('es'));
+    // Preference: Google > Microsoft > Apple > Default
+    const googleVoices = esVoices.filter(v => v.name.includes('Google'));
+    const msVoices = esVoices.filter(v => v.name.includes('Microsoft'));
+    const premiumVoices = [...googleVoices, ...msVoices];
+    
+    switch(profile) {
+      case 'mujer': {
+        // Look for female voice names
+        const femaleKeywords = ['female', 'mujer', 'Lucia', 'Elena', 'Conchita', 'Penelope', 'Lupe', 'Miren', 'femenin'];
+        const femaleVoice = premiumVoices.find(v => femaleKeywords.some(k => v.name.toLowerCase().includes(k.toLowerCase())));
+        return femaleVoice || premiumVoices.find(v => v.lang === 'es-ES') || esVoices[0] || null;
+      }
+      case 'hombre': {
+        const maleKeywords = ['male', 'hombre', 'Enrique', 'Jorge', 'Pablo', 'Diego', 'Andres', 'masculin'];
+        const maleVoice = premiumVoices.find(v => maleKeywords.some(k => v.name.toLowerCase().includes(k.toLowerCase())));
+        return maleVoice || premiumVoices.find(v => v.lang === 'es-MX') || esVoices[1] || esVoices[0] || null;
+      }
+      case 'animador': {
+        return premiumVoices.find(v => v.lang === 'es-MX') || esVoices.find(v => v.lang === 'es-MX') || premiumVoices[0] || esVoices[0] || null;
+      }
+      case 'serio': {
+        return premiumVoices.find(v => v.lang === 'es-ES') || esVoices.find(v => v.lang === 'es-ES') || premiumVoices[0] || esVoices[0] || null;
+      }
+      default: return premiumVoices[0] || esVoices[0] || null;
+    }
+  };
 
   // Unlock iOS audio with user gesture
   const unlockVoice = () => {
@@ -69,26 +107,61 @@ const BotFloating = ({ userId, userRole }) => {
     if (!voiceEnabled || !window.speechSynthesis) return;
     window.speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = 'es-ES';
-    // Get saved voice preference from localStorage
-    const voicePref = localStorage.getItem('bot_voice') || 'hombre';
+    
     const voiceConfigs = {
-      hombre: { pitch: 0.9, rate: 1.0, lang: 'es-ES' },
-      mujer: { pitch: 1.3, rate: 1.0, lang: 'es-ES' },
-      animador: { pitch: 1.1, rate: 1.15, lang: 'es-MX' },
-      serio: { pitch: 0.8, rate: 0.95, lang: 'es-ES' },
+      hombre:   { pitch: 0.85, rate: 1.0, volume: 1.0 },
+      mujer:    { pitch: 1.2,  rate: 1.0, volume: 1.0 },
+      animador: { pitch: 1.05, rate: 1.2, volume: 1.0 },
+      serio:    { pitch: 0.7,  rate: 0.9, volume: 1.0 },
     };
-    const cfg = voiceConfigs[voicePref] || voiceConfigs.hombre;
+    const cfg = voiceConfigs[voiceMode] || voiceConfigs.mujer;
     utterance.pitch = cfg.pitch;
     utterance.rate = cfg.rate;
-    utterance.lang = cfg.lang;
-    utterance.volume = 1.0;
-    const voices = window.speechSynthesis.getVoices();
-    const esVoice = voices.find(v => v.lang === cfg.lang || v.lang.startsWith('es'));
-    if (esVoice) utterance.voice = esVoice;
+    utterance.volume = cfg.volume;
+    
+    const bestVoice = findBestVoice(voiceMode);
+    if (bestVoice) {
+      utterance.voice = bestVoice;
+      utterance.lang = bestVoice.lang;
+    } else {
+      utterance.lang = voiceMode === 'animador' ? 'es-MX' : 'es-ES';
+    }
+    
     utterance.onstart = () => setSpeaking(true);
     utterance.onend = () => setSpeaking(false);
     utterance.onerror = () => setSpeaking(false);
+    window.speechSynthesis.speak(utterance);
+  };
+
+  const previewVoice = (mode) => {
+    const previews = {
+      hombre: 'Hola, soy tu asistente con voz masculina.',
+      mujer: 'Hola, soy tu asistente con voz femenina.',
+      animador: 'Buenas noches a todos! Bienvenidos a Lluvia Live!',
+      serio: 'Bienvenidos. Soy el administrador de esta sala.',
+    };
+    const oldMode = voiceMode;
+    setVoiceMode(mode);
+    localStorage.setItem('bot_voice', mode);
+    // Need to speak with the new mode
+    if (!window.speechSynthesis) return;
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(previews[mode]);
+    const voiceConfigs = {
+      hombre:   { pitch: 0.85, rate: 1.0 },
+      mujer:    { pitch: 1.2,  rate: 1.0 },
+      animador: { pitch: 1.05, rate: 1.2 },
+      serio:    { pitch: 0.7,  rate: 0.9 },
+    };
+    const cfg = voiceConfigs[mode];
+    utterance.pitch = cfg.pitch;
+    utterance.rate = cfg.rate;
+    utterance.volume = 1.0;
+    const bestVoice = findBestVoice(mode);
+    if (bestVoice) { utterance.voice = bestVoice; utterance.lang = bestVoice.lang; }
+    else { utterance.lang = 'es-ES'; }
+    utterance.onstart = () => setSpeaking(true);
+    utterance.onend = () => setSpeaking(false);
     window.speechSynthesis.speak(utterance);
   };
 
@@ -156,18 +229,46 @@ const BotFloating = ({ userId, userRole }) => {
                 <div>
                   <div className="text-white font-bold text-sm">Bot Lluvia Live</div>
                   <div className={`text-[10px] ${listening ? 'text-red-400' : speaking ? 'text-yellow-400' : 'text-green-400'}`}>
-                    {listening ? '🎙️ Escuchando...' : speaking ? '🔊 Hablando...' : 'Privado - Voz activa'}
+                    {listening ? '🎙️ Escuchando...' : speaking ? '🔊 Hablando...' : `Voz: ${voiceMode}`}
                   </div>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1">
+                <button data-testid="bot-voice-select" onClick={() => { unlockVoice(); setShowVoicePanel(!showVoicePanel); }}
+                  className="text-[10px] px-2 py-1 rounded-full bg-purple-700 text-white">
+                  {voiceMode === 'mujer' ? '👩' : voiceMode === 'hombre' ? '👨' : voiceMode === 'animador' ? '🎙️' : '🎩'}
+                </button>
                 <button data-testid="bot-voice-toggle" onClick={() => { unlockVoice(); setVoiceEnabled(!voiceEnabled); }}
                   className={`text-xs px-2 py-1 rounded-full ${voiceEnabled ? 'bg-green-600 text-white' : 'bg-gray-700 text-gray-400'}`}>
                   {voiceEnabled ? '🔊' : '🔇'}
                 </button>
-                <button data-testid="bot-close-btn" onClick={() => { window.speechSynthesis?.cancel(); setOpen(false); }} className="text-white/50 hover:text-white text-lg">✕</button>
+                <button data-testid="bot-close-btn" onClick={() => { window.speechSynthesis?.cancel(); setOpen(false); setShowVoicePanel(false); }} className="text-white/50 hover:text-white text-lg">✕</button>
               </div>
             </div>
+
+            {/* Voice Selector Panel */}
+            {showVoicePanel && (
+              <div className="p-3 border-b border-gray-700 bg-gray-800/80 flex-shrink-0">
+                <div className="text-[10px] text-white/50 mb-2 font-bold">SELECCIONAR VOZ</div>
+                <div className="grid grid-cols-4 gap-2">
+                  {[
+                    { id: 'mujer', label: 'Mujer', icon: '👩', desc: 'Voz femenina' },
+                    { id: 'hombre', label: 'Hombre', icon: '👨', desc: 'Voz masculina' },
+                    { id: 'animador', label: 'Animador', icon: '🎙️', desc: 'Energetico' },
+                    { id: 'serio', label: 'Serio', icon: '🎩', desc: 'Formal' },
+                  ].map(v => (
+                    <button key={v.id} onClick={() => previewVoice(v.id)}
+                      className={`p-2 rounded-xl text-center transition-all ${
+                        voiceMode === v.id ? 'bg-purple-600 text-white ring-2 ring-purple-400' : 'bg-gray-700 text-white/60 hover:bg-gray-600'
+                      }`}>
+                      <div className="text-lg">{v.icon}</div>
+                      <div className="text-[9px] font-bold">{v.label}</div>
+                    </button>
+                  ))}
+                </div>
+                <div className="text-[9px] text-white/30 mt-2 text-center">Toca para escuchar una muestra</div>
+              </div>
+            )}
 
             {/* Messages */}
             <div ref={chatRef} className="flex-1 overflow-y-auto p-3 space-y-2 min-h-0">

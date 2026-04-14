@@ -123,6 +123,13 @@ const ControlPanel = ({ onBack }) => {
     } catch (err) { alert(err.response?.data?.detail || 'Error'); }
   };
 
+  const saveConfig = async () => {
+    try {
+      await axios.put(`${API}/admin/config?admin_id=${user.id}`, config);
+      alert('Configuracion guardada!');
+    } catch (err) { alert(err.response?.data?.detail || 'Error'); }
+  };
+
   const banUser = async (userId) => {
     if (!window.confirm('¿Banear este usuario?')) return;
     try {
@@ -340,13 +347,12 @@ const ControlPanel = ({ onBack }) => {
           </>
         )}
 
-        {/* EVENTS - now part of config */}
-        {/* CONFIG - Events + Clanes + Rooms + Prizes */}
+        {/* CONFIG - All Config in one block */}
         {activeTab === 'config' && (
           <div>
             <h3 className="text-lg font-bold text-yellow-400 mb-4">⚙️ Configuracion General</h3>
             
-            {/* Weekly */}
+            {/* Weekly Events */}
             <div className="bg-gray-900 rounded-xl p-5 border border-gray-800 mb-4">
               <h4 className="font-bold text-white mb-3">📅 Evento Semanal - Top 3</h4>
               <div className="grid grid-cols-3 gap-3 mb-3">
@@ -372,7 +378,7 @@ const ControlPanel = ({ onBack }) => {
               </button>
             </div>
 
-            {/* Clanes */}
+            {/* Clanes Prizes */}
             <div className="bg-gray-900 rounded-xl p-5 border border-gray-800 mb-4">
               <h4 className="font-bold text-white mb-3">🏷️ Premios Clanes</h4>
               <p className="text-gray-400 text-sm mb-3">1° = 25M + Arist.6 | 2° = 20M + Arist.5 | 3° = 15M + Arist.4</p>
@@ -384,34 +390,16 @@ const ControlPanel = ({ onBack }) => {
 
             {/* Baby Robot */}
             <div className="bg-gray-900 rounded-xl p-5 border border-gray-800 mb-4">
-              <h4 className="font-bold text-white mb-3">🤖 Bebé Robot</h4>
+              <h4 className="font-bold text-white mb-3">🤖 Bebe Robot</h4>
               <p className="text-gray-400 text-sm mb-3">Meta global: 25M → Bono 15M repartido</p>
               <button onClick={triggerBabyRobot}
                 className="w-full bg-gradient-to-r from-green-600 to-emerald-600 py-3 rounded-xl font-bold">
-                🤖 ACTIVAR BEBÉ ROBOT
+                🤖 ACTIVAR BEBE ROBOT
               </button>
             </div>
 
-            {/* History */}
-            <h4 className="font-bold text-white mb-2">📜 Historial</h4>
-            <div className="space-y-2">
-              {events.map(e => (
-                <div key={e.id} className="bg-gray-900 rounded-lg p-3 border border-gray-800 text-sm">
-                  <span className="text-yellow-400 font-bold">{e.type}</span>
-                  <span className="text-gray-500 ml-2">{e.created_at?.split('T')[0]}</span>
-                </div>
-              ))}
-              {events.length === 0 && <p className="text-gray-600 text-center py-4">Sin eventos registrados</p>}
-            </div>
-          </div>
-        )}
-
-        {/* CONFIG - System Config + Prices + Events + Rooms + Clanes + Prizes */}
-        {activeTab === 'config' && (
-          <div>
-            <h3 className="text-lg font-bold text-yellow-400 mb-4">⚙️ Configuracion</h3>
-            
             {/* System Config */}
+            <h4 className="font-bold text-white mb-3">🔧 Precios y Valores</h4>
             <div className="space-y-3 mb-6">
               {Object.entries(config).map(([key, value]) => (
                 <div key={key} className="bg-gray-900 rounded-xl p-3 border border-gray-800 flex items-center justify-between">
@@ -421,7 +409,7 @@ const ControlPanel = ({ onBack }) => {
                     className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-yellow-400 font-bold w-28 text-right text-sm" />
                 </div>
               ))}
-              <button onClick={saveConfig} className="w-full bg-gradient-to-r from-yellow-600 to-amber-600 py-3 rounded-xl font-bold">Guardar Config</button>
+              <button onClick={saveConfig} data-testid="save-config-btn" className="w-full bg-gradient-to-r from-yellow-600 to-amber-600 py-3 rounded-xl font-bold">Guardar Config</button>
             </div>
 
             {/* Prizes */}
@@ -458,6 +446,18 @@ const ControlPanel = ({ onBack }) => {
                   <span className="text-gray-400 text-xs">{c.members?.length || 0} miembros</span>
                 </div>
               ))}
+            </div>
+
+            {/* History */}
+            <h4 className="font-bold text-white mt-6 mb-2">📜 Historial de Eventos</h4>
+            <div className="space-y-2">
+              {events.map(e => (
+                <div key={e.id} className="bg-gray-900 rounded-lg p-3 border border-gray-800 text-sm">
+                  <span className="text-yellow-400 font-bold">{e.type}</span>
+                  <span className="text-gray-500 ml-2">{e.created_at?.split('T')[0]}</span>
+                </div>
+              ))}
+              {events.length === 0 && <p className="text-gray-600 text-center py-4">Sin eventos registrados</p>}
             </div>
           </div>
         )}
