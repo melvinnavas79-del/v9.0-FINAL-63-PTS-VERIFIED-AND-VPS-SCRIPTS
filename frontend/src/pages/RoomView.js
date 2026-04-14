@@ -181,13 +181,19 @@ const RoomView = ({ roomId, onBack }) => {
     } catch (e) { alert('Error'); }
   };
 
+  const [gameResult, setGameResult] = useState(null);
+
   const playMiniGame = async (gameId, cost) => {
+    setGameResult(null);
     try {
       const r = await axios.post(`${API}/games/play`, { user_id: user.id, game: gameId, bet: cost || 500 });
       if (r.data.new_balance !== undefined) updateUser({ coins: r.data.new_balance });
-      const msg = r.data.won ? `🎉 Ganaste ${(r.data.prize || 0).toLocaleString()} monedas!` : '😔 Perdiste. Intenta de nuevo!';
-      alert(msg);
-    } catch (e) { alert(e.response?.data?.detail || 'Error'); }
+      setGameResult(r.data);
+      setTimeout(() => setGameResult(null), 4000);
+    } catch (e) {
+      setGameResult({ won: false, error: e.response?.data?.detail || 'Error' });
+      setTimeout(() => setGameResult(null), 3000);
+    }
   };
 
   if (!room) return <div className="h-screen bg-gradient-to-b from-indigo-950 via-slate-900 to-gray-950 flex items-center justify-center"><div className="text-white">Cargando...</div></div>;
@@ -318,7 +324,16 @@ const RoomView = ({ roomId, onBack }) => {
             )}
 
             {panel === 'games' && (
-              <div className="grid grid-cols-3 gap-2">
+              <>
+                {gameResult && (
+                  <div className={`text-center p-3 rounded-xl mb-3 ${gameResult.won ? 'bg-yellow-500/20 border border-yellow-500/30' : 'bg-red-500/20 border border-red-500/30'}`}>
+                    <div className="text-2xl mb-1">{gameResult.won ? '🏆' : '💨'}</div>
+                    <div className={`font-bold text-sm ${gameResult.won ? 'text-yellow-300' : 'text-red-300'}`}>
+                      {gameResult.error || (gameResult.won ? `+${(gameResult.prize || 0).toLocaleString()} (x${gameResult.multiplier})` : 'Perdiste! Intenta')}
+                    </div>
+                  </div>
+                )}
+                <div className="grid grid-cols-3 gap-2">
                 {[
                   { id: 'slots', name: 'Lucky 777', emoji: '🎰', cost: 1000, color: 'from-red-600/40 to-yellow-600/40' },
                   { id: 'ruleta', name: 'Ruleta', emoji: '🎡', cost: 500, color: 'from-yellow-500/40 to-orange-600/40' },
@@ -334,7 +349,8 @@ const RoomView = ({ roomId, onBack }) => {
                     <div className="text-yellow-300 text-[9px]">{g.cost.toLocaleString()} coins</div>
                   </button>
                 ))}
-              </div>
+                </div>
+              </>
             )}
 
             <p className="text-yellow-400/50 text-[10px] text-center mt-2">Tus monedas: {(user.coins || 0).toLocaleString()}</p>

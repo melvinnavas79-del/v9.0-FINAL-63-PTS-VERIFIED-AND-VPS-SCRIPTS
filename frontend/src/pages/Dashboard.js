@@ -147,80 +147,67 @@ const Dashboard = ({ onNavigate }) => {
 
     return (
     <div className="p-4">
-      {/* Monthly Star Banner - ROUNDED CIRCLES */}
-      <div className="bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 rounded-2xl p-3 mb-3 overflow-hidden relative">
-        <div className="absolute inset-0 opacity-20" style={{background: 'radial-gradient(circle at 50% 30%, #fbbf24 0%, transparent 70%)'}} />
-        <div className="relative">
-          <div className="flex items-center justify-center gap-2 mb-2">
-            <span className="text-2xl" style={{animation: 'pulse 2s infinite'}}>🦁</span>
-            <h2 className="text-base font-bold text-yellow-400">Monthly Star</h2>
-          </div>
-          <div className="flex justify-center gap-4">
+      {/* Monthly Star Banner - GOLD BACKGROUND */}
+      <div className="rounded-2xl p-4 mb-3 overflow-hidden relative" style={{background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)'}}>
+        <div className="absolute inset-0 opacity-30" style={{background: 'radial-gradient(circle at 50% 50%, #d4a017 0%, transparent 60%)'}} />
+        <div className="relative flex items-center justify-center">
+          <div className="flex justify-center gap-5">
             <div className="text-center" style={{animation: 'fadeIn 0.5s ease'}}>
-              <div className="w-14 h-14 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 border-2 border-yellow-400 flex items-center justify-center mx-auto mb-1">
+              <div className="w-14 h-14 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 border-2 border-yellow-400 flex items-center justify-center mx-auto mb-1 shadow-lg">
                 <span className="text-lg">🏰</span>
               </div>
-              <div className="text-[9px] text-white/50">Clan Mensual</div>
-              <div className="text-[10px] font-bold text-yellow-300 truncate max-w-[70px]">{topMonthly[0]?.name || '---'}</div>
+              <div className="text-[9px] text-white/60">Clan</div>
+            </div>
+            <div className="text-center">
+              <div className="text-3xl mb-1" style={{animation: 'pulse 2s infinite'}}>🦁</div>
+              <h2 className="text-sm font-bold text-yellow-400" style={{textShadow: '0 0 10px rgba(212,160,23,0.5)'}}>Monthly Star</h2>
             </div>
             <div className="text-center" style={{animation: 'fadeIn 0.5s ease 0.1s both'}}>
-              <div className="w-14 h-14 rounded-full bg-gradient-to-br from-pink-400 to-rose-600 border-2 border-yellow-400 flex items-center justify-center mx-auto mb-1">
+              <div className="w-14 h-14 rounded-full bg-gradient-to-br from-pink-400 to-rose-600 border-2 border-yellow-400 flex items-center justify-center mx-auto mb-1 shadow-lg">
                 <span className="text-lg">💖</span>
               </div>
-              <div className="text-[9px] text-white/50">Pareja Mensual</div>
-              <div className="text-[10px] font-bold text-pink-300">TOP CP</div>
-            </div>
-            <div className="text-center" style={{animation: 'fadeIn 0.5s ease 0.2s both'}}>
-              <div className="w-14 h-14 rounded-full bg-gradient-to-br from-yellow-400 to-amber-600 border-2 border-yellow-400 flex items-center justify-center mx-auto mb-1">
-                <span className="text-lg">💰</span>
-              </div>
-              <div className="text-[9px] text-white/50">Recarga Mensual</div>
-              <div className="text-[10px] font-bold text-cyan-300">TOP 1</div>
+              <div className="text-[9px] text-white/60">Pareja</div>
             </div>
           </div>
         </div>
       </div>
       <style>{`@keyframes fadeIn { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }`}</style>
 
-      {/* WEEKLY CARDS - Original style bigger */}
+      {/* WEEKLY CARDS - Original style: lista (cyan), Pareja (pink), Clan (blue) */}
       <div className="grid grid-cols-3 gap-3 mb-4">
-        {/* Clan Semanal */}
-        <button data-testid="nav-clanes-btn" onClick={() => onNavigate('clanes')} className="bg-gradient-to-b from-blue-100 to-blue-50 rounded-2xl p-4 text-center hover:scale-105 transition-transform">
-          <h4 className="font-bold text-gray-800 text-xs mb-2">Clan Semanal</h4>
-          <div className="flex justify-center -space-x-2 mb-2">
-            <div className="w-10 h-10 rounded-full bg-yellow-300 border-2 border-yellow-400 flex items-center justify-center text-sm" style={{animation: 'pulse 2s infinite'}}>🦁</div>
-            <div className="w-10 h-10 rounded-full bg-blue-300 border-2 border-yellow-400 flex items-center justify-center text-sm">👤</div>
-            <div className="w-10 h-10 rounded-full bg-pink-300 border-2 border-yellow-400 flex items-center justify-center text-sm">👩</div>
-          </div>
-          <div className="text-xs font-bold text-gray-800">🔥 TOP 2 🔥</div>
-        </button>
-
-        {/* Pareja CP Semanal */}
-        <button data-testid="nav-parejas-btn" onClick={() => onNavigate('parejas')} className="bg-gradient-to-b from-pink-100 to-pink-50 rounded-2xl p-4 text-center hover:scale-105 transition-transform">
-          <h4 className="font-bold text-gray-800 text-xs mb-2">Pareja CP</h4>
-          <div className="flex justify-center items-center gap-1 mb-2">
-            <div className="w-10 h-10 rounded-full bg-blue-300 border-2 border-yellow-400 flex items-center justify-center text-sm">👤</div>
-            <div className="text-xl" style={{animation: 'pulse 1.5s infinite'}}>💖</div>
-            <div className="w-10 h-10 rounded-full bg-pink-300 border-2 border-yellow-400 flex items-center justify-center text-sm">👩</div>
-          </div>
-          <div className="text-xs font-bold text-pink-600">🔥 PAREJA 🔥</div>
-        </button>
-
-        {/* Eventos Semanales */}
-        <button onClick={() => onNavigate('games')} className="bg-gradient-to-b from-green-100 to-green-50 rounded-2xl p-4 text-center hover:scale-105 transition-transform cursor-pointer">
-          <h4 className="font-bold text-gray-800 text-xs mb-2">Eventos</h4>
+        {/* lista */}
+        <div className="bg-gradient-to-b from-cyan-200 to-cyan-100 rounded-2xl p-4 text-center shadow-sm">
+          <h4 className="font-bold text-gray-800 text-sm mb-2">lista</h4>
           <div className="flex justify-center -space-x-2 mb-2">
             {users.slice(0, 3).length > 0 ? users.slice(0, 3).map((u, i) => (
-              <img key={i} src={u.avatar} alt="" className="w-10 h-10 rounded-full border-2 border-yellow-400 object-cover" style={{animation: `fadeIn 0.3s ease ${i * 0.1}s both`}} />
-            )) : (
-              <>
-                <div className="w-10 h-10 rounded-full bg-green-300 border-2 border-yellow-400 flex items-center justify-center text-sm">🏆</div>
-                <div className="w-10 h-10 rounded-full bg-emerald-300 border-2 border-yellow-400 flex items-center justify-center text-sm">🎮</div>
-                <div className="w-10 h-10 rounded-full bg-lime-300 border-2 border-yellow-400 flex items-center justify-center text-sm">⭐</div>
-              </>
-            )}
+              <img key={i} src={u.avatar} alt="" className="w-11 h-11 rounded-full border-2 border-yellow-400 object-cover" />
+            )) : [1,2,3].map(i => (
+              <div key={i} className="w-11 h-11 rounded-full bg-blue-300 border-2 border-yellow-400 flex items-center justify-center text-sm">👤</div>
+            ))}
           </div>
-          <div className="text-xs font-bold text-green-600">🔥 TOP 3 🔥</div>
+          <div className="text-sm font-bold text-gray-800">👑 TOP 3 👑</div>
+        </div>
+
+        {/* Pareja */}
+        <button data-testid="nav-parejas-btn" onClick={() => onNavigate('parejas')} className="bg-gradient-to-b from-pink-200 to-pink-100 rounded-2xl p-4 text-center shadow-sm hover:scale-105 transition-transform">
+          <h4 className="font-bold text-gray-800 text-sm mb-2">Pareja</h4>
+          <div className="flex justify-center items-center gap-1 mb-2">
+            <div className="w-11 h-11 rounded-full bg-blue-300 border-2 border-yellow-400 flex items-center justify-center text-sm">👤</div>
+            <div className="text-xl" style={{animation: 'pulse 1.5s infinite'}}>💖</div>
+            <div className="w-11 h-11 rounded-full bg-pink-300 border-2 border-yellow-400 flex items-center justify-center text-sm">👩</div>
+          </div>
+          <div className="text-sm font-bold text-pink-600">👑 PAREJA 👑</div>
+        </button>
+
+        {/* Clan */}
+        <button data-testid="nav-clanes-btn" onClick={() => onNavigate('clanes')} className="bg-gradient-to-b from-blue-200 to-blue-100 rounded-2xl p-4 text-center shadow-sm hover:scale-105 transition-transform">
+          <h4 className="font-bold text-gray-800 text-sm mb-2">Clan</h4>
+          <div className="flex justify-center -space-x-2 mb-2">
+            <div className="w-11 h-11 rounded-full bg-yellow-300 border-2 border-yellow-400 flex items-center justify-center text-sm" style={{animation: 'pulse 2s infinite'}}>🦁</div>
+            <div className="w-11 h-11 rounded-full bg-blue-300 border-2 border-yellow-400 flex items-center justify-center text-sm">👤</div>
+            <div className="w-11 h-11 rounded-full bg-pink-300 border-2 border-yellow-400 flex items-center justify-center text-sm">👩</div>
+          </div>
+          <div className="text-sm font-bold text-gray-800">👑 TOP 2 👑</div>
         </button>
       </div>
 
