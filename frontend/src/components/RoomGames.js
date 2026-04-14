@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import LudoGame from './LudoGame';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -281,6 +282,21 @@ const RoomGames = ({ userId, userAvatar, userName, userCoins, onResult, onClose,
   if (activeGame) {
     const game = GAMES.find(g => g.id === activeGame);
     if (!game) { setActiveGame(null); return null; }
+    
+    // LUDO gets the real board game
+    if (game.id === 'ludo') {
+      return (
+        <LudoGame
+          userId={userId}
+          userName={userName}
+          userAvatar={userAvatar}
+          bet={5000}
+          onResult={onResult}
+          onClose={() => setActiveGame(null)}
+        />
+      );
+    }
+    
     return (
       <GameLobby
         game={game}
