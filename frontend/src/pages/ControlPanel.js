@@ -10,7 +10,7 @@ const ControlPanel = ({ onBack }) => {
   const [rooms, setRooms] = useState([]);
   const [clanes, setClanes] = useState([]);
   const [events, setEvents] = useState([]);
-  const [activeTab, setActiveTab] = useState('dashboard');
+  const [activeTab, setActiveTab] = useState('salas');
   const [searchQuery, setSearchQuery] = useState('');
 
   // Event Creator
@@ -186,15 +186,10 @@ const ControlPanel = ({ onBack }) => {
   const totalCoins = users.reduce((a, u) => a + (u.coins || 0), 0);
 
   const tabs = [
-    { id: 'dashboard', label: '📊 Panel', icon: '📊' },
-    { id: 'users', label: '👥 Usuarios', icon: '👥' },
-    { id: 'events', label: '🏆 Eventos', icon: '🏆' },
-    { id: 'clanes', label: '🏷️ Clanes', icon: '🏷️' },
-    { id: 'rooms', label: '🏠 Salas', icon: '🏠' },
-    { id: 'config', label: '⚙️ Config', icon: '⚙️' },
-    { id: 'prizes', label: '💰 Premios', icon: '💰' },
-    { id: 'console', label: '💻 Consola', icon: '💻' },
-    { id: 'bot', label: '🤖 Bot IA', icon: '🤖' },
+    { id: 'salas', label: 'Salas', icon: '🏠' },
+    { id: 'config', label: 'Config', icon: '⚙️' },
+    { id: 'console', label: 'Consola', icon: '💻' },
+    { id: 'bot', label: 'Bot IA', icon: '🤖' },
   ];
 
   return (
@@ -225,7 +220,9 @@ const ControlPanel = ({ onBack }) => {
       <div className="max-w-6xl mx-auto p-4">
 
         {/* DASHBOARD */}
-        {activeTab === 'dashboard' && (
+        {activeTab === 'salas' && (
+          <>
+          {/* PANEL MAESTRO - Stats */}
           <div>
             {/* Flash de Fama - Top 1 */}
             {users.length > 0 && (
@@ -280,11 +277,10 @@ const ControlPanel = ({ onBack }) => {
               </button>
             </div>
           </div>
-        )}
 
-        {/* USERS */}
-        {activeTab === 'users' && (
-          <div>
+          {/* USERS */}
+          <div className="mt-4">
+            <h3 className="text-lg font-bold text-white mb-3">Usuarios ({users.length})</h3>
             <div className="mb-4">
               <input type="text" value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
                 placeholder="🔍 Buscar por nombre o ID..."
@@ -341,12 +337,14 @@ const ControlPanel = ({ onBack }) => {
               ))}
             </div>
           </div>
+          </>
         )}
 
-        {/* EVENTS */}
-        {activeTab === 'events' && (
+        {/* EVENTS - now part of config */}
+        {/* CONFIG - Events + Clanes + Rooms + Prizes */}
+        {activeTab === 'config' && (
           <div>
-            <h3 className="text-lg font-bold text-yellow-400 mb-4">🏆 Gestión de Eventos</h3>
+            <h3 className="text-lg font-bold text-yellow-400 mb-4">⚙️ Configuracion General</h3>
             
             {/* Weekly */}
             <div className="bg-gray-900 rounded-xl p-5 border border-gray-800 mb-4">
@@ -408,76 +406,62 @@ const ControlPanel = ({ onBack }) => {
           </div>
         )}
 
-        {/* CLANES */}
-        {activeTab === 'clanes' && (
-          <div>
-            <h3 className="text-lg font-bold text-yellow-400 mb-4">🏷️ Clanes ({clanes.length})</h3>
-            <div className="space-y-2">
-              {clanes.map((c, i) => (
-                <div key={c.id} className="bg-gray-900 rounded-xl p-4 border border-gray-800">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <span className="text-yellow-400 font-bold mr-2">#{i + 1}</span>
-                      <span className="text-white font-bold">{c.name}</span>
-                      <span className="text-gray-500 text-sm ml-2">by {c.owner_name}</span>
-                    </div>
-                    <div className="text-sm text-gray-400">
-                      {c.members?.length || 0} miembros
-                    </div>
-                  </div>
-                </div>
-              ))}
-              {clanes.length === 0 && <p className="text-gray-600 text-center py-8">Sin clanes</p>}
-            </div>
-          </div>
-        )}
-
-        {/* ROOMS */}
-        {activeTab === 'rooms' && (
-          <div>
-            <h3 className="text-lg font-bold text-yellow-400 mb-4">🏠 Salas ({rooms.length})</h3>
-            <div className="space-y-2">
-              {rooms.map(r => (
-                <div key={r.id} className="bg-gray-900 rounded-xl p-4 border border-gray-800 flex items-center justify-between">
-                  <div>
-                    <div className="text-white font-bold">{r.name}</div>
-                    <div className="text-gray-500 text-xs">Dueño: {r.owner_name} | {r.active_users} online</div>
-                  </div>
-                  <button onClick={async () => {
-                    if (!window.confirm('¿Eliminar sala?')) return;
-                    await axios.delete(`${API}/admin/rooms/${r.id}?admin_id=${user.id}`);
-                    loadAll();
-                  }} className="bg-red-900 text-red-400 px-3 py-1 rounded-lg text-xs font-bold">Eliminar</button>
-                </div>
-              ))}
-              {rooms.length === 0 && <p className="text-gray-600 text-center py-8">Sin salas</p>}
-            </div>
-          </div>
-        )}
-
-        {/* CONFIG */}
+        {/* CONFIG - System Config + Prices + Events + Rooms + Clanes + Prizes */}
         {activeTab === 'config' && (
           <div>
-            <h3 className="text-lg font-bold text-yellow-400 mb-4">⚙️ Configuración del Sistema</h3>
-            <div className="space-y-3">
+            <h3 className="text-lg font-bold text-yellow-400 mb-4">⚙️ Configuracion</h3>
+            
+            {/* System Config */}
+            <div className="space-y-3 mb-6">
               {Object.entries(config).map(([key, value]) => (
-                <div key={key} className="bg-gray-900 rounded-xl p-4 border border-gray-800 flex items-center justify-between">
-                  <span className="text-gray-300 text-sm">{key.replace(/_/g, ' ').toUpperCase()}</span>
+                <div key={key} className="bg-gray-900 rounded-xl p-3 border border-gray-800 flex items-center justify-between">
+                  <span className="text-gray-300 text-xs">{key.replace(/_/g, ' ').toUpperCase()}</span>
                   <input type="number" value={value}
                     onChange={e => setConfig(prev => ({ ...prev, [key]: Number(e.target.value) }))}
-                    className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-yellow-400 font-bold w-36 text-right" />
+                    className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-yellow-400 font-bold w-28 text-right text-sm" />
                 </div>
               ))}
-              <button className="w-full bg-gradient-to-r from-yellow-600 to-amber-600 py-3 rounded-xl font-bold mt-4">
-                💾 Guardar Configuración
-              </button>
+              <button onClick={saveConfig} className="w-full bg-gradient-to-r from-yellow-600 to-amber-600 py-3 rounded-xl font-bold">Guardar Config</button>
+            </div>
+
+            {/* Prizes */}
+            <PrizesConfig userId={user.id} />
+            
+            {/* Rooms */}
+            <h4 className="text-white font-bold mt-6 mb-3">Salas ({rooms.length})</h4>
+            <div className="space-y-2 mb-4">
+              {rooms.map(r => (
+                <div key={r.id} className="bg-gray-900 rounded-xl p-3 border border-gray-800 flex items-center justify-between">
+                  <div>
+                    <div className="text-white font-bold text-sm">{r.name}</div>
+                    <div className="text-gray-500 text-xs">{r.owner_name} | {r.active_users} online</div>
+                  </div>
+                  <button onClick={async () => {
+                    if (!window.confirm('Eliminar sala?')) return;
+                    await axios.delete(`${API}/admin/rooms/${r.id}?admin_id=${user.id}`);
+                    loadAll();
+                  }} className="bg-red-900 text-red-400 px-3 py-1 rounded-lg text-xs font-bold">X</button>
+                </div>
+              ))}
+            </div>
+
+            {/* Clanes */}
+            <h4 className="text-white font-bold mb-3">Clanes ({clanes.length})</h4>
+            <div className="space-y-2">
+              {clanes.map((c, i) => (
+                <div key={c.id} className="bg-gray-900 rounded-xl p-3 border border-gray-800 flex justify-between">
+                  <div>
+                    <span className="text-yellow-400 font-bold mr-1">#{i+1}</span>
+                    <span className="text-white font-bold text-sm">{c.name}</span>
+                    <span className="text-gray-500 text-xs ml-1">by {c.owner_name}</span>
+                  </div>
+                  <span className="text-gray-400 text-xs">{c.members?.length || 0} miembros</span>
+                </div>
+              ))}
             </div>
           </div>
         )}
-        {/* PRIZES CONFIG */}
-        {activeTab === 'prizes' && (
-          <PrizesConfig userId={user.id} />
-        )}
+
         {/* CONSOLE */}
         {activeTab === 'console' && (
           <div>

@@ -353,6 +353,26 @@ const RoomView = ({ roomId, onBack }) => {
               </>
             )}
 
+            {/* TIENDA */}
+            {panel === 'tienda' && (
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  { name: 'Oros', emoji: '🪙', desc: 'Comprar monedas', color: 'from-yellow-500/30 to-amber-600/30' },
+                  { name: 'Aristocracia', emoji: '👑', desc: 'Niveles VIP', color: 'from-purple-500/30 to-indigo-600/30' },
+                  { name: 'Marco', emoji: '🖼️', desc: 'Marcos de perfil', color: 'from-cyan-500/30 to-blue-600/30' },
+                  { name: 'Entradas', emoji: '🐉', desc: 'Entradas VIP', color: 'from-red-500/30 to-orange-600/30' },
+                  { name: 'Anillo', emoji: '💍', desc: 'Anillos de CP', color: 'from-pink-500/30 to-rose-600/30' },
+                  { name: 'Supermercado', emoji: '🛒', desc: 'Todo en oferta', color: 'from-green-500/30 to-emerald-600/30' },
+                ].map(item => (
+                  <button key={item.name} className={`bg-gradient-to-b ${item.color} border border-white/10 rounded-xl p-3 text-center active:scale-95 transition-all`}>
+                    <div className="text-3xl mb-1">{item.emoji}</div>
+                    <div className="text-white text-xs font-bold">{item.name}</div>
+                    <div className="text-white/40 text-[9px]">{item.desc}</div>
+                  </button>
+                ))}
+              </div>
+            )}
+
             <p className="text-yellow-400/50 text-[10px] text-center mt-2">Tus monedas: {(user.coins || 0).toLocaleString()}</p>
           </div>
         </div>
@@ -402,6 +422,9 @@ const RoomView = ({ roomId, onBack }) => {
           </button>
           <button data-testid="bar-juegos" onClick={() => setPanel('games')} className="bg-green-500/15 border border-green-500/20 rounded-full px-2.5 py-1 flex items-center gap-1">
             <span className="text-xs">🎮</span><span className="text-green-300 text-[10px] font-bold">Juegos</span>
+          </button>
+          <button data-testid="bar-tienda" onClick={() => setPanel('tienda')} className="bg-purple-500/15 border border-purple-500/20 rounded-full px-2.5 py-1 flex items-center gap-1">
+            <span className="text-xs">🛒</span><span className="text-purple-300 text-[10px] font-bold">Tienda</span>
           </button>
           <div className="ml-auto bg-white/5 rounded-full px-2.5 py-1">
             <span className="text-yellow-400 text-[10px] font-bold">💰 {user.coins >= 1e6 ? `${(user.coins/1e6).toFixed(1)}M` : (user.coins || 0).toLocaleString()}</span>
