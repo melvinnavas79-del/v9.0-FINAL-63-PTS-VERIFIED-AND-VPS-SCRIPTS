@@ -11,38 +11,34 @@ App de streaming de audio en vivo (estilo TikTok Live) con salas, juegos, econom
 
 ## Implementado
 - [x] Auth (login/registro), roles (dueño, admin, moderador, supervisor, usuario)
-- [x] Salas de audio con Agora WebRTC (mic/speaker, auto-mute, seats)
-- [x] Monthly Star con 3 circulos (Clan, Recarga mensual centro, Pareja)
+- [x] Salas de audio con Agora WebRTC (mic/speaker, auto-mute 2min, seats)
+- [x] Monthly Star con 3 circulos (Clan, Recarga centro, Pareja)
 - [x] Semanales: Clan Semanal, Pareja CP, Eventos con animaciones
-- [x] Bot ON/OFF switch + voz muteada por defecto (persistente en localStorage)
+- [x] Bot ON/OFF switch + voz muteada por defecto (persistente localStorage)
 - [x] Bot con 4 modos de voz: Mujer, Hombre, Animador, Serio
-- [x] Bot obedece "callate" / "habla" / modos
 - [x] Minimizar sala (pantalla flotante)
-- [x] Mic no graba al entrar (solo al activar)
-- [x] Auto-mute 2 min
 - [x] Panel de Control MAESTRO (Salas, Config, Consola, Bot IA)
-- [x] Premios Clanes EDITABLES en Panel de Control (1er, 2do, 3er lugar)
-- [x] Panel Premios: config recarga mensual, retorno semanal, pago auto
-- [x] Chat limpio al entrar
+- [x] Premios Clanes EDITABLES en Panel de Control
+- [x] Cashback Semanal automatico (100M=10M, 500M=25M, 600M=45M)
+- [x] Eventos King 1/2/3 en sala (300M/500M/1B) - boton corona en header
+- [x] Eventos CP Nivel 6/7 en sala (5M por usuario)
+- [x] Modo Fantasma FUNCIONAL (oculta de rankings y busquedas)
+- [x] Zoom en fotos del chat (modal fullscreen al hacer click)
 - [x] 10 Cofres, 7 Sobres, 15 regalos, 6 juegos en sala
-- [x] ID unico + busqueda
-- [x] Bot autonomo, amigo personal, memoria finanzas
-- [x] Dashboard: lista (iconos medalla), Pareja, Clan (mismo estilo visual)
+- [x] Tienda en sala (Supermercado, Aristocracia, Oros, Marco, Entradas, Anillo)
+- [x] Musica en sala (upload y playback)
+- [x] Dashboard: lista (iconos medalla), Pareja, Clan (mismo estilo)
 - [x] Dashboard Event tab con 3 tarjetas (King, CP Event, Recarga)
-- [x] Tienda en sala (Supermercado, Aristocracia, etc.)
-- [x] Flash Fame y animaciones de ganadores
+- [x] Flash Fame, animaciones de ganadores, entrada VIP
+- [x] Upload de avatar
+- [x] Notificaciones (Global, CP, Connection, Invites)
 - [x] Deploy en GitHub + Contabo VPS configurado
 
-## Pendiente
-- Eventos King 1/2/3 (flujo completo en sala)
-- Eventos CP nivel 6/7
-- Sistema aprobacion eventos
-- Musica en sala (upload y playback sincronizado)
+## Pendiente / Backlog
 - Ludo game WebView integration
-- Zoom en fotos del chat
-- Cashback semanal automatico
-- Refactorizar server.py (~3000 lineas)
-- Mas regalos con efectos
+- Refactorizar server.py (~3000 lineas) en modulos
+- Mas regalos con efectos especiales animados
+- Sistema de aprobacion de eventos por admin
 
 ## Credenciales
 - Melvin_Live / test123 - Role: dueño
