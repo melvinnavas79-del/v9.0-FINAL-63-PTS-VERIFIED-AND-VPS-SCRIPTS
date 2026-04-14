@@ -885,12 +885,13 @@ async def king_level_reward(user_id: str):
     return {"success": True, "new_level": new_level, "bonus": bonus, "new_coins": updated['coins']}
 
 @api_router.post("/events/clan-rewards")
-async def clan_rewards(admin_id: str):
+async def clan_rewards(admin_id: str, body: dict = None):
     admin = await db.users.find_one({"id": admin_id})
     if not admin or admin.get('role') != 'dueño':
         raise HTTPException(status_code=403, detail="Solo el dueño")
     top_clans = await db.clanes.find().sort("weekly_coins", -1).limit(3).to_list(3)
-    rewards = [25000000, 20000000, 15000000]
+    default_rewards = [25000000, 20000000, 15000000]
+    rewards = (body or {}).get('prizes', default_rewards) if body else default_rewards
     aristocracies = [6, 5, 4]
     results = []
     for i, clan in enumerate(top_clans):

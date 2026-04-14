@@ -19,6 +19,11 @@ const ControlPanel = ({ onBack }) => {
   const [eventPrize2, setEventPrize2] = useState(35000000);
   const [eventPrize3, setEventPrize3] = useState(25000000);
 
+  // Clan Prizes
+  const [clanPrize1, setClanPrize1] = useState(25000000);
+  const [clanPrize2, setClanPrize2] = useState(20000000);
+  const [clanPrize3, setClanPrize3] = useState(15000000);
+
   // Config
   const [config, setConfig] = useState({
     gift_rosa_price: 100,
@@ -156,9 +161,11 @@ const ControlPanel = ({ onBack }) => {
   };
 
   const distributeClanRewards = async () => {
-    if (!window.confirm('¿Repartir premios de clanes?')) return;
+    if (!window.confirm(`¿Repartir premios de clanes?\n1° = ${clanPrize1.toLocaleString()}\n2° = ${clanPrize2.toLocaleString()}\n3° = ${clanPrize3.toLocaleString()}`)) return;
     try {
-      const res = await axios.post(`${API}/events/clan-rewards?admin_id=${user.id}`);
+      const res = await axios.post(`${API}/events/clan-rewards?admin_id=${user.id}`, {
+        prizes: [clanPrize1, clanPrize2, clanPrize3]
+      });
       alert(`Premios de clanes:\n${res.data.results.map(r => `${r.place}° ${r.clan}: +${r.total_reward.toLocaleString()}`).join('\n')}`);
       loadAll();
     } catch (err) { alert(err.response?.data?.detail || 'Error'); }
@@ -381,7 +388,24 @@ const ControlPanel = ({ onBack }) => {
             {/* Clanes Prizes */}
             <div className="bg-gray-900 rounded-xl p-5 border border-gray-800 mb-4">
               <h4 className="font-bold text-white mb-3">🏷️ Premios Clanes</h4>
-              <p className="text-gray-400 text-sm mb-3">1° = 25M + Arist.6 | 2° = 20M + Arist.5 | 3° = 15M + Arist.4</p>
+              <div className="grid grid-cols-3 gap-3 mb-3">
+                <div>
+                  <label className="text-gray-500 text-xs">🥇 1er Clan</label>
+                  <input type="number" value={clanPrize1} onChange={e => setClanPrize1(Number(e.target.value))}
+                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-yellow-400 font-bold" />
+                </div>
+                <div>
+                  <label className="text-gray-500 text-xs">🥈 2do Clan</label>
+                  <input type="number" value={clanPrize2} onChange={e => setClanPrize2(Number(e.target.value))}
+                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-gray-300 font-bold" />
+                </div>
+                <div>
+                  <label className="text-gray-500 text-xs">🥉 3er Clan</label>
+                  <input type="number" value={clanPrize3} onChange={e => setClanPrize3(Number(e.target.value))}
+                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-orange-400 font-bold" />
+                </div>
+              </div>
+              <p className="text-gray-500 text-xs mb-3">+ Aristocracia: 1°=Lv6 | 2°=Lv5 | 3°=Lv4</p>
               <button onClick={distributeClanRewards}
                 className="w-full bg-gradient-to-r from-blue-600 to-cyan-600 py-3 rounded-xl font-bold">
                 🏷️ REPARTIR PREMIOS CLANES

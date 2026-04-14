@@ -10,7 +10,10 @@ const BotFloating = ({ userId, userRole }) => {
   const [loading, setLoading] = useState(false);
   const [listening, setListening] = useState(false);
   const [speaking, setSpeaking] = useState(false);
-  const [voiceEnabled, setVoiceEnabled] = useState(true);
+  const [voiceEnabled, setVoiceEnabled] = useState(() => {
+    const saved = localStorage.getItem('bot_voice_enabled');
+    return saved === null ? false : saved === 'true';
+  });
   const [voiceUnlocked, setVoiceUnlocked] = useState(false);
   const [showVoicePanel, setShowVoicePanel] = useState(false);
   const [voiceMode, setVoiceMode] = useState(localStorage.getItem('bot_voice') || 'mujer');
@@ -238,7 +241,13 @@ const BotFloating = ({ userId, userRole }) => {
                   className="text-[10px] px-2 py-1 rounded-full bg-purple-700 text-white">
                   {voiceMode === 'mujer' ? '👩' : voiceMode === 'hombre' ? '👨' : voiceMode === 'animador' ? '🎙️' : '🎩'}
                 </button>
-                <button data-testid="bot-voice-toggle" onClick={() => { unlockVoice(); setVoiceEnabled(!voiceEnabled); }}
+                <button data-testid="bot-voice-toggle" onClick={() => { 
+                  unlockVoice(); 
+                  const newVal = !voiceEnabled;
+                  setVoiceEnabled(newVal); 
+                  localStorage.setItem('bot_voice_enabled', String(newVal));
+                  if (!newVal) window.speechSynthesis?.cancel();
+                }}
                   className={`text-xs px-2 py-1 rounded-full ${voiceEnabled ? 'bg-green-600 text-white' : 'bg-gray-700 text-gray-400'}`}>
                   {voiceEnabled ? '🔊' : '🔇'}
                 </button>
