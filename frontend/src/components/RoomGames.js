@@ -276,7 +276,7 @@ const GameLobby = ({ game, userId, userAvatar, userName, onClose, onResult }) =>
 };
 
 // ========== GAME GRID (Selection screen) ==========
-const RoomGames = ({ userId, userAvatar, userName, userCoins, onResult, onClose, onStartPK }) => {
+const RoomGames = ({ userId, userAvatar, userName, userCoins, onResult, onClose, onStartPK, onOpenLionTiger }) => {
   const [activeGame, setActiveGame] = useState(null);
 
   if (activeGame) {
@@ -311,6 +311,19 @@ const RoomGames = ({ userId, userAvatar, userName, userCoins, onResult, onClose,
 
   return (
     <div>
+      {/* Lion vs Tiger - Featured Game */}
+      <button data-testid="game-lion-tiger" onClick={() => onOpenLionTiger && onOpenLionTiger()}
+        className="w-full mb-4 bg-gradient-to-r from-amber-700 to-red-700 rounded-2xl p-3 flex items-center gap-3 active:scale-[0.98] transition-transform border border-yellow-500/30 shadow-lg">
+        <div className="w-16 h-16 bg-gradient-to-br from-yellow-400 to-red-500 rounded-xl flex items-center justify-center text-3xl shadow-inner">
+          🦁
+        </div>
+        <div className="flex-1 text-left">
+          <div className="text-white font-bold text-base">Lion vs Tiger</div>
+          <div className="text-yellow-300/80 text-xs">Casino en vivo - Apuesta y gana!</div>
+        </div>
+        <div className="text-3xl">🐯</div>
+      </button>
+
       <h4 className="text-white font-bold text-sm mb-3">Juegos de sociedad</h4>
       <div className="grid grid-cols-4 gap-3">
         {GAMES.map(g => (
