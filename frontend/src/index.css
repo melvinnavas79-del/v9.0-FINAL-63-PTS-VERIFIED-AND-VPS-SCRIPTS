@@ -2,45 +2,12 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ========== ANDROID/MOBILE RESPONSIVE SCALING ========== */
+/* ========== ANDROID AUTO-SCALING ========== */
 
 :root {
   --sab: env(safe-area-inset-bottom, 0px);
   --sat: env(safe-area-inset-top, 0px);
-}
-
-/* Small Android phones (< 360px width) */
-@media screen and (max-width: 359px) {
-  html { font-size: 14px; }
-}
-
-/* Standard Android phones (360-410px) */
-@media screen and (min-width: 360px) and (max-width: 410px) {
-  html { font-size: 16px; }
-}
-
-/* Large Android/iPhone (411px+) */
-@media screen and (min-width: 411px) {
-  html { font-size: 16px; }
-}
-
-/* High DPI Android - scale ALL tiny text up */
-@media screen and (-webkit-min-device-pixel-ratio: 2), screen and (min-resolution: 192dpi) {
-  .text-\[8px\] { font-size: 11px !important; }
-  .text-\[9px\] { font-size: 12px !important; }
-  .text-\[10px\] { font-size: 13px !important; }
-  .text-\[11px\] { font-size: 14px !important; }
-  .text-xs { font-size: 13px !important; }
-}
-
-/* Very high DPI (3x+) Android */
-@media screen and (-webkit-min-device-pixel-ratio: 3), screen and (min-resolution: 288dpi) {
-  .text-\[8px\] { font-size: 12px !important; }
-  .text-\[9px\] { font-size: 13px !important; }
-  .text-\[10px\] { font-size: 14px !important; }
-  .text-\[11px\] { font-size: 15px !important; }
-  .text-xs { font-size: 14px !important; }
-  .text-sm { font-size: 15px !important; }
+  --app-scale: 1;
 }
 
 /* Global minimum font sizes for readability */

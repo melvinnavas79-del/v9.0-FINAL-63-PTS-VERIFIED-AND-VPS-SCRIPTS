@@ -27,6 +27,10 @@ function AppContent() {
     if (savedUser) {
       login(JSON.parse(savedUser));
     }
+    // Android detection - ensure class is set
+    if (/Android/i.test(navigator.userAgent)) {
+      document.documentElement.classList.add('android');
+    }
   }, []);
 
   const handleNavigate = (view, data) => {

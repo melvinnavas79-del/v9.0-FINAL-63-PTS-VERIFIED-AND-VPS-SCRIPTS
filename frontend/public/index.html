@@ -30,6 +30,72 @@
         -->
         <title>Lluvia Live</title>
         <script>window.addEventListener("error",function(e){if(e.error instanceof DOMException&&e.error.name==="DataCloneError"&&e.message&&e.message.includes("PerformanceServerTiming")){e.stopImmediatePropagation();e.preventDefault()}},true);</script>
+        <script>
+        /**
+         * Android Auto-Scale Fix
+         * -----------------------
+         * Android Chrome/WebView renders content smaller than iOS Safari
+         * at the same CSS pixel width. This script detects Android and
+         * dynamically adjusts the viewport to match iOS rendering.
+         */
+        (function() {
+          var ua = navigator.userAgent || '';
+          var isAndroid = /Android/i.test(ua);
+          var isIOS = /iPhone|iPad|iPod/i.test(ua);
+          
+          if (isAndroid) {
+            // Get screen info
+            var dpr = window.devicePixelRatio || 1;
+            var sw = screen.width;
+            
+            // Android with high DPI renders too small in PWA mode
+            // Force the viewport to render at a larger scale
+            var meta = document.querySelector('meta[name="viewport"]');
+            if (meta) {
+              // Calculate scale factor: Android needs ~1.0-1.1x to match iOS
+              var scale = 1.0;
+              if (sw <= 360) {
+                scale = 1.05; // Small Android phones
+              } else if (sw <= 400) {
+                scale = 1.0;  // Standard
+              }
+              meta.content = 'width=device-width, initial-scale=' + scale + ', minimum-scale=' + scale + ', maximum-scale=5, user-scalable=no, viewport-fit=cover';
+            }
+            
+            // Add Android class to html for CSS targeting
+            document.documentElement.classList.add('android');
+            document.documentElement.style.setProperty('--android-scale', '1');
+          }
+          
+          if (isIOS) {
+            document.documentElement.classList.add('ios');
+          }
+        })();
+        </script>
+        <style>
+          /* Android-specific scaling via class detection */
+          .android body {
+            font-size: 16px !important;
+            -webkit-text-size-adjust: 100% !important;
+          }
+          /* Force minimum sizes on Android */
+          .android .text-xs { font-size: 0.8125rem !important; }  /* 13px */
+          .android .text-sm { font-size: 0.9375rem !important; }  /* 15px */
+          .android .text-base { font-size: 1.0625rem !important; } /* 17px */
+          .android .text-lg { font-size: 1.1875rem !important; }  /* 19px */
+          
+          /* Android tiny text override - these are the problematic ones */
+          .android [class*="text-[8px]"] { font-size: 12px !important; }
+          .android [class*="text-[9px]"] { font-size: 13px !important; }
+          .android [class*="text-[10px]"] { font-size: 14px !important; }
+          .android [class*="text-[11px]"] { font-size: 15px !important; }
+          
+          /* Android button minimum size */
+          .android button { min-height: 36px; }
+          
+          /* Android bottom nav bigger */
+          .android .fixed.bottom-0 button { min-height: 48px; min-width: 48px; }
+        </style>
         
     </head>
     <body>
