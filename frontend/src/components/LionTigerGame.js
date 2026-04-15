@@ -1,268 +1,321 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import axios from 'axios';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
-const CARDS = ['2','3','4','5','6','7','8','9','10','J','Q','K','A'];
-const SUITS = ['♠','♥','♦','♣'];
-const SUIT_COLORS = {'♠':'#fff','♥':'#ef4444','♦':'#ef4444','♣':'#fff'};
-
-const Card = ({ value, suit, revealed, delay }) => (
-  <div className={`relative w-20 h-28 rounded-xl transition-all duration-500 ${revealed ? 'scale-100' : 'scale-y-0'}`}
-    style={{ transitionDelay: `${delay}ms` }}>
-    {revealed ? (
-      <div className="w-full h-full bg-white rounded-xl border-2 border-gray-300 flex flex-col items-center justify-center shadow-xl">
-        <span className="text-2xl font-black" style={{color: SUIT_COLORS[suit]}}>{value}</span>
-        <span className="text-3xl" style={{color: SUIT_COLORS[suit]}}>{suit}</span>
-      </div>
-    ) : (
-      <div className="w-full h-full bg-gradient-to-br from-red-700 to-red-900 rounded-xl border-2 border-yellow-500 flex items-center justify-center shadow-xl">
-        <span className="text-yellow-400 text-2xl font-bold">?</span>
-      </div>
-    )}
-  </div>
-);
+const TIGER_IMG = 'https://images.unsplash.com/photo-1767814896543-e9a2da641c4f?w=300&h=300&fit=crop';
+const LION_IMG = 'https://images.unsplash.com/photo-1629812456605-4a044aa38fbc?w=300&h=300&fit=crop';
 
 const LionTigerGame = ({ userId, userCoins, onBalanceUpdate, onClose }) => {
-  const [bet, setBet] = useState(5000);
-  const [choice, setChoice] = useState(null);
-  const [phase, setPhase] = useState('bet');
-  const [lionCard, setLionCard] = useState(null);
-  const [tigerCard, setTigerCard] = useState(null);
-  const [result, setResult] = useState(null);
-  const [history, setHistory] = useState([]);
   const [coins, setCoins] = useState(userCoins || 0);
-  const [streak, setStreak] = useState(0);
+  const [activeChip, setActiveChip] = useState(1000000);
+  const [betTiger, setBetTiger] = useState(0);
+  const [betDraw, setBetDraw] = useState(0);
+  const [betLion, setBetLion] = useState(0);
+  const [prevBets, setPrevBets] = useState({ tiger: 0, draw: 0, lion: 0 });
+  const [seconds, setSeconds] = useState(15);
+  const [locked, setLocked] = useState(false);
+  const [phase, setPhase] = useState('betting'); // betting, attacking, cloud, result, reset
+  const [winner, setWinner] = useState(null);
+  const [winAmount, setWinAmount] = useState(0);
+  const [message, setMessage] = useState('');
+  const timerRef = useRef(null);
 
   useEffect(() => { setCoins(userCoins); }, [userCoins]);
 
-  const betPresets = [1000, 5000, 10000, 50000, 100000, 500000];
+  // Start timer on mount and after each reset
+  const startTimer = useCallback(() => {
+    setSeconds(15);
+    setLocked(false);
+    setPhase('betting');
+    setWinner(null);
+    setMessage('');
+    setWinAmount(0);
+    setBetTiger(0);
+    setBetDraw(0);
+    setBetLion(0);
 
-  const drawCard = () => {
-    const val = CARDS[Math.floor(Math.random() * CARDS.length)];
-    const suit = SUITS[Math.floor(Math.random() * SUITS.length)];
-    return { value: val, suit, rank: CARDS.indexOf(val) };
-  };
+    if (timerRef.current) clearInterval(timerRef.current);
+    let s = 15;
+    timerRef.current = setInterval(() => {
+      s--;
+      setSeconds(s);
+      if (s <= 0) {
+        clearInterval(timerRef.current);
+        ejecutarDuelo();
+      }
+    }, 1000);
+  }, []);
 
-  const play = async () => {
-    if (!choice) return;
-    if (coins < bet) { alert('Monedas insuficientes'); return; }
+  useEffect(() => {
+    startTimer();
+    return () => { if (timerRef.current) clearInterval(timerRef.current); };
+  }, [startTimer]);
 
-    setPhase('dealing');
-    setResult(null);
+  const ejecutarDuelo = async () => {
+    setLocked(true);
+    setPhase('attacking');
 
-    const lion = drawCard();
-    const tiger = drawCard();
+    // Wait for characters to move
+    await new Promise(r => setTimeout(r, 600));
+    setPhase('cloud');
 
-    // Show cards with delay
-    setTimeout(() => setLionCard(lion), 500);
-    setTimeout(() => setTigerCard(tiger), 1000);
+    // Cloud impact
+    await new Promise(r => setTimeout(r, 1200));
 
     // Determine winner
-    setTimeout(async () => {
-      let winner;
-      if (lion.rank > tiger.rank) winner = 'lion';
-      else if (tiger.rank > lion.rank) winner = 'tiger';
-      else winner = 'tie';
+    const rand = Math.random();
+    const w = rand < 0.45 ? 'tiger' : (rand < 0.9 ? 'lion' : 'draw');
+    setWinner(w);
+    setPhase('result');
 
-      const won = choice === winner;
-      const multiplier = choice === 'tie' ? (won ? 8 : 0) : (won ? 2 : 0);
-      const prize = won ? bet * multiplier : 0;
+    if (w === 'tiger') setMessage('TIGER WINS!');
+    else if (w === 'lion') setMessage('LION WINS!');
+    else setMessage('DRAW!');
 
-      // Call backend
-      try {
-        const r = await axios.post(`${API}/games/play`, {
-          user_id: userId, game: 'lion_tiger', bet
+    // Calculate and pay winnings using current bet state
+    // We need to read the current bet values
+    setBetTiger(prev => {
+      setBetDraw(prevD => {
+        setBetLion(prevL => {
+          let won = 0;
+          if (w === 'tiger' && prev > 0) won = prev * 2;
+          if (w === 'lion' && prevL > 0) won = prevL * 2;
+          if (w === 'draw' && prevD > 0) won = prevD * 8;
+
+          if (won > 0) {
+            setWinAmount(won);
+            // Add coins via backend
+            axios.post(`${API}/games/play`, { user_id: userId, game: 'lion_tiger', bet: 0 }).catch(() => {});
+            setCoins(c => {
+              const newBal = c + won;
+              if (onBalanceUpdate) onBalanceUpdate(newBal);
+              return newBal;
+            });
+          }
+
+          // Save previous bets
+          setPrevBets({ tiger: prev, draw: prevD, lion: prevL });
+          return prevL;
         });
-        // Override with our local result since backend is random
-        const newBal = won ? (r.data.new_balance || coins) + prize - (r.data.prize || 0) : r.data.new_balance || coins;
-        
-        // Use backend for actual balance tracking
-        if (won) {
-          await axios.post(`${API}/games/play`, { user_id: userId, game: 'ruleta', bet: 0 });
+        return prevD;
+      });
+      return prev;
+    });
+
+    // Auto reset after 4 seconds
+    setTimeout(() => {
+      startTimer();
+    }, 4000);
+  };
+
+  const apostar = async (lado) => {
+    if (seconds <= 0 || locked) return;
+    if (coins < activeChip) { alert('Monedas insuficientes'); return; }
+
+    // Deduct coins
+    try {
+      const r = await axios.post(`${API}/games/play`, { user_id: userId, game: 'lion_tiger', bet: activeChip });
+      if (r.data.new_balance !== undefined) {
+        setCoins(r.data.new_balance);
+        if (onBalanceUpdate) onBalanceUpdate(r.data.new_balance);
+      }
+    } catch (e) {
+      // Deduct locally if API fails
+      setCoins(c => c - activeChip);
+    }
+
+    if (lado === 'tiger') setBetTiger(b => b + activeChip);
+    if (lado === 'draw') setBetDraw(b => b + activeChip);
+    if (lado === 'lion') setBetLion(b => b + activeChip);
+  };
+
+  const repetir = async () => {
+    if (seconds <= 0 || locked) return;
+    const total = prevBets.tiger + prevBets.draw + prevBets.lion;
+    if (total === 0) return;
+    if (coins < total) { alert('Monedas insuficientes para repetir'); return; }
+
+    try {
+      if (total > 0) {
+        const r = await axios.post(`${API}/games/play`, { user_id: userId, game: 'lion_tiger', bet: total });
+        if (r.data.new_balance !== undefined) {
+          setCoins(r.data.new_balance);
+          if (onBalanceUpdate) onBalanceUpdate(r.data.new_balance);
         }
-      } catch (e) { /* continue with local state */ }
+      }
+    } catch (e) {
+      setCoins(c => c - total);
+    }
 
-      // Update local state
-      const newCoins = won ? coins + (prize - bet) : coins - bet;
-      setCoins(Math.max(0, newCoins));
-
-      const resultData = { winner, won, prize, multiplier, lionCard: lion, tigerCard: tiger };
-      setResult(resultData);
-      setHistory(prev => [{ winner, lion: lion.value + lion.suit, tiger: tiger.value + tiger.suit }, ...prev].slice(0, 20));
-      setStreak(won ? streak + 1 : 0);
-      setPhase('result');
-
-      if (onBalanceUpdate) onBalanceUpdate(Math.max(0, newCoins));
-    }, 1800);
+    setBetTiger(b => b + prevBets.tiger);
+    setBetDraw(b => b + prevBets.draw);
+    setBetLion(b => b + prevBets.lion);
   };
 
-  const playAgain = () => {
-    setPhase('bet');
-    setChoice(null);
-    setLionCard(null);
-    setTigerCard(null);
-    setResult(null);
+  const formatBet = (v) => {
+    if (v === 0) return '0';
+    if (v >= 1e6) return (v / 1e6).toFixed(1) + 'M';
+    return (v / 1e3).toFixed(0) + 'K';
   };
+
+  const chips = [
+    { value: 50000, label: '50K', color: '#2980b9' },
+    { value: 1000000, label: '1M', color: '#c0392b' },
+    { value: 10000000, label: '10M', color: '#f39c12', textColor: '#000' },
+  ];
+
+  // Character positions based on phase
+  const tigerStyle = {
+    left: phase === 'attacking' || phase === 'cloud' || phase === 'result' ? '30%' : '10%',
+    transition: 'all 0.5s ease-in-out',
+  };
+  const lionStyle = {
+    right: phase === 'attacking' || phase === 'cloud' || phase === 'result' ? '30%' : '10%',
+    transition: 'all 0.5s ease-in-out',
+  };
+
+  const tigerClass = winner === 'tiger' ? 'win-glow' : winner === 'lion' ? 'lose-fade' : winner === 'draw' ? '' : '';
+  const lionClass = winner === 'lion' ? 'win-glow' : winner === 'tiger' ? 'lose-fade' : winner === 'draw' ? '' : '';
 
   return (
-    <div className="fixed inset-0 z-[58] flex flex-col" style={{background: 'linear-gradient(180deg, #1a0f00 0%, #2d1500 30%, #1a0800 100%)'}}>
-      {/* Decorative pattern */}
-      <div className="absolute inset-0 opacity-5" style={{backgroundImage: 'repeating-linear-gradient(45deg, transparent, transparent 30px, rgba(255,215,0,0.1) 30px, rgba(255,215,0,0.1) 31px)'}} />
+    <div className="fixed inset-0 z-[58] flex flex-col" style={{ background: '#071f18', overflow: 'hidden' }}>
+      <style>{`
+        @keyframes shake { 0%{transform:translate(0,0) scale(1)} 50%{transform:translate(5px,5px) scale(1.1)} 100%{transform:translate(-5px,-5px) scale(1)} }
+        .win-glow { filter: drop-shadow(0 0 20px #ffcc00); transform: scale(1.4) !important; z-index: 30 !important; }
+        .lose-fade { opacity: 0.2; transform: scale(0.7) !important; }
+        .chip-selected { border-color: #ffcc00 !important; transform: translateY(-5px); box-shadow: 0 0 10px #ffcc00; }
+      `}</style>
 
       {/* Header */}
-      <div className="relative flex-shrink-0 flex items-center justify-between px-4" style={{paddingTop: 'max(10px, env(safe-area-inset-top, 10px))', paddingBottom: '6px'}}>
+      <div className="flex-shrink-0 flex items-center justify-between px-3 py-2" style={{ background: '#000', borderBottom: '2px solid #ffcc00' }}>
         <div className="flex items-center gap-2">
-          <span className="text-2xl">🦁</span>
-          <span className="text-yellow-400 font-black text-lg" style={{textShadow: '0 0 10px rgba(234,179,8,0.5)'}}>VS</span>
-          <span className="text-2xl">🐯</span>
+          <span className="text-base">💰</span>
+          <span className="text-white font-bold text-sm">{coins.toLocaleString()}</span>
         </div>
-        <div className="flex items-center gap-3">
-          <div className="bg-black/40 rounded-full px-3 py-1 flex items-center gap-1">
-            <span className="text-yellow-400">💰</span>
-            <span className="text-yellow-400 text-sm font-bold">{coins >= 1e6 ? `${(coins/1e6).toFixed(1)}M` : coins.toLocaleString()}</span>
-          </div>
-          {streak > 1 && <span className="bg-red-500 text-white text-xs px-2 py-0.5 rounded-full font-bold">{streak}x Racha</span>}
-          <button onClick={onClose} data-testid="close-lion-tiger" className="bg-white/20 w-9 h-9 rounded-full flex items-center justify-center text-lg">✕</button>
-        </div>
+        <span className="font-bold text-sm" style={{ color: '#ffcc00' }}>TIGER VS LION</span>
+        <button onClick={onClose} data-testid="close-lion-tiger" className="text-white/60 text-lg w-8 h-8 flex items-center justify-center">✕</button>
       </div>
 
-      {/* Main game area */}
-      <div className="relative flex-1 flex flex-col items-center justify-center px-4">
+      {/* Timer bar */}
+      <div className="flex-shrink-0" style={{ width: '100%', height: '5px', background: '#222' }}>
+        <div style={{
+          width: `${(seconds / 15) * 100}%`,
+          height: '100%',
+          background: seconds > 5 ? '#00ff00' : seconds > 2 ? '#ffcc00' : '#ff0000',
+          transition: 'width 1s linear',
+        }} />
+      </div>
 
-        {/* Table */}
-        <div className="w-full max-w-sm bg-gradient-to-b from-green-900/60 to-green-950/80 rounded-3xl border-2 border-yellow-600/30 p-5 shadow-2xl mb-4">
-          
-          {/* Lion vs Tiger labels */}
-          <div className="flex justify-between mb-3">
-            <div className="text-center">
-              <div className="text-3xl mb-1">🦁</div>
-              <div className="text-amber-400 font-bold text-sm">LION</div>
-            </div>
-            <div className="text-yellow-500/30 font-black text-xl self-center">VS</div>
-            <div className="text-center">
-              <div className="text-3xl mb-1">🐯</div>
-              <div className="text-orange-400 font-bold text-sm">TIGER</div>
-            </div>
+      {/* Arena */}
+      <div className="flex-shrink-0 relative flex items-center justify-center" style={{
+        height: '42vh',
+        background: 'radial-gradient(circle, #1a5c48, #071f18)',
+        overflow: 'hidden',
+      }}>
+        {/* Fight cloud - CSS based */}
+        {phase === 'cloud' && (
+          <div style={{
+            position: 'absolute', width: '180px', height: '180px', zIndex: 20,
+            background: 'radial-gradient(circle, rgba(255,255,255,0.9) 0%, rgba(255,255,100,0.6) 30%, rgba(255,100,0,0.3) 60%, transparent 70%)',
+            borderRadius: '50%',
+            animation: 'shake 0.1s infinite',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: '4rem',
+          }}>
+            💥
           </div>
+        )}
 
-          {/* Cards area */}
-          <div className="flex items-center justify-center gap-8 mb-4 min-h-[120px]">
-            <div className="text-center">
-              {(phase === 'dealing' || phase === 'result') ? (
-                <Card value={lionCard?.value} suit={lionCard?.suit} revealed={!!lionCard} delay={0} />
-              ) : (
-                <div className="w-20 h-28 rounded-xl border-2 border-dashed border-amber-500/30 flex items-center justify-center">
-                  <span className="text-amber-500/30 text-xs">LION</span>
-                </div>
-              )}
-            </div>
-            <div className="text-center">
-              {(phase === 'dealing' || phase === 'result') ? (
-                <Card value={tigerCard?.value} suit={tigerCard?.suit} revealed={!!tigerCard} delay={400} />
-              ) : (
-                <div className="w-20 h-28 rounded-xl border-2 border-dashed border-orange-500/30 flex items-center justify-center">
-                  <span className="text-orange-500/30 text-xs">TIGER</span>
-                </div>
-              )}
-            </div>
+        {/* Message overlay */}
+        {(phase === 'result' && message) && (
+          <div style={{
+            position: 'absolute', zIndex: 100,
+            fontSize: '1.8rem', fontWeight: 'bold',
+            textShadow: '2px 2px #000',
+            color: winner === 'draw' ? '#ffcc00' : '#fff',
+          }}>
+            {message}
+            {winAmount > 0 && (
+              <div style={{ fontSize: '1.2rem', color: '#ffcc00', marginTop: '4px' }}>
+                +{winAmount.toLocaleString()}
+              </div>
+            )}
           </div>
+        )}
 
-          {/* Result */}
-          {phase === 'result' && result && (
-            <div className={`text-center p-3 rounded-2xl mb-3 ${result.won ? 'bg-yellow-500/20 border border-yellow-400/30' : 'bg-red-500/20 border border-red-400/30'}`}
-              style={{animation: 'fadeIn 0.3s ease'}}>
-              <div className="text-2xl mb-1">{result.won ? '🏆' : '💔'}</div>
-              <div className={`font-black text-lg ${result.won ? 'text-yellow-300' : 'text-red-300'}`}>
-                {result.won ? `GANASTE +${result.prize.toLocaleString()}` : 'Perdiste'}
-              </div>
-              <div className="text-white/40 text-xs mt-1">
-                {result.winner === 'lion' ? '🦁 Lion gana' : result.winner === 'tiger' ? '🐯 Tiger gana' : '🤝 Empate'}
-              </div>
-            </div>
-          )}
+        {/* Tiger */}
+        <div className={tigerClass} style={{ position: 'absolute', zIndex: 5, transition: 'all 0.5s ease-in-out', ...tigerStyle }}>
+          <div style={{ width: '110px', height: '110px', borderRadius: '50%', overflow: 'hidden', border: '3px solid #ff6600', boxShadow: '0 0 15px rgba(255,102,0,0.5)' }}>
+            <img src={TIGER_IMG} alt="Tiger" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          </div>
+          <div style={{ textAlign: 'center', color: '#ff6600', fontWeight: 'bold', fontSize: '0.75rem', marginTop: '4px', textShadow: '0 0 5px #000' }}>TIGER</div>
         </div>
 
-        {/* Betting area */}
-        {phase === 'bet' && (
-          <div className="w-full max-w-sm">
-            {/* Choice buttons */}
-            <div className="grid grid-cols-3 gap-3 mb-4">
-              <button onClick={() => setChoice('lion')} data-testid="bet-lion"
-                className={`p-4 rounded-2xl border-2 text-center transition-all active:scale-95 ${choice === 'lion' ? 'bg-amber-500/20 border-amber-400 shadow-lg shadow-amber-500/20' : 'bg-white/5 border-white/10'}`}>
-                <div className="text-3xl mb-1">🦁</div>
-                <div className="text-white font-bold text-sm">Lion</div>
-                <div className="text-yellow-400 text-xs">x2</div>
-              </button>
-              <button onClick={() => setChoice('tie')} data-testid="bet-tie"
-                className={`p-4 rounded-2xl border-2 text-center transition-all active:scale-95 ${choice === 'tie' ? 'bg-purple-500/20 border-purple-400 shadow-lg shadow-purple-500/20' : 'bg-white/5 border-white/10'}`}>
-                <div className="text-3xl mb-1">🤝</div>
-                <div className="text-white font-bold text-sm">Tie</div>
-                <div className="text-purple-400 text-xs">x8</div>
-              </button>
-              <button onClick={() => setChoice('tiger')} data-testid="bet-tiger"
-                className={`p-4 rounded-2xl border-2 text-center transition-all active:scale-95 ${choice === 'tiger' ? 'bg-orange-500/20 border-orange-400 shadow-lg shadow-orange-500/20' : 'bg-white/5 border-white/10'}`}>
-                <div className="text-3xl mb-1">🐯</div>
-                <div className="text-white font-bold text-sm">Tiger</div>
-                <div className="text-yellow-400 text-xs">x2</div>
-              </button>
-            </div>
-
-            {/* Bet amount */}
-            <div className="flex gap-1.5 flex-wrap justify-center mb-3">
-              {betPresets.map(p => (
-                <button key={p} onClick={() => setBet(p)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${bet === p ? 'bg-yellow-500 text-black scale-105' : 'bg-white/10 text-white/60'}`}>
-                  {p >= 1000000 ? `${p/1000000}M` : `${p/1000}K`}
-                </button>
-              ))}
-            </div>
-
-            {/* Play button */}
-            <button onClick={play} disabled={!choice} data-testid="lion-tiger-play"
-              className={`w-full py-4 rounded-2xl font-black text-lg shadow-xl active:scale-95 transition-all ${choice ? 'bg-gradient-to-r from-yellow-500 to-amber-500 text-black' : 'bg-gray-700 text-gray-500'}`}>
-              {choice ? `Apostar ${bet.toLocaleString()} a ${choice === 'lion' ? '🦁 Lion' : choice === 'tiger' ? '🐯 Tiger' : '🤝 Tie'}` : 'Elige Lion, Tiger o Tie'}
-            </button>
+        {/* Lion */}
+        <div className={lionClass} style={{ position: 'absolute', zIndex: 5, transition: 'all 0.5s ease-in-out', ...lionStyle }}>
+          <div style={{ width: '110px', height: '110px', borderRadius: '50%', overflow: 'hidden', border: '3px solid #ffcc00', boxShadow: '0 0 15px rgba(255,204,0,0.5)' }}>
+            <img src={LION_IMG} alt="Lion" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
           </div>
-        )}
+          <div style={{ textAlign: 'center', color: '#ffcc00', fontWeight: 'bold', fontSize: '0.75rem', marginTop: '4px', textShadow: '0 0 5px #000' }}>LION</div>
+        </div>
 
-        {/* Dealing animation */}
-        {phase === 'dealing' && (
-          <div className="text-center">
-            <div className="text-white/60 text-sm font-bold" style={{animation: 'pulse 0.5s infinite'}}>Repartiendo cartas...</div>
-          </div>
-        )}
-
-        {/* Play again */}
-        {phase === 'result' && (
-          <div className="w-full max-w-sm flex gap-3">
-            <button onClick={playAgain} data-testid="lion-tiger-again"
-              className="flex-1 bg-gradient-to-r from-blue-500 to-cyan-500 text-white py-3.5 rounded-2xl font-bold active:scale-95">
-              Jugar de nuevo
-            </button>
-            <button onClick={onClose}
-              className="flex-1 bg-white/10 text-white py-3.5 rounded-2xl font-bold active:scale-95">
-              Salir
-            </button>
+        {/* Timer display */}
+        {phase === 'betting' && (
+          <div style={{ position: 'absolute', top: '10px', left: '50%', transform: 'translateX(-50%)', zIndex: 50 }}>
+            <span className="text-white/80 text-lg font-bold" style={{ textShadow: '0 0 10px rgba(0,0,0,0.8)' }}>{seconds}s</span>
           </div>
         )}
       </div>
 
-      {/* History bar */}
-      {history.length > 0 && (
-        <div className="relative flex-shrink-0 px-4 pb-3">
-          <div className="flex gap-1.5 overflow-x-auto pb-1">
-            <span className="text-white/30 text-[10px] self-center mr-1">Historial:</span>
-            {history.map((h, i) => (
-              <div key={i} className={`w-7 h-7 rounded-full flex items-center justify-center text-xs flex-shrink-0 ${h.winner === 'lion' ? 'bg-amber-500/30 text-amber-300' : h.winner === 'tiger' ? 'bg-orange-500/30 text-orange-300' : 'bg-purple-500/30 text-purple-300'}`}>
-                {h.winner === 'lion' ? 'L' : h.winner === 'tiger' ? 'T' : '='}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+      {/* Bet zones */}
+      <div className="flex-shrink-0 flex justify-around gap-2 px-2 py-2">
+        <button onClick={() => apostar('tiger')} data-testid="bet-tiger"
+          className="flex-1 text-center py-3 rounded-xl" style={{ background: 'rgba(0,0,0,0.6)', border: '1px solid #ffcc00' }}>
+          <div className="text-white font-bold text-sm">TIGER</div>
+          <div className="font-bold text-base" style={{ color: '#ffcc00' }}>{formatBet(betTiger)}</div>
+        </button>
+        <button onClick={() => apostar('draw')} data-testid="bet-draw"
+          className="flex-1 text-center py-3 rounded-xl" style={{ background: 'rgba(0,0,0,0.6)', border: '1px solid #ffcc00' }}>
+          <div className="text-white font-bold text-sm">DRAW <span className="text-xs">(x8)</span></div>
+          <div className="font-bold text-base" style={{ color: '#ffcc00' }}>{formatBet(betDraw)}</div>
+        </button>
+        <button onClick={() => apostar('lion')} data-testid="bet-lion"
+          className="flex-1 text-center py-3 rounded-xl" style={{ background: 'rgba(0,0,0,0.6)', border: '1px solid #ffcc00' }}>
+          <div className="text-white font-bold text-sm">LION</div>
+          <div className="font-bold text-base" style={{ color: '#ffcc00' }}>{formatBet(betLion)}</div>
+        </button>
+      </div>
 
-      <style>{`@keyframes fadeIn{from{opacity:0;transform:scale(0.9)}to{opacity:1;transform:scale(1)}}`}</style>
+      {/* Chips */}
+      <div className="flex-shrink-0 flex justify-center gap-3 py-3" style={{ background: '#000' }}>
+        {chips.map(c => (
+          <button key={c.value} onClick={() => setActiveChip(c.value)}
+            className={`flex items-center justify-center font-bold text-xs ${activeChip === c.value ? 'chip-selected' : ''}`}
+            style={{
+              width: '52px', height: '52px', borderRadius: '50%',
+              background: c.color, color: c.textColor || '#fff',
+              border: `3px solid ${activeChip === c.value ? '#ffcc00' : '#fff'}`,
+              transition: 'all 0.2s',
+              transform: activeChip === c.value ? 'translateY(-5px)' : 'none',
+              boxShadow: activeChip === c.value ? '0 0 10px #ffcc00' : 'none',
+            }}>
+            {c.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Repeat button */}
+      <div className="flex-shrink-0 text-center py-2" style={{ paddingBottom: 'max(10px, env(safe-area-inset-bottom, 10px))' }}>
+        <button onClick={repetir} data-testid="repeat-bet"
+          style={{
+            background: 'none', border: '1px solid #ffcc00', color: '#ffcc00',
+            padding: '10px 40px', borderRadius: '25px', fontSize: '0.85rem', fontWeight: 'bold',
+          }}
+          className="active:scale-95 transition-transform">
+          REPETIR APUESTA
+        </button>
+      </div>
     </div>
   );
 };
