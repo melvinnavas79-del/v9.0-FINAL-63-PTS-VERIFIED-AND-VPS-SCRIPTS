@@ -3122,18 +3122,42 @@ async def activate_bot_in_room(admin_id: str, room_id: str):
     
     await db.bot_active_rooms.update_one(
         {"room_id": room_id},
-        {"$set": {"room_id": room_id, "room_name": room['name'], "admin_id": admin_id, "active": True, "created_at": datetime.now(timezone.utc).isoformat()}},
+        {"$set": {"room_id": room_id, "room_name": room['name'], "admin_id": admin_id, "active": True, "paused": False, "created_at": datetime.now(timezone.utc).isoformat()}},
         upsert=True
     )
-    # Bot announces itself
     await db.room_chat.insert_one({
         "id": str(uuid.uuid4()), "room_id": room_id,
         "user_id": "bot", "username": "🤖 Bot Lluvia",
-        "avatar": admin.get('avatar', ''),
-        "text": "Hola a todos! Soy el Bot de Lluvia Live. Estoy aqui para animar y hablar con ustedes. Preguntenme lo que quieran!",
+        "avatar": "", "text": "Hola! Soy el Bot de Lluvia Live. Diganme 'bot' seguido de su pregunta y les respondo. Tambien puedo animar la sala!",
         "type": "message", "created_at": datetime.now(timezone.utc).isoformat()
     })
     return {"success": True, "message": f"Bot activado en {room['name']}"}
+
+@api_router.post("/bot/activate-all-rooms")
+async def activate_bot_all_rooms(admin_id: str):
+    """Activate bot in ALL existing rooms at once - global monitoring"""
+    admin = await db.users.find_one({"id": admin_id})
+    if not admin or admin.get('role') != 'dueño':
+        raise HTTPException(status_code=403, detail="Solo el dueño")
+    rooms = await db.rooms.find().to_list(100)
+    activated = 0
+    for room in rooms:
+        await db.bot_active_rooms.update_one(
+            {"room_id": room['id']},
+            {"$set": {"room_id": room['id'], "room_name": room['name'], "admin_id": admin_id, "active": True, "paused": False, "created_at": datetime.now(timezone.utc).isoformat()}},
+            upsert=True
+        )
+        activated += 1
+    return {"success": True, "activated": activated, "message": f"Bot activado en {activated} salas"}
+
+@api_router.post("/bot/deactivate-all-rooms")
+async def deactivate_bot_all_rooms(admin_id: str):
+    """Deactivate bot from ALL rooms"""
+    admin = await db.users.find_one({"id": admin_id})
+    if not admin or admin.get('role') != 'dueño':
+        raise HTTPException(status_code=403, detail="Solo el dueño")
+    result = await db.bot_active_rooms.update_many({}, {"$set": {"active": False}})
+    return {"success": True, "deactivated": result.modified_count}
 
 @api_router.post("/bot/deactivate-room")
 async def deactivate_bot_in_room(admin_id: str, room_id: str):
@@ -3211,16 +3235,38 @@ async def bot_auto_reply(room_id: str, username: str, text: str):
             })
             return
     
+    # ANIMATE COMMAND - Bot starts animating the room
+    animate_words = ['anima', 'animanos', 'alegra', 'diviertenos', 'entretennos', 'pon ambiente', 'haz algo divertido']
+    for aw in animate_words:
+        if aw in text_lower:
+            import random
+            animations = [
+                "ATENCION TODOS! Vamos a jugar! El que mande mas regalos en los proximos 2 minutos GANA un premio especial! 🎁🔥",
+                "HORA DE TRIVIA! Quien sabe: Cual es el pais mas grande de Sudamerica? El primero en responder gana 10K monedas! 🧠",
+                "RETO MUSICAL! Pongan su cancion favorita y voten! El que tenga mas votos gana! 🎵🎶",
+                "MOMENTO DE VERDAD! Cada uno diga algo que nadie sabe de ustedes... yo empiezo: me encanta el reggaeton! 🤫",
+                "BATALLA DE CHISTES! Cuenten su mejor chiste y yo decido el ganador! El premio: 50K monedas! 😂",
+                "LLUVIA DE REGALOS! Todos manden un regalo a alguien nuevo en la sala! Hagamos que se sienta bienvenido! 🌧️🎁",
+            ]
+            await db.room_chat.insert_one({
+                "id": str(uuid.uuid4()), "room_id": room_id,
+                "user_id": "bot", "username": "🤖 Bot Lluvia", "avatar": "",
+                "text": random.choice(animations),
+                "type": "message", "created_at": datetime.now(timezone.utc).isoformat()
+            })
+            return
+    
     # If paused, don't reply
     if active.get('paused'):
         return
     
     # Only reply when someone talks TO the bot or asks a question
     is_directed = ('bot' in text_lower or '🤖' in text_lower or 'lluvia' in text_lower)
-    is_question = '?' in text or text_lower.startswith(('que ', 'como ', 'quien ', 'donde ', 'cuando ', 'por que', 'cuanto'))
-    is_greeting = text_lower in ('hola', 'hey', 'oye', 'buenas', 'que hay')
+    # ONLY respond if someone directly addresses the bot
+    is_directed = ('bot' in text_lower or '🤖' in text_lower or 'lluvia' in text_lower or 'asistente' in text_lower)
     
-    if not (is_directed or is_question or is_greeting):
+    # If NOT directed at bot, stay silent (even for questions/greetings)
+    if not is_directed:
         return
     
     # Get bot mode for personality

@@ -154,22 +154,22 @@ const Dashboard = ({ onNavigate }) => {
           <h2 className="text-sm font-bold text-yellow-400 mb-3" style={{textShadow: '0 0 10px rgba(212,160,23,0.5)'}}>Monthly Star</h2>
           <div className="flex justify-center gap-5">
             <div className="text-center" style={{animation: 'fadeIn 0.5s ease'}}>
-              <div className="w-14 h-14 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 border-2 border-yellow-400 flex items-center justify-center mx-auto mb-1 shadow-lg">
-                <span className="text-lg">🏰</span>
+              <div className="w-16 h-16 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 border-2 border-yellow-400 flex items-center justify-center mx-auto mb-1 shadow-lg">
+                <span className="text-xl">🏰</span>
               </div>
-              <div className="text-[9px] text-white/60">Clan</div>
+              <div className="text-xs text-white/60">Clan</div>
             </div>
             <div className="text-center" style={{animation: 'fadeIn 0.5s ease 0.05s both'}}>
-              <div className="w-14 h-14 rounded-full bg-gradient-to-br from-yellow-400 to-amber-600 border-2 border-yellow-400 flex items-center justify-center mx-auto mb-1 shadow-lg" style={{animation: 'pulse 2s infinite'}}>
-                <span className="text-lg">🦁</span>
+              <div className="w-16 h-16 rounded-full bg-gradient-to-br from-yellow-400 to-amber-600 border-2 border-yellow-400 flex items-center justify-center mx-auto mb-1 shadow-lg" style={{animation: 'pulse 2s infinite'}}>
+                <span className="text-xl">🦁</span>
               </div>
-              <div className="text-[9px] text-white/60">Recarga</div>
+              <div className="text-xs text-white/60">Recarga</div>
             </div>
             <div className="text-center" style={{animation: 'fadeIn 0.5s ease 0.1s both'}}>
-              <div className="w-14 h-14 rounded-full bg-gradient-to-br from-pink-400 to-rose-600 border-2 border-yellow-400 flex items-center justify-center mx-auto mb-1 shadow-lg">
-                <span className="text-lg">💖</span>
+              <div className="w-16 h-16 rounded-full bg-gradient-to-br from-pink-400 to-rose-600 border-2 border-yellow-400 flex items-center justify-center mx-auto mb-1 shadow-lg">
+                <span className="text-xl">💖</span>
               </div>
-              <div className="text-[9px] text-white/60">Pareja</div>
+              <div className="text-xs text-white/60">Pareja</div>
             </div>
           </div>
         </div>
@@ -229,23 +229,23 @@ const Dashboard = ({ onNavigate }) => {
       </div>
 
       {/* User Feed */}
-      <div className="space-y-3">
+      <div className="space-y-3 px-1">
         {users.map((u, i) => (
           <div key={u.id || i} className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
             <div className="flex items-center gap-3">
               <img
                 src={u.avatar}
                 alt={u.username}
-                className="w-14 h-14 rounded-full border-2 border-blue-200 object-cover"
+                className="w-16 h-16 rounded-full border-2 border-blue-200 object-cover flex-shrink-0"
               />
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-1 mb-1 flex-wrap">
                   <span className="text-blue-500">🦋</span>
-                  <span className="font-bold text-gray-800 text-sm truncate max-w-[120px]">{u.username}</span>
+                  <span className="font-bold text-gray-800 text-base truncate max-w-[140px]">{u.username}</span>
                   <span className="text-blue-500">🦋</span>
-                  <span className="bg-orange-400 text-white text-[10px] px-1.5 py-0.5 rounded-full font-bold">FRIENDS</span>
+                  <span className="bg-orange-400 text-white text-xs px-2 py-0.5 rounded-full font-bold">FRIENDS</span>
                 </div>
-                <div className="flex gap-1 mb-1">
+                <div className="flex gap-1 mb-1 text-base">
                   <span>🇨🇴</span>
                   <span>🏆</span>
                   <span>👑</span>
@@ -253,8 +253,8 @@ const Dashboard = ({ onNavigate }) => {
                 <p className="text-gray-500 text-sm truncate">Nunca hagas cosas que después ...</p>
               </div>
               <div className="text-right flex-shrink-0">
-                <div className="text-blue-500 font-bold flex items-center gap-1 text-sm">
-                  <span className="text-base">📊</span>
+                <div className="text-blue-500 font-bold flex items-center gap-1 text-base">
+                  <span className="text-lg">📊</span>
                   <span className="whitespace-nowrap">{u.coins >= 1e9 ? `${(u.coins/1e9).toFixed(1)}B` : u.coins >= 1e6 ? `${(u.coins/1e6).toFixed(1)}M` : u.coins?.toLocaleString() || 0}</span>
                 </div>
               </div>
@@ -440,40 +440,40 @@ const Dashboard = ({ onNavigate }) => {
             onClick={openMyRoom}
             className="flex flex-col items-center gap-1 min-w-[60px] py-1"
           >
-            <div className="w-14 h-14 bg-gradient-to-r from-cyan-400 to-blue-500 rounded-full flex items-center justify-center shadow-md">
-              <span className="text-white text-2xl">🎤</span>
+            <div className="w-16 h-16 bg-gradient-to-r from-cyan-400 to-blue-500 rounded-full flex items-center justify-center shadow-md">
+              <span className="text-white text-3xl">🎤</span>
             </div>
-            <span className="text-[11px] text-cyan-500 font-semibold">por la sala</span>
+            <span className="text-xs text-cyan-500 font-semibold">por la sala</span>
           </button>
 
           <button
             onClick={() => onNavigate('games')}
             className="flex flex-col items-center gap-1 min-w-[60px] py-1"
           >
-            <div className="w-14 h-14 bg-gray-100 rounded-full flex items-center justify-center">
+            <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center">
               <span className="text-3xl">🎮</span>
             </div>
-            <span className="text-[11px] text-gray-600 font-medium">Juegos</span>
+            <span className="text-xs text-gray-600 font-medium">Juegos</span>
           </button>
 
           <button
             onClick={() => onNavigate('reels')}
             className="flex flex-col items-center gap-1 min-w-[60px] py-1"
           >
-            <div className="w-14 h-14 bg-gray-100 rounded-full flex items-center justify-center">
+            <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center">
               <span className="text-3xl">🎬</span>
             </div>
-            <span className="text-[11px] text-gray-600 font-medium">Momento</span>
+            <span className="text-xs text-gray-600 font-medium">Momento</span>
           </button>
 
           <button
             onClick={() => onNavigate('photos')}
             className="flex flex-col items-center gap-1 min-w-[60px] py-1"
           >
-            <div className="w-14 h-14 bg-gray-100 rounded-full flex items-center justify-center">
+            <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center">
               <span className="text-3xl">📸</span>
             </div>
-            <span className="text-[11px] text-gray-600 font-medium">Fotos</span>
+            <span className="text-xs text-gray-600 font-medium">Fotos</span>
           </button>
 
           <button
@@ -483,9 +483,9 @@ const Dashboard = ({ onNavigate }) => {
             <img
               src={user.avatar}
               alt="yo"
-              className="w-14 h-14 rounded-full border-2 border-gray-200 object-cover"
+              className="w-16 h-16 rounded-full border-2 border-gray-200 object-cover"
             />
-            <span className="text-[11px] text-gray-600 font-medium">yo</span>
+            <span className="text-xs text-gray-600 font-medium">yo</span>
           </button>
         </div>
       </div>

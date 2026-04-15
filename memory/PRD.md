@@ -1,32 +1,29 @@
 # Lluvia Live - PRD
 
 ## Descripcion
-App de streaming de audio en vivo con salas, juegos de monetizacion real, economia de monedas, Bot IA y sistema de clanes/parejas.
+App de streaming de audio en vivo con salas, juegos de monetizacion, Bot IA inteligente, economia de monedas.
 
 ## Stack
 - Frontend: React.js + TailwindCSS + Agora.io WebRTC
 - Backend: FastAPI + Motor (MongoDB async)
-- AI Bot: emergentintegrations (Gemini) + Web Speech API (TTS/STT)
+- AI Bot: emergentintegrations (Gemini) + Web Speech API
 
-## Juegos (8 con iconos profesionales, estilo app movil)
-- [x] Tablita (Ruleta/Greedy Dice) - icono generado
-- [x] PK Battle (1v1 apuestas de regalos) - icono generado
-- [x] LUDO (Batalla de dados) - icono generado
-- [x] UNO (Carta Mayor) - icono generado
-- [x] Domino (Profesional, 7 fichas) - icono stock
-- [x] Eliminacion (Monster Battle) - icono generado
-- [x] Corona (Pool/Carrom) - icono stock
-- [x] Jackaroo (Greedy Dice variant) - icono stock
-Todos con: apuesta real (1K-500K), visual interactivo, dentro de sala, trackean King progress
+## Responsivo
+- iOS: Safe area insets para notch y home indicator
+- Android: Font scaling agresivo para High DPI (2x/3x), iconos w-16 h-16
+- Bottom nav: 64px icons, safe-area-inset-bottom
+- Room header: paddingTop safe-area-inset-top
 
-## Funcionalidades Core
-- [x] Salas de audio Agora WebRTC
-- [x] Sistema Eventos con Aprobacion (King/CP)
-- [x] 10 Cofres, 7 Sobres, 15 regalos
-- [x] Tienda en sala, Cashback semanal
-- [x] Bot IA con 4 voces, Modo Fantasma
-- [x] Panel MAESTRO, Dashboard completo
-- [x] Deploy GitHub + Contabo VPS
+## Bot IA
+- [x] Solo responde cuando le dicen "bot" directamente
+- [x] Si alguien habla normal, NO interrumpe
+- [x] Puede animar salas (comandos: "bot anima", "bot animanos")
+- [x] Vigilar TODAS las salas (boton en Panel > Bot IA)
+- [x] 4 modos: normal, locutor, animador, serio
+- [x] Comandos: callate, habla, modo X
+
+## Juegos (8 con iconos profesionales)
+- Tablita, PK, LUDO (tablero real), UNO, Domino, Eliminacion, Corona, Jackaroo
 
 ## Credenciales
 - Melvin_Live / test123 - Role: dueño

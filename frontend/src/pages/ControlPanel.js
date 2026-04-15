@@ -675,7 +675,31 @@ const BotTab = ({ userId }) => {
       <div className="bg-gradient-to-r from-purple-600 to-indigo-600 rounded-2xl p-4 mb-4 text-center">
         <div className="text-4xl mb-2">🤖</div>
         <h3 className="text-xl font-black text-white">Bot Administrativo IA</h3>
-        <p className="text-white/60 text-xs">Pregúntame lo que quieras o dame órdenes</p>
+        <p className="text-white/60 text-xs">Preguntame lo que quieras o dame ordenes</p>
+      </div>
+
+      {/* Bot Room Monitoring */}
+      <div className="bg-gray-800 rounded-xl p-3 mb-4">
+        <h4 className="text-white/70 text-xs font-bold mb-2">Vigilancia de Salas</h4>
+        <p className="text-white/40 text-[10px] mb-2">El bot solo responde cuando le hablan directamente (digan "bot...")</p>
+        <div className="grid grid-cols-2 gap-2">
+          <button onClick={async () => {
+            try {
+              const r = await axios.post(`${API}/bot/activate-all-rooms?admin_id=${userId}`);
+              alert(`Bot activado en ${r.data.activated} salas!`);
+            } catch (e) { alert(e.response?.data?.detail || 'Error'); }
+          }} className="bg-green-600 text-white py-3 rounded-xl font-bold text-sm active:scale-95">
+            Vigilar TODAS las Salas
+          </button>
+          <button onClick={async () => {
+            try {
+              const r = await axios.post(`${API}/bot/deactivate-all-rooms?admin_id=${userId}`);
+              alert(`Bot desactivado de ${r.data.deactivated} salas`);
+            } catch (e) { alert(e.response?.data?.detail || 'Error'); }
+          }} className="bg-red-600 text-white py-3 rounded-xl font-bold text-sm active:scale-95">
+            Desactivar de TODAS
+          </button>
+        </div>
       </div>
 
       {/* Voice Selector */}
