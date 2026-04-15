@@ -5,10 +5,17 @@ from fastapi import APIRouter, HTTPException
 from database import db, BotMessage, WatchMission, uuid, datetime, timezone, create_notification
 import os
 
+try:
+    from emergentintegrations.llm.chat import LlmChat, UserMessage
+except ImportError:
+    LlmChat = None
+    UserMessage = None
+
 router = APIRouter()
 
 @router.post("/bot/command")
 async def bot_command(msg: BotMessage):
+    """Bot Command."""
     # Only owner can use
     admin = await db.users.find_one({"id": msg.admin_id})
     if not admin or admin.get('role') != 'dueño':
@@ -328,6 +335,7 @@ REGLAS:
 
 @router.get("/bot/history")
 async def get_bot_history(admin_id: str):
+    """Get Bot History."""
     admin = await db.users.find_one({"id": admin_id})
     if not admin or admin.get('role') != 'dueño':
         raise HTTPException(status_code=403, detail="Solo el dueño")
@@ -421,6 +429,7 @@ async def create_watch_mission(admin_id: str, mission: WatchMission):
 
 @router.get("/bot/missions")
 async def get_missions(admin_id: str):
+    """Get Missions."""
     admin = await db.users.find_one({"id": admin_id})
     if not admin or admin.get('role') != 'dueño':
         raise HTTPException(status_code=403, detail="Solo el dueño")
@@ -429,6 +438,7 @@ async def get_missions(admin_id: str):
 
 @router.delete("/bot/missions/{mission_id}")
 async def delete_mission(mission_id: str, admin_id: str):
+    """Delete Mission."""
     admin = await db.users.find_one({"id": admin_id})
     if not admin or admin.get('role') != 'dueño':
         raise HTTPException(status_code=403, detail="Solo el dueño")
@@ -437,6 +447,7 @@ async def delete_mission(mission_id: str, admin_id: str):
 
 @router.get("/bot/alerts")
 async def get_bot_alerts(admin_id: str, limit: int = 20):
+    """Get Bot Alerts."""
     admin = await db.users.find_one({"id": admin_id})
     if not admin or admin.get('role') != 'dueño':
         raise HTTPException(status_code=403, detail="Solo el dueño")
@@ -525,6 +536,7 @@ async def deactivate_bot_all_rooms(admin_id: str):
 
 @router.post("/bot/deactivate-room")
 async def deactivate_bot_in_room(admin_id: str, room_id: str):
+    """Deactivate Bot In Room."""
     admin = await db.users.find_one({"id": admin_id})
     if not admin or admin.get('role') != 'dueño':
         raise HTTPException(status_code=403, detail="Solo el dueño")
@@ -540,6 +552,7 @@ async def deactivate_bot_in_room(admin_id: str, room_id: str):
 
 @router.get("/bot/active-rooms")
 async def get_bot_active_rooms(admin_id: str):
+    """Get Bot Active Rooms."""
     admin = await db.users.find_one({"id": admin_id})
     if not admin or admin.get('role') != 'dueño':
         raise HTTPException(status_code=403, detail="Solo el dueño")

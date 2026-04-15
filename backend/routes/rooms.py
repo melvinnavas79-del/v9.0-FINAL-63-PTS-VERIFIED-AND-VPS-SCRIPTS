@@ -34,11 +34,13 @@ async def create_room(room_data: RoomCreate, owner_id: str):
 
 @router.get("/rooms")
 async def get_rooms():
+    """Get Rooms."""
     rooms = await db.rooms.find().to_list(100)
     return [serialize_room(r) for r in rooms]
 
 @router.get("/rooms/{room_id}")
 async def get_room(room_id: str):
+    """Get Room."""
     room = await db.rooms.find_one({"id": room_id})
     if not room:
         raise HTTPException(status_code=404, detail="Sala no encontrada")
@@ -46,6 +48,7 @@ async def get_room(room_id: str):
 
 @router.delete("/rooms/{room_id}")
 async def delete_room(room_id: str, owner_id: str):
+    """Delete Room."""
     room = await db.rooms.find_one({"id": room_id})
     if not room:
         raise HTTPException(status_code=404, detail="Sala no encontrada")
@@ -118,6 +121,7 @@ async def join_room(room_id: str, user_id: str, seat_index: int):
 
 @router.post("/rooms/{room_id}/toggle-mute")
 async def toggle_mute(room_id: str, user_id: str):
+    """Toggle Mute."""
     room = await db.rooms.find_one({"id": room_id})
     if not room:
         raise HTTPException(status_code=404, detail="Sala no encontrada")
@@ -131,6 +135,7 @@ async def toggle_mute(room_id: str, user_id: str):
 
 @router.post("/rooms/{room_id}/leave")
 async def leave_room(room_id: str, user_id: str):
+    """Leave Room."""
     room = await db.rooms.find_one({"id": room_id})
     if not room:
         raise HTTPException(status_code=404, detail="Sala no encontrada")
@@ -170,6 +175,7 @@ async def send_chat(room_id: str, msg: ChatMessage):
 
 @router.get("/rooms/{room_id}/chat")
 async def get_chat(room_id: str, limit: int = 50, user_id: str = None):
+    """Get Chat."""
     query = {"room_id": room_id}
     if user_id:
         join_record = await db.room_joins.find_one({"user_id": user_id, "room_id": room_id})
@@ -181,6 +187,7 @@ async def get_chat(room_id: str, limit: int = 50, user_id: str = None):
 
 @router.post("/rooms/{room_id}/mark-join")
 async def mark_join(room_id: str, user_id: str):
+    """Mark Join."""
     existing = await db.room_joins.find_one({"user_id": user_id, "room_id": room_id})
     if not existing:
         await db.room_joins.insert_one({"user_id": user_id, "room_id": room_id, "joined_at": datetime.now(timezone.utc).isoformat()})
@@ -230,6 +237,7 @@ async def set_room_music(room_id: str, owner_id: str, file: UploadFile = File(..
 
 @router.delete("/rooms/{room_id}/music")
 async def remove_room_music(room_id: str, owner_id: str):
+    """Remove Room Music."""
     await db.rooms.update_one({"id": room_id}, {"$unset": {"music_url": 1}})
     return {"success": True}
 
@@ -278,6 +286,7 @@ async def get_agora_token(channel_name: str, user_id: str):
 
 @router.post("/upload")
 async def upload_file(file: UploadFile = File(...)):
+    """Upload File."""
     filename = f"{uuid.uuid4().hex[:12]}{os.path.splitext(file.filename)[1]}"
     filepath = UPLOAD_DIR / filename
     with open(filepath, "wb") as buffer:

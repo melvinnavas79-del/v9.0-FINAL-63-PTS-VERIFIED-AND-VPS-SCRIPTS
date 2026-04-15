@@ -2,7 +2,7 @@
 Social routes: Clanes, Parejas (CP), Gifts, Sobres, Cofres.
 """
 from fastapi import APIRouter, HTTPException, UploadFile, File
-from database import db, ClanCreate, serialize_user, uuid, datetime, timezone, create_notification
+from database import db, ClanCreate, GiftSend, serialize_user, uuid, datetime, timezone, create_notification
 from pydantic import BaseModel
 import random
 
@@ -12,6 +12,7 @@ router = APIRouter()
 
 @router.post("/clanes")
 async def create_clan(data: ClanCreate):
+    """Create Clan."""
     owner = await db.users.find_one({"id": data.owner_id})
     if not owner:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
@@ -32,11 +33,13 @@ async def create_clan(data: ClanCreate):
 
 @router.get("/clanes")
 async def get_clanes():
+    """Get Clanes."""
     clanes = await db.clanes.find().sort("weekly_coins", -1).to_list(50)
     return [{k: v for k, v in c.items() if k != "_id"} for c in clanes]
 
 @router.post("/clanes/{clan_id}/join")
 async def join_clan(clan_id: str, user_id: str):
+    """Join Clan."""
     clan = await db.clanes.find_one({"id": clan_id})
     if not clan:
         raise HTTPException(status_code=404, detail="Clan no encontrado")
@@ -48,6 +51,7 @@ async def join_clan(clan_id: str, user_id: str):
 
 @router.post("/clanes/{clan_id}/leave")
 async def leave_clan(clan_id: str, user_id: str):
+    """Leave Clan."""
     await db.clanes.update_one({"id": clan_id}, {"$pull": {"members": user_id}})
     await db.users.update_one({"id": user_id}, {"$set": {"clan_id": None, "clan_name": None}})
     return {"success": True}
@@ -60,6 +64,7 @@ class CPCreate(BaseModel):
 
 @router.post("/cp/create")
 async def create_cp(data: CPCreate):
+    """Create Cp."""
     u1 = await db.users.find_one({"id": data.user1_id})
     u2 = await db.users.find_one({"id": data.user2_id})
     if not u1 or not u2:
@@ -88,11 +93,13 @@ async def create_cp(data: CPCreate):
 
 @router.get("/cp")
 async def get_parejas():
+    """Get Parejas."""
     cps = await db.parejas.find().sort("total_coins", -1).to_list(50)
     return [{k: v for k, v in c.items() if k != "_id"} for c in cps]
 
 @router.post("/cp/{cp_id}/level-up")
 async def cp_level_up(cp_id: str):
+    """Cp Level Up."""
     cp = await db.parejas.find_one({"id": cp_id})
     if not cp:
         raise HTTPException(status_code=404, detail="Pareja no encontrada")
@@ -161,10 +168,12 @@ GIFTS = {
 
 @router.get("/gifts")
 async def get_gifts():
+    """Get Gifts."""
     return GIFTS
 
 @router.post("/gifts/send")
 async def send_gift(gift: GiftSend):
+    """Send Gift."""
     if gift.gift_type not in GIFTS:
         raise HTTPException(status_code=400, detail="Regalo no válido")
     
@@ -252,10 +261,12 @@ class SobreData(BaseModel):
 
 @router.get("/sobres")
 async def get_sobres():
+    """Get Sobres."""
     return SOBRE_TIERS
 
 @router.post("/sobres/throw")
 async def throw_sobre(data: SobreData):
+    """Throw Sobre."""
     sobre = next((s for s in SOBRE_TIERS if s['id'] == data.sobre_id), None)
     if not sobre:
         raise HTTPException(status_code=400, detail="Sobre no valido")
@@ -290,6 +301,7 @@ async def throw_sobre(data: SobreData):
 
 @router.post("/rooms/{room_id}/background")
 async def set_room_background(room_id: str, owner_id: str, file: UploadFile = File(...)):
+    """Set Room Background."""
     room = await db.rooms.find_one({"id": room_id})
     if not room:
         raise HTTPException(status_code=404, detail="Sala no encontrada")
@@ -311,6 +323,7 @@ async def set_room_background(room_id: str, owner_id: str, file: UploadFile = Fi
 
 @router.post("/rooms/{room_id}/music")
 async def set_room_music(room_id: str, owner_id: str, file: UploadFile = File(...)):
+    """Set Room Music."""
     room = await db.rooms.find_one({"id": room_id})
     if not room:
         raise HTTPException(status_code=404, detail="Sala no encontrada")
@@ -332,6 +345,7 @@ async def set_room_music(room_id: str, owner_id: str, file: UploadFile = File(..
 
 @router.delete("/rooms/{room_id}/music")
 async def remove_room_music(room_id: str, owner_id: str):
+    """Remove Room Music."""
     await db.rooms.update_one({"id": room_id}, {"$unset": {"music_url": ""}})
     return {"success": True}
 
@@ -339,11 +353,13 @@ async def remove_room_music(room_id: str, owner_id: str):
 
 @router.get("/rankings/weekly-clans")
 async def get_weekly_clans():
+    """Get Weekly Clans."""
     clans = await db.clanes.find().sort("weekly_coins", -1).limit(3).to_list(3)
     return [{k: v for k, v in c.items() if k != "_id"} for c in clans]
 
 @router.get("/rankings/monthly-clans")
 async def get_monthly_clans():
+    """Get Monthly Clans."""
     clans = await db.clanes.find().sort("monthly_coins", -1).limit(3).to_list(3)
     return [{k: v for k, v in c.items() if k != "_id"} for c in clans]
 
@@ -364,6 +380,7 @@ COFRE_THRESHOLDS = [
 
 @router.get("/rooms/{room_id}/cofres")
 async def get_room_cofres(room_id: str):
+    """Get Room Cofres."""
     room = await db.rooms.find_one({"id": room_id})
     if not room:
         raise HTTPException(status_code=404, detail="Sala no encontrada")
@@ -373,6 +390,7 @@ async def get_room_cofres(room_id: str):
 
 @router.post("/rooms/{room_id}/open-cofre")
 async def try_open_cofre(room_id: str):
+    """Try Open Cofre."""
     room = await db.rooms.find_one({"id": room_id})
     if not room:
         raise HTTPException(status_code=404, detail="Sala no encontrada")

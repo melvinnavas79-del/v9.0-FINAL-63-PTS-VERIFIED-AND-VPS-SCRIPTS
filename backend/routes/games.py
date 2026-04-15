@@ -9,6 +9,7 @@ router = APIRouter()
 
 @router.post("/games/play")
 async def play_generic(play: GenericPlay):
+    """Play Generic."""
     user = await db.users.find_one({"id": play.user_id})
     if not user:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
@@ -173,6 +174,7 @@ async def start_pk_battle(battle: PKBattleStart):
 
 @router.get("/games/pk-battle/{room_id}")
 async def get_active_pk(room_id: str):
+    """Get Active Pk."""
     battle = await db.pk_battles.find_one({"room_id": room_id, "status": "active"})
     if not battle:
         return None
@@ -240,6 +242,7 @@ async def end_pk_battle(battle_id: str):
 
 @router.post("/games/ruleta")
 async def play_ruleta(bet: GameBet):
+    """Play Ruleta."""
     user = await db.users.find_one({"id": bet.user_id})
     if not user:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
@@ -287,6 +290,7 @@ async def play_ruleta(bet: GameBet):
 
 @router.post("/games/dados")
 async def play_dados(bet: GameBet):
+    """Play Dados."""
     user = await db.users.find_one({"id": bet.user_id})
     if not user:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
@@ -336,6 +340,7 @@ async def play_dados(bet: GameBet):
 
 @router.post("/games/piedra-papel-tijera")
 async def play_rps(bet: RPSBet):
+    """Play Rps."""
     user = await db.users.find_one({"id": bet.user_id})
     if not user:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
@@ -385,6 +390,7 @@ async def play_rps(bet: RPSBet):
 
 @router.get("/games/trivia/question")
 async def get_trivia_question():
+    """Get Trivia Question."""
     q = random.choice(TRIVIA_QUESTIONS)
     return {
         "question": q["question"],
@@ -394,6 +400,7 @@ async def get_trivia_question():
 
 @router.post("/games/trivia")
 async def play_trivia(bet: TriviaBet):
+    """Play Trivia."""
     user = await db.users.find_one({"id": bet.user_id})
     if not user:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
@@ -429,6 +436,7 @@ async def play_trivia(bet: TriviaBet):
 
 @router.post("/games/carta-mayor")
 async def play_carta_mayor(bet: CardBet):
+    """Play Carta Mayor."""
     user = await db.users.find_one({"id": bet.user_id})
     if not user:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
@@ -484,6 +492,7 @@ async def play_carta_mayor(bet: CardBet):
 
 @router.post("/games/slot-machine")
 async def play_slot_machine(bet: GameBet):
+    """Play Slot Machine."""
     user = await db.users.find_one({"id": bet.user_id})
     if not user:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")

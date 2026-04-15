@@ -1,6 +1,25 @@
 """
 Lluvia Live - Shared database connection and helpers.
-All route modules import db, models and utilities from here.
+=====================================================
+Central module for MongoDB connection, Pydantic models, 
+security utilities, and shared helper functions.
+
+All route modules import from here to maintain a single 
+source of truth for data access and validation.
+
+Collections:
+    users          - User accounts, profiles, coins, roles
+    rooms          - Audio rooms with seats and settings
+    room_chat      - Chat messages per room
+    clanes         - Clan groups with members
+    parejas        - CP (couple) partnerships
+    events         - Event history log
+    event_requests - Event request/approval workflow
+    bot_sessions   - Bot memory per user session
+    bot_active_rooms - Rooms where bot is active
+    pk_battles     - PK battle state
+    notifications  - User notifications
+    gifts_log      - Gift transaction history
 """
 from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel
@@ -92,6 +111,13 @@ class NotifPreferences(BaseModel):
     cp_notifs: bool = True
     connection_notifs: bool = True
     invite_notifs: bool = True
+
+
+class GiftSend(BaseModel):
+    sender_id: str
+    receiver_id: str
+    gift_type: str
+    room_id: str = ""
 
 class IDChange(BaseModel):
     user_id: str

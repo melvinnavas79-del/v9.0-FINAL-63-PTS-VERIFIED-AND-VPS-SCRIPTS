@@ -7,6 +7,27 @@ from typing import Dict, Any
 
 router = APIRouter()
 
+DEFAULT_CONFIG = {
+    "coin_price_1000": 1.0,
+    "coin_price_5000": 4.5,
+    "coin_price_10000": 8.0,
+    "diamond_price": 10.0,
+    "entry_animation_price": 50000,
+    "vip_entry_price": 100000,
+}
+
+@router.get("/admin/stats")
+async def admin_stats(admin_id: str):
+    """Dashboard stats for admin panel."""
+    admin = await db.users.find_one({"id": admin_id})
+    if not admin or not has_permission(admin.get('role', 'usuario'), 'moderador'):
+        raise HTTPException(status_code=403, detail="Sin permiso")
+    total_users = await db.users.count_documents({})
+    total_rooms = await db.rooms.count_documents({})
+    total_clanes = await db.clanes.count_documents({})
+    total_events = await db.events.count_documents({})
+    return {"total_users": total_users, "total_rooms": total_rooms, "total_clanes": total_clanes, "total_events": total_events}
+
 ROLE_BADGES = {
     "dueno": ["Crown Dueno", "Fundador", "Admin", "VIP"],
     "admin": ["Admin", "VIP", "Verificado"],
@@ -16,6 +37,7 @@ ROLE_BADGES = {
 
 @router.post("/admin/set-owner")
 async def set_owner(user_id: str, owner_key: str):
+    """Set Owner."""
     if owner_key != "lluvia_owner_melvin":
         raise HTTPException(status_code=403, detail="Clave inválida")
     
@@ -41,6 +63,7 @@ async def set_owner(user_id: str, owner_key: str):
 
 @router.post("/admin/set-admin")
 async def set_admin(user_id: str, admin_key: str):
+    """Set Admin."""
     if admin_key != "lluvia_admin_2024":
         raise HTTPException(status_code=403, detail="Clave inválida")
     
@@ -56,6 +79,7 @@ async def set_admin(user_id: str, admin_key: str):
 
 @router.post("/admin/set-role")
 async def set_role(user_id: str, admin_id: str, role: str):
+    """Set Role."""
     admin = await db.users.find_one({"id": admin_id})
     if not admin:
         raise HTTPException(status_code=404, detail="Admin no encontrado")
@@ -89,6 +113,7 @@ async def set_role(user_id: str, admin_id: str, role: str):
 
 @router.get("/admin/users")
 async def admin_get_users(admin_id: str):
+    """Admin Get Users."""
     admin = await db.users.find_one({"id": admin_id})
     if not admin:
         raise HTTPException(status_code=403, detail="No tienes permisos")
@@ -102,6 +127,7 @@ async def admin_get_users(admin_id: str):
 
 @router.get("/admin/staff")
 async def get_staff(admin_id: str):
+    """Get Staff."""
     admin = await db.users.find_one({"id": admin_id})
     if not admin:
         raise HTTPException(status_code=403, detail="No tienes permisos")
@@ -115,6 +141,7 @@ async def get_staff(admin_id: str):
 
 @router.put("/admin/users/{user_id}")
 async def admin_update_user(user_id: str, admin_id: str, updates: Dict[str, Any]):
+    """Admin Update User."""
     admin = await db.users.find_one({"id": admin_id})
     if not admin:
         raise HTTPException(status_code=403, detail="No tienes permisos")
@@ -137,6 +164,7 @@ async def admin_update_user(user_id: str, admin_id: str, updates: Dict[str, Any]
 
 @router.delete("/admin/users/{user_id}")
 async def admin_delete_user(user_id: str, admin_id: str):
+    """Admin Delete User."""
     admin = await db.users.find_one({"id": admin_id})
     if not admin:
         raise HTTPException(status_code=403, detail="No tienes permisos")
@@ -156,6 +184,7 @@ async def admin_delete_user(user_id: str, admin_id: str):
 
 @router.post("/admin/verify-user")
 async def verify_user(user_id: str, admin_id: str):
+    """Verify User."""
     admin = await db.users.find_one({"id": admin_id})
     if not admin or not has_permission(admin.get('role', 'usuario'), 'admin'):
         raise HTTPException(status_code=403, detail="No tienes permisos")
@@ -173,6 +202,7 @@ async def verify_user(user_id: str, admin_id: str):
 
 @router.post("/admin/unverify-user")
 async def unverify_user(user_id: str, admin_id: str):
+    """Unverify User."""
     admin = await db.users.find_one({"id": admin_id})
     if not admin or not has_permission(admin.get('role', 'usuario'), 'admin'):
         raise HTTPException(status_code=403, detail="No tienes permisos")
@@ -189,6 +219,7 @@ async def unverify_user(user_id: str, admin_id: str):
 
 @router.post("/admin/console/give-coins")
 async def console_give_coins(admin_id: str, target_id: str, amount: int):
+    """Console Give Coins."""
     admin = await db.users.find_one({"id": admin_id})
     if not admin or admin.get('role') != 'dueño':
         raise HTTPException(status_code=403, detail="Solo el dueño")
@@ -198,6 +229,7 @@ async def console_give_coins(admin_id: str, target_id: str, amount: int):
 
 @router.post("/admin/console/set-level")
 async def console_set_level(admin_id: str, target_id: str, level: int):
+    """Console Set Level."""
     admin = await db.users.find_one({"id": admin_id})
     if not admin or admin.get('role') != 'dueño':
         raise HTTPException(status_code=403, detail="Solo el dueño")
@@ -206,6 +238,7 @@ async def console_set_level(admin_id: str, target_id: str, level: int):
 
 @router.post("/admin/console/set-aristocracy")
 async def console_set_aristocracy(admin_id: str, target_id: str, aristocracy: int):
+    """Console Set Aristocracy."""
     admin = await db.users.find_one({"id": admin_id})
     if not admin or admin.get('role') != 'dueño':
         raise HTTPException(status_code=403, detail="Solo el dueño")
@@ -214,6 +247,7 @@ async def console_set_aristocracy(admin_id: str, target_id: str, aristocracy: in
 
 @router.post("/admin/console/ban")
 async def console_ban(admin_id: str, target_id: str):
+    """Console Ban."""
     admin = await db.users.find_one({"id": admin_id})
     if not admin or not has_permission(admin.get('role', 'usuario'), 'moderador'):
         raise HTTPException(status_code=403, detail="No tienes permisos")
@@ -225,6 +259,7 @@ async def console_ban(admin_id: str, target_id: str):
 
 @router.post("/admin/console/unban")
 async def console_unban(admin_id: str, target_id: str):
+    """Console Unban."""
     admin = await db.users.find_one({"id": admin_id})
     if not admin or not has_permission(admin.get('role', 'usuario'), 'moderador'):
         raise HTTPException(status_code=403, detail="No tienes permisos")
@@ -233,6 +268,7 @@ async def console_unban(admin_id: str, target_id: str):
 
 @router.post("/admin/console/broadcast")
 async def console_broadcast(admin_id: str, message: str):
+    """Console Broadcast."""
     admin = await db.users.find_one({"id": admin_id})
     if not admin or admin.get('role') != 'dueño':
         raise HTTPException(status_code=403, detail="Solo el dueño")
@@ -248,6 +284,7 @@ async def console_broadcast(admin_id: str, message: str):
 
 @router.post("/admin/console/expand-room")
 async def expand_room_seats(admin_id: str, room_id: str, max_seats: int):
+    """Expand Room Seats."""
     admin = await db.users.find_one({"id": admin_id})
     if not admin or admin.get('role') != 'dueño':
         raise HTTPException(status_code=403, detail="Solo el dueño")
@@ -269,6 +306,7 @@ async def expand_room_seats(admin_id: str, room_id: str, max_seats: int):
 
 @router.post("/admin/console/update-store")
 async def update_store_package(admin_id: str, package_id: str, coins: int, diamonds: int, price: float, name: str):
+    """Update Store Package."""
     admin = await db.users.find_one({"id": admin_id})
     if not admin or admin.get('role') != 'dueño':
         raise HTTPException(status_code=403, detail="Solo el dueño")
@@ -282,11 +320,13 @@ async def update_store_package(admin_id: str, package_id: str, coins: int, diamo
 
 @router.get("/broadcasts")
 async def get_broadcasts():
+    """Get Broadcasts."""
     msgs = await db.broadcasts.find().sort("created_at", -1).limit(10).to_list(10)
     return [{k: v for k, v in m.items() if k != "_id"} for m in msgs]
 
 @router.delete("/admin/rooms/{room_id}")
 async def admin_delete_room(room_id: str, admin_id: str):
+    """Admin Delete Room."""
     admin = await db.users.find_one({"id": admin_id})
     if not admin:
         raise HTTPException(status_code=403, detail="No tienes permisos")
@@ -315,6 +355,7 @@ async def admin_delete_room(room_id: str, admin_id: str):
 
 @router.post("/users/change-id")
 async def change_user_id(data: IDChange):
+    """Change User Id."""
     user = await db.users.find_one({"id": data.user_id})
     if not user:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
@@ -350,6 +391,7 @@ async def change_user_id(data: IDChange):
 
 @router.post("/upload")
 async def upload_file(file: UploadFile = File(...)):
+    """Upload File."""
     ext = file.filename.split('.')[-1].lower() if '.' in file.filename else 'bin'
     allowed = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'mp4', 'mov', 'avi', 'webm', 'mp3', 'wav']
     if ext not in allowed:
@@ -370,6 +412,7 @@ async def upload_file(file: UploadFile = File(...)):
 
 @router.post("/rooms/my-room")
 async def get_or_create_my_room(user_id: str):
+    """Get Or Create My Room."""
     user = await db.users.find_one({"id": user_id})
     if not user:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
@@ -390,6 +433,7 @@ async def get_or_create_my_room(user_id: str):
 
 @router.get("/users/{user_id}/can-use-gif")
 async def check_gif_permission(user_id: str):
+    """Check Gif Permission."""
     user = await db.users.find_one({"id": user_id})
     if not user:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
@@ -398,6 +442,7 @@ async def check_gif_permission(user_id: str):
 
 @router.post("/admin/grant-gif/{target_id}")
 async def grant_gif_permission(target_id: str, admin_id: str):
+    """Grant Gif Permission."""
     admin = await db.users.find_one({"id": admin_id})
     if not admin or admin.get('role') != 'dueño':
         raise HTTPException(status_code=403, detail="Solo el dueño")
@@ -406,6 +451,7 @@ async def grant_gif_permission(target_id: str, admin_id: str):
 
 @router.post("/admin/revoke-gif/{target_id}")
 async def revoke_gif_permission(target_id: str, admin_id: str):
+    """Revoke Gif Permission."""
     admin = await db.users.find_one({"id": admin_id})
     if not admin or admin.get('role') != 'dueño':
         raise HTTPException(status_code=403, detail="Solo el dueño")
@@ -414,6 +460,7 @@ async def revoke_gif_permission(target_id: str, admin_id: str):
 
 @router.get("/admin/config")
 async def get_admin_config():
+    """Get Admin Config."""
     config = await db.system.find_one({"key": "admin_config"})
     if config:
         config.pop('_id', None)
@@ -422,6 +469,7 @@ async def get_admin_config():
 
 @router.put("/admin/config")
 async def update_admin_config(admin_id: str, updates: dict):
+    """Update Admin Config."""
     admin = await db.users.find_one({"id": admin_id})
     if not admin or admin.get('role') != 'dueño':
         raise HTTPException(status_code=403, detail="Solo el dueño")

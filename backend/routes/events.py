@@ -20,6 +20,7 @@ CP_LEVELS = {
 
 @router.post("/events/weekly-rewards")
 async def distribute_weekly_rewards(admin_id: str):
+    """Distribute Weekly Rewards."""
     admin = await db.users.find_one({"id": admin_id})
     if not admin or admin.get('role') != 'dueño':
         raise HTTPException(status_code=403, detail="Solo el dueño puede distribuir premios")
@@ -72,6 +73,7 @@ async def distribute_weekly_rewards(admin_id: str):
 
 @router.get("/flash-fame")
 async def get_flash_fame():
+    """Get Flash Fame."""
     fame = await db.system.find_one({"key": "flash_fame"})
     if fame:
         fame.pop('_id', None)
@@ -79,6 +81,7 @@ async def get_flash_fame():
 
 @router.post("/events/baby-robot")
 async def baby_robot_prize(admin_id: str):
+    """Baby Robot Prize."""
     admin = await db.users.find_one({"id": admin_id})
     if not admin or admin.get('role') != 'dueño':
         raise HTTPException(status_code=403, detail="Solo el dueño")
@@ -95,6 +98,7 @@ async def baby_robot_prize(admin_id: str):
 
 @router.post("/events/king-level")
 async def king_level_reward(user_id: str):
+    """King Level Reward."""
     user = await db.users.find_one({"id": user_id})
     if not user:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
@@ -106,6 +110,7 @@ async def king_level_reward(user_id: str):
 
 @router.post("/events/clan-rewards")
 async def clan_rewards(admin_id: str, body: dict = None):
+    """Clan Rewards."""
     admin = await db.users.find_one({"id": admin_id})
     if not admin or admin.get('role') != 'dueño':
         raise HTTPException(status_code=403, detail="Solo el dueño")
@@ -135,11 +140,13 @@ async def clan_rewards(admin_id: str, body: dict = None):
 
 @router.get("/events/history")
 async def get_events():
+    """Get Events."""
     events = await db.events.find().sort("created_at", -1).to_list(50)
     return [{k: v for k, v in e.items() if k != "_id"} for e in events]
 
 @router.post("/events/cashback")
 async def distribute_cashback(admin_id: str):
+    """Distribute Cashback."""
     admin = await db.users.find_one({"id": admin_id})
     if not admin or admin.get('role') != 'dueño':
         raise HTTPException(status_code=403, detail="Solo el dueño")

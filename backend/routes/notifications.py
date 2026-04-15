@@ -28,6 +28,7 @@ async def create_notification(category: str, title: str, message: str, target_us
 
 @router.get("/notifications/{user_id}")
 async def get_notifications(user_id: str, limit: int = 30):
+    """Get Notifications."""
     user = await db.users.find_one({"id": user_id})
     if not user:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
@@ -49,6 +50,7 @@ async def get_notifications(user_id: str, limit: int = 30):
 
 @router.get("/notifications/{user_id}/unread-count")
 async def get_unread_count(user_id: str):
+    """Get Unread Count."""
     user = await db.users.find_one({"id": user_id})
     if not user:
         return {"count": 0}
@@ -71,6 +73,7 @@ async def get_unread_count(user_id: str):
 
 @router.post("/notifications/{user_id}/mark-read")
 async def mark_notifications_read(user_id: str):
+    """Mark Notifications Read."""
     await db.users.update_one(
         {"id": user_id},
         {"$set": {"notif_last_read": datetime.now(timezone.utc).isoformat()}}
@@ -79,6 +82,7 @@ async def mark_notifications_read(user_id: str):
 
 @router.get("/notifications/{user_id}/preferences")
 async def get_notif_preferences(user_id: str):
+    """Get Notif Preferences."""
     user = await db.users.find_one({"id": user_id})
     if not user:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
@@ -86,6 +90,7 @@ async def get_notif_preferences(user_id: str):
 
 @router.put("/notifications/{user_id}/preferences")
 async def update_notif_preferences(user_id: str, prefs: NotifPreferences):
+    """Update Notif Preferences."""
     await db.users.update_one(
         {"id": user_id},
         {"$set": {"notif_prefs": prefs.dict()}}

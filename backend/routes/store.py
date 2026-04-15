@@ -5,14 +5,32 @@ from fastapi import APIRouter, HTTPException, Request
 from database import db, uuid, datetime, timezone
 import os
 
+try:
+    from emergentintegrations.payments.stripe.checkout import StripeCheckout, CheckoutSessionRequest
+except ImportError:
+    StripeCheckout = None
+    CheckoutSessionRequest = None
+
 router = APIRouter()
+
+COIN_PACKAGES = {
+    "pack_1000": {"coins": 1000, "price": 1.00, "label": "1,000 Monedas"},
+    "pack_5000": {"coins": 5000, "price": 4.50, "label": "5,000 Monedas"},
+    "pack_10000": {"coins": 10000, "price": 8.00, "label": "10,000 Monedas"},
+    "pack_50000": {"coins": 50000, "price": 35.00, "label": "50,000 Monedas"},
+    "pack_100000": {"coins": 100000, "price": 60.00, "label": "100,000 Monedas"},
+    "pack_500000": {"coins": 500000, "price": 250.00, "label": "500,000 Monedas"},
+    "pack_1000000": {"coins": 1000000, "price": 450.00, "label": "1,000,000 Monedas"},
+}
 
 @router.get("/store/packages")
 async def get_packages():
+    """Get Packages."""
     return COIN_PACKAGES
 
 @router.post("/store/checkout")
 async def create_checkout(package_id: str, user_id: str, request: Request):
+    """Create Checkout."""
     if package_id not in COIN_PACKAGES:
         raise HTTPException(status_code=400, detail="Paquete inválido")
     
@@ -60,6 +78,7 @@ async def create_checkout(package_id: str, user_id: str, request: Request):
 
 @router.get("/store/status/{session_id}")
 async def check_payment(session_id: str, request: Request):
+    """Check Payment."""
     api_key = os.environ.get('STRIPE_API_KEY')
     host_url = str(request.base_url).rstrip('/')
     webhook_url = f"{host_url}/api/webhook/stripe"
@@ -83,6 +102,7 @@ async def check_payment(session_id: str, request: Request):
 
 @router.post("/webhook/stripe")
 async def stripe_webhook(request: Request):
+    """Stripe Webhook."""
     body = await request.body()
     sig = request.headers.get("Stripe-Signature", "")
     api_key = os.environ.get('STRIPE_API_KEY')
