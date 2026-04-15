@@ -4,6 +4,7 @@ import AgoraRTC from 'agora-rtc-sdk-ng';
 import { useUser } from '../contexts/UserContext';
 import { EntryAnimation, ProfileFrame } from '../components/Animations';
 import RoomGames from '../components/RoomGames';
+import LionTigerGame from '../components/LionTigerGame';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -315,31 +316,14 @@ const RoomView = ({ roomId, onBack }) => {
         </div>
       )}
 
-      {/* LION VS TIGER GAME OVERLAY */}
+      {/* LION VS TIGER GAME */}
       {showLionTiger && (
-        <div className="absolute inset-0 z-[58] flex flex-col bg-black">
-          {/* Game header */}
-          <div className="flex-shrink-0 flex items-center justify-between px-3 py-2 bg-gradient-to-r from-amber-900 to-red-900">
-            <div className="flex items-center gap-2">
-              <span className="text-xl">🦁</span>
-              <span className="text-white font-bold text-sm">Lion vs Tiger</span>
-              <span className="text-xl">🐯</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-yellow-400 text-xs font-bold">💰 {user.coins >= 1e6 ? `${(user.coins/1e6).toFixed(1)}M` : (user.coins || 0).toLocaleString()}</span>
-              <button onClick={() => setShowLionTiger(false)} 
-                className="bg-white/20 text-white w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold" data-testid="close-lion-tiger">✕</button>
-            </div>
-          </div>
-          {/* Game iframe */}
-          <iframe
-            src={`https://lluvialive.com/game/index.html?user_id=${user.id}`}
-            className="flex-1 w-full border-0"
-            allow="autoplay; microphone"
-            sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
-            title="Lion vs Tiger"
-          />
-        </div>
+        <LionTigerGame
+          userId={user.id}
+          userCoins={user.coins || 0}
+          onBalanceUpdate={(newBal) => updateUser({ coins: newBal })}
+          onClose={() => setShowLionTiger(false)}
+        />
       )}
 
       {/* EVENTS PANEL - Request based */}

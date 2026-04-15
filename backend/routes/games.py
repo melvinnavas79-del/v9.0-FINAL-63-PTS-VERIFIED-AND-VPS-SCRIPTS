@@ -32,7 +32,7 @@ async def play_generic(play: GenericPlay):
         return {"won": False, "prize": 0, "new_balance": updated['coins']}
     
     elif play.game in ('ruleta', 'dados', 'rps', 'slots', 'trivia', 'carta',
-                       'ludo', 'yacaro', 'carreras', 'pool', 'domino', 'monster'):
+                       'ludo', 'yacaro', 'carreras', 'pool', 'domino', 'monster', 'lion_tiger'):
         await db.users.update_one({"id": play.user_id}, {"$inc": {"coins": -play.bet}})
         import random
         
