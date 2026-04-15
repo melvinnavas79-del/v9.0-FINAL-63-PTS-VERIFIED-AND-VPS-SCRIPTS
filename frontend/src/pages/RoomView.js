@@ -592,22 +592,22 @@ const RoomView = ({ roomId, onBack }) => {
       )}
 
       {/* ACTION BAR */}
-      <div className="flex-shrink-0 px-3 mb-1">
-        <div className="flex gap-1.5">
-          <button data-testid="bar-cofres" onClick={() => setPanel('cofres')} className="bg-yellow-500/15 border border-yellow-500/20 rounded-full px-2.5 py-1 flex items-center gap-1">
-            <span className="text-xs">📦</span><span className="text-yellow-300 text-[10px] font-bold">Cofres</span>
+      <div className="flex-shrink-0 px-3 mb-2">
+        <div className="flex gap-2">
+          <button data-testid="bar-cofres" onClick={() => setPanel('cofres')} className="bg-yellow-500/15 border border-yellow-500/20 rounded-full px-3 py-2 flex items-center gap-1.5 min-h-[40px]">
+            <span className="text-base">📦</span><span className="text-yellow-300 text-xs font-bold">Cofres</span>
           </button>
-          <button data-testid="bar-sobres" onClick={() => setPanel('sobres')} className="bg-red-500/15 border border-red-500/20 rounded-full px-2.5 py-1 flex items-center gap-1">
-            <span className="text-xs">🧧</span><span className="text-red-300 text-[10px] font-bold">Sobres</span>
+          <button data-testid="bar-sobres" onClick={() => setPanel('sobres')} className="bg-red-500/15 border border-red-500/20 rounded-full px-3 py-2 flex items-center gap-1.5 min-h-[40px]">
+            <span className="text-base">🧧</span><span className="text-red-300 text-xs font-bold">Sobres</span>
           </button>
-          <button data-testid="bar-juegos" onClick={() => setPanel('games')} className="bg-green-500/15 border border-green-500/20 rounded-full px-2.5 py-1 flex items-center gap-1">
-            <span className="text-xs">🎮</span><span className="text-green-300 text-[10px] font-bold">Juegos</span>
+          <button data-testid="bar-juegos" onClick={() => setPanel('games')} className="bg-green-500/15 border border-green-500/20 rounded-full px-3 py-2 flex items-center gap-1.5 min-h-[40px]">
+            <span className="text-base">🎮</span><span className="text-green-300 text-xs font-bold">Juegos</span>
           </button>
-          <button data-testid="bar-tienda" onClick={() => setPanel('tienda')} className="bg-purple-500/15 border border-purple-500/20 rounded-full px-2.5 py-1 flex items-center gap-1">
-            <span className="text-xs">🛒</span><span className="text-purple-300 text-[10px] font-bold">Tienda</span>
+          <button data-testid="bar-tienda" onClick={() => setPanel('tienda')} className="bg-purple-500/15 border border-purple-500/20 rounded-full px-3 py-2 flex items-center gap-1.5 min-h-[40px]">
+            <span className="text-base">🛒</span><span className="text-purple-300 text-xs font-bold">Tienda</span>
           </button>
-          <div className="ml-auto bg-white/5 rounded-full px-2.5 py-1">
-            <span className="text-yellow-400 text-[10px] font-bold">💰 {user.coins >= 1e6 ? `${(user.coins/1e6).toFixed(1)}M` : (user.coins || 0).toLocaleString()}</span>
+          <div className="ml-auto bg-white/5 rounded-full px-3 py-2 flex items-center min-h-[40px]">
+            <span className="text-yellow-400 text-xs font-bold">💰 {user.coins >= 1e6 ? `${(user.coins/1e6).toFixed(1)}M` : (user.coins || 0).toLocaleString()}</span>
           </div>
         </div>
       </div>
@@ -634,24 +634,24 @@ const RoomView = ({ roomId, onBack }) => {
       )}
 
       {/* SEATS */}
-      <div className="flex-shrink-0 px-3 mb-1 overflow-y-auto" style={{maxHeight: '32vh'}}>
-        <div className="grid grid-cols-3 gap-1.5">
+      <div className="flex-shrink-0 px-3 mb-1 overflow-y-auto" style={{maxHeight: '34vh'}}>
+        <div className="grid grid-cols-3 gap-2">
           {room.seats.map((seat, i) => (
             <button key={i} data-testid={`seat-btn-${i}`}
               onClick={() => { if (seat?.user_id === user.id) leaveSeat(); else if (seat) openGiftPanel(seat); else joinSeat(i); }}
-              className={`relative h-[72px] rounded-2xl border transition-all ${seat ? seat.user_id === user.id ? 'bg-green-500/10 border-green-500/30' : 'bg-white/[0.03] border-white/[0.08]' : 'bg-white/[0.02] border-white/[0.05]'}`}>
+              className={`relative h-[80px] rounded-2xl border transition-all ${seat ? seat.user_id === user.id ? 'bg-green-500/10 border-green-500/30' : 'bg-white/[0.03] border-white/[0.08]' : 'bg-white/[0.02] border-white/[0.05]'}`}>
               <div className="flex flex-col items-center justify-center h-full">
                 {seat ? (
                   <>
                     <ProfileFrame aristocracy={seat.aristocracy || 0}>
-                      <img src={seat.avatar} alt="" className="w-10 h-10 rounded-full object-cover" />
+                      <img src={seat.avatar} alt="" className="w-12 h-12 rounded-full object-cover" />
                     </ProfileFrame>
-                    <span className="text-white text-[9px] mt-0.5 truncate w-full text-center px-1">{seat.username}</span>
-                    {seat.user_id !== user.id && <div className="absolute bottom-1 right-1 text-[8px]">🎁</div>}
-                    {seat.user_id === user.id && <div className={`absolute top-1 right-1 w-3.5 h-3.5 rounded-full flex items-center justify-center text-[7px] ${isMuted ? 'bg-red-500' : 'bg-green-500'}`}>{isMuted ? '🔇' : '🎤'}</div>}
+                    <span className="text-white text-xs mt-0.5 truncate w-full text-center px-1 font-medium">{seat.username}</span>
+                    {seat.user_id !== user.id && <div className="absolute bottom-1.5 right-1.5 text-sm">🎁</div>}
+                    {seat.user_id === user.id && <div className={`absolute top-1.5 right-1.5 w-5 h-5 rounded-full flex items-center justify-center text-xs ${isMuted ? 'bg-red-500' : 'bg-green-500'}`}>{isMuted ? '🔇' : '🎤'}</div>}
                   </>
                 ) : (
-                  <div className="text-white/10 text-[10px]">{i + 1}</div>
+                  <div className="text-white/15 text-sm font-medium">{i + 1}</div>
                 )}
               </div>
             </button>
@@ -662,85 +662,69 @@ const RoomView = ({ roomId, onBack }) => {
       {/* CHAT */}
       <div className="flex-1 min-h-0 px-3 pb-1">
         <div className="h-full flex flex-col">
-          <div ref={chatRef} className="flex-1 min-h-0 overflow-y-auto space-y-0.5 pr-1">
+          <div ref={chatRef} className="flex-1 min-h-0 overflow-y-auto space-y-1 pr-1">
             {chatMessages.map(m => (
               <div key={m.id} className={m.type === 'welcome' || m.type === 'gift' ? 'text-center' : ''}>
                 {m.type === 'welcome' ? (
-                  <span className="bg-yellow-500/10 text-yellow-300/70 text-[9px] px-2 py-0.5 rounded-full">{m.text}</span>
+                  <span className="bg-yellow-500/10 text-yellow-300/70 text-xs px-2 py-1 rounded-full">{m.text}</span>
                 ) : m.type === 'gift' ? (
-                  <span className="bg-pink-500/10 text-pink-300/80 text-[9px] px-2 py-0.5 rounded-full">{m.text}</span>
+                  <span className="bg-pink-500/10 text-pink-300/80 text-xs px-2 py-1 rounded-full">{m.text}</span>
                 ) : m.type === 'photo' ? (
-                  <div className="flex items-start gap-1">
-                    <img src={m.avatar || ''} alt="" className="w-4 h-4 rounded-full mt-0.5" />
+                  <div className="flex items-start gap-1.5">
+                    <img src={m.avatar || ''} alt="" className="w-6 h-6 rounded-full mt-0.5" />
                     <div>
-                      <span className="text-pink-400 text-[9px] font-bold">{m.username}</span>
+                      <span className="text-pink-400 text-xs font-bold">{m.username}</span>
                       <img src={m.image_url?.startsWith('/api') ? `${process.env.REACT_APP_BACKEND_URL}${m.image_url}` : m.image_url} alt=""
                         onClick={() => setZoomImg(m.image_url?.startsWith('/api') ? `${process.env.REACT_APP_BACKEND_URL}${m.image_url}` : m.image_url)}
                         className="mt-0.5 max-w-[150px] rounded-lg object-cover cursor-pointer transition-all hover:opacity-80" />
                     </div>
                   </div>
                 ) : (
-                  <div className="flex items-start gap-1">
-                    <img src={m.avatar || ''} alt="" className="w-4 h-4 rounded-full mt-0.5" />
-                    <div><span className="text-cyan-400 text-[9px] font-bold">{m.username}: </span><span className="text-white/60 text-[9px]">{m.text}</span></div>
+                  <div className="flex items-start gap-1.5">
+                    <img src={m.avatar || ''} alt="" className="w-6 h-6 rounded-full mt-0.5" />
+                    <div><span className="text-cyan-400 text-xs font-bold">{m.username}: </span><span className="text-white/60 text-xs">{m.text}</span></div>
                   </div>
                 )}
               </div>
             ))}
           </div>
-          <div className="flex gap-1 flex-shrink-0 mt-1">
-            <button onClick={() => photoRef.current?.click()} className="bg-white/5 w-7 h-7 rounded-full flex items-center justify-center text-[10px]">📷</button>
+          <div className="flex gap-2 flex-shrink-0 mt-1">
+            <button onClick={() => photoRef.current?.click()} className="bg-white/5 w-10 h-10 rounded-full flex items-center justify-center text-sm">📷</button>
             <input ref={photoRef} type="file" accept="image/*" onChange={sendPhoto} className="hidden" />
             <input type="text" value={chatInput} onChange={e => setChatInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && sendChat()}
-              placeholder="Mensaje..." data-testid="chat-input" className="flex-1 bg-white/5 text-white placeholder-white/20 border-0 rounded-full px-3 py-1.5 text-[10px] outline-none" />
-            <button data-testid="chat-send-btn" onClick={sendChat} className="bg-cyan-500 text-white px-2.5 py-1.5 rounded-full text-[10px] font-bold">Enviar</button>
+              placeholder="Mensaje..." data-testid="chat-input" className="flex-1 bg-white/5 text-white placeholder-white/20 border-0 rounded-full px-4 py-2.5 text-sm outline-none min-h-[40px]" />
+            <button data-testid="chat-send-btn" onClick={sendChat} className="bg-cyan-500 text-white px-4 py-2.5 rounded-full text-sm font-bold min-h-[40px]">Enviar</button>
           </div>
         </div>
       </div>
 
       {/* BOTTOM BAR - ALWAYS VISIBLE */}
-      <div className="flex-shrink-0 bg-black/90 border-t border-white/5 px-2" style={{paddingTop: '8px', paddingBottom: 'max(10px, env(safe-area-inset-bottom, 10px))'}}>
-        <div className="flex items-center justify-center gap-2">
+      <div className="flex-shrink-0 bg-black/90 border-t border-white/5 px-3" style={{paddingTop: '10px', paddingBottom: 'max(14px, env(safe-area-inset-bottom, 14px))'}}>
+        <div className="flex items-center justify-center gap-3">
           {/* Gift */}
           <button data-testid="gift-bottom-btn" onClick={() => setPanel('gifts-all')}
-            className="w-11 h-11 rounded-full bg-pink-500 flex items-center justify-center text-lg active:scale-90 shadow-lg shadow-pink-500/30">🎁</button>
+            className="w-14 h-14 rounded-full bg-pink-500 flex items-center justify-center text-2xl active:scale-90 shadow-lg shadow-pink-500/30">🎁</button>
 
           {/* Music */}
           <button data-testid="music-btn" onClick={() => musicRef.current?.click()}
-            className="w-9 h-9 rounded-full bg-purple-600/80 flex items-center justify-center text-sm active:scale-90">🎵</button>
+            className="w-12 h-12 rounded-full bg-purple-600/80 flex items-center justify-center text-lg active:scale-90">🎵</button>
           <input ref={musicRef} type="file" accept="audio/*" onChange={uploadMusic} className="hidden" />
 
           {/* Mic - always visible */}
           <button data-testid="toggle-mute-btn" onClick={mySeat !== null ? toggleMute : () => {}}
-            className={`w-12 h-12 rounded-full flex items-center justify-center text-xl active:scale-90 shadow-lg ${
+            className={`w-16 h-16 rounded-full flex items-center justify-center text-2xl active:scale-90 shadow-lg ${
               mySeat === null ? 'bg-gray-700 opacity-50' : isMuted ? 'bg-red-500 shadow-red-500/30' : 'bg-green-500 shadow-green-500/30'
             }`}>{mySeat === null ? '🎤' : isMuted ? '🔇' : '🎤'}</button>
 
           {/* Speaker */}
           <button data-testid="toggle-deafen-btn" onClick={mySeat !== null ? toggleDeafen : () => {}}
-            className={`w-9 h-9 rounded-full flex items-center justify-center text-sm active:scale-90 ${
+            className={`w-12 h-12 rounded-full flex items-center justify-center text-lg active:scale-90 ${
               mySeat === null ? 'bg-gray-700 opacity-50' : isDeafened ? 'bg-orange-500' : 'bg-blue-500'
             }`}>{isDeafened ? '🔕' : '🔊'}</button>
 
-          {/* Leave seat */}
-          {mySeat !== null && (
-            <button data-testid="leave-seat-btn" onClick={leaveSeat}
-              className="w-9 h-9 rounded-full bg-red-600 flex items-center justify-center text-sm active:scale-90">🚪</button>
-          )}
-
-          {/* Bot ON/OFF - only for dueño */}
-          {user.role === 'dueño' && (
-            <button data-testid="bot-toggle-bottom" onClick={toggleBot}
-              className={`w-9 h-9 rounded-full flex items-center justify-center text-sm active:scale-90 border-2 ${botOn ? 'bg-green-500 border-green-400' : 'bg-gray-700 border-gray-600'}`}>🤖</button>
-          )}
-
-          {/* PK Battle */}
-          <button data-testid="pk-battle-btn" onClick={() => {
-            const others = room.seats.filter(s => s && s.user_id !== user.id);
-            if (others.length === 0) return alert('No hay otros usuarios en la sala');
-            startPK(others[0]);
-          }}
-            className="w-9 h-9 rounded-full bg-red-600 flex items-center justify-center text-sm active:scale-90 border-2 border-red-400">⚔️</button>
+          {/* Close/Leave */}
+          <button data-testid="pk-battle-btn" onClick={() => { leaveAgora(); onBack(); }}
+            className="w-14 h-14 rounded-full bg-red-600 flex items-center justify-center text-2xl active:scale-90 border-2 border-red-400">✕</button>
         </div>
         {room.music_url && (
           <audio src={room.music_url.startsWith('/api') ? `${process.env.REACT_APP_BACKEND_URL}${room.music_url}` : room.music_url} autoPlay loop className="hidden" />
