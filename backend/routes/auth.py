@@ -1,11 +1,31 @@
 """
-Auth routes: Register, Login, User profile, Ghost mode.
+Auth routes: Register, Login, Firebase Auth (Google + Phone), User profile, Ghost mode.
 """
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from database import (
     db, UserRegister, UserLogin, hash_password, verify_password,
     serialize_user, uuid, datetime, timezone
 )
+import os
+
+# Firebase Admin SDK initialization
+try:
+    import firebase_admin
+    from firebase_admin import credentials, auth as firebase_auth
+    if not firebase_admin._apps:
+        # Try service account file first, then fall back to project ID
+        sa_path = os.environ.get('FIREBASE_SERVICE_ACCOUNT', 'firebase-admin.json')
+        if os.path.exists(sa_path):
+            cred = credentials.Certificate(sa_path)
+            firebase_admin.initialize_app(cred)
+        else:
+            # Minimal init with project ID for token verification
+            project_id = os.environ.get('FIREBASE_PROJECT_ID', '')
+            if project_id:
+                firebase_admin.initialize_app(options={'projectId': project_id})
+    FIREBASE_AVAILABLE = True
+except Exception:
+    FIREBASE_AVAILABLE = False
 
 router = APIRouter()
 
@@ -52,7 +72,190 @@ async def login(credentials: UserLogin):
         raise HTTPException(status_code=401, detail="Credenciales invalidas")
     if user.get('is_banned'):
         raise HTTPException(status_code=403, detail="Cuenta suspendida")
+    # Check device ban
     return {"success": True, "user": serialize_user(user)}
+
+
+@router.post("/auth/firebase")
+async def firebase_login(request: Request):
+    """
+    Authenticate with Firebase ID token (Google Sign-In or Phone).
+    Creates or links user account in MongoDB.
+    Registers device_id for ban tracking.
+    """
+    if not FIREBASE_AVAILABLE:
+        raise HTTPException(status_code=500, detail="Firebase no configurado. Agrega FIREBASE_PROJECT_ID o firebase-admin.json")
+
+    body = await request.json()
+    id_token = body.get('id_token', '')
+    device_id = body.get('device_id', '')
+
+    if not id_token:
+        raise HTTPException(status_code=400, detail="Token de Firebase requerido")
+
+    # Verify the Firebase ID token
+    try:
+        decoded = firebase_auth.verify_id_token(id_token)
+    except Exception as e:
+        raise HTTPException(status_code=401, detail=f"Token invalido: {str(e)}")
+
+    firebase_uid = decoded.get('uid', '')
+    email = decoded.get('email', '')
+    phone = decoded.get('phone_number', '')
+    name = decoded.get('name', '') or decoded.get('display_name', '')
+    photo = decoded.get('picture', '')
+    provider = decoded.get('firebase', {}).get('sign_in_provider', 'unknown')
+
+    # Check if device is banned
+    if device_id:
+        banned_device = await db.banned_devices.find_one({"device_id": device_id})
+        if banned_device:
+            raise HTTPException(status_code=403, detail="Este dispositivo ha sido suspendido por fraude")
+
+    # Find existing user by firebase_uid, email, or phone
+    existing = await db.users.find_one({"$or": [
+        {"firebase_uid": firebase_uid},
+        {"email": email} if email else {"_impossible": True},
+        {"phone": phone} if phone else {"_impossible": True},
+    ]})
+
+    if existing:
+        # Update firebase info and device
+        update_data = {"firebase_uid": firebase_uid, "is_verified": True}
+        if email:
+            update_data["email"] = email
+        if phone:
+            update_data["phone"] = phone
+        if photo and not existing.get('avatar', '').startswith('/api'):
+            update_data["avatar"] = photo
+        if device_id:
+            update_data["device_id"] = device_id
+        update_data["last_login"] = datetime.now(timezone.utc).isoformat()
+        update_data["auth_provider"] = provider
+
+        await db.users.update_one({"id": existing['id']}, {"$set": update_data})
+        if existing.get('is_banned'):
+            raise HTTPException(status_code=403, detail="Cuenta suspendida")
+        updated = await db.users.find_one({"id": existing['id']})
+        return {"success": True, "user": serialize_user(updated), "is_new": False}
+
+    # Create new user from Firebase auth
+    username = name or email.split('@')[0] if email else f"user_{firebase_uid[:8]}"
+    # Ensure unique username
+    base_username = username
+    counter = 1
+    while await db.users.find_one({"username": {"$regex": f"^{username}$", "$options": "i"}}):
+        username = f"{base_username}{counter}"
+        counter += 1
+
+    numeric_id = str(uuid.uuid4().int)[:6]
+    while await db.users.find_one({"numeric_id": numeric_id}):
+        numeric_id = str(uuid.uuid4().int)[:6]
+
+    user_doc = {
+        "id": str(uuid.uuid4()),
+        "numeric_id": numeric_id,
+        "firebase_uid": firebase_uid,
+        "username": username,
+        "password": "",
+        "email": email,
+        "phone": phone,
+        "role": "usuario",
+        "level": 1,
+        "coins": 1500000,
+        "diamonds": 0,
+        "aristocracy": 0,
+        "avatar": photo or f"https://api.dicebear.com/7.x/adventurer/svg?seed={username}",
+        "clan": None,
+        "cp_partner": None,
+        "ghost_mode": False,
+        "is_verified": True,
+        "is_banned": False,
+        "entry_animation": "none",
+        "total_spent": 0,
+        "auth_provider": provider,
+        "device_id": device_id,
+        "last_login": datetime.now(timezone.utc).isoformat(),
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    await db.users.insert_one(user_doc)
+    user_doc.pop('_id', None)
+
+    # Check badges for new user
+    from routes.badges import check_and_award_badges
+    await check_and_award_badges(user_doc['id'])
+
+    return {"success": True, "user": serialize_user(user_doc), "is_new": True}
+
+
+@router.post("/auth/link-account")
+async def link_firebase_account(request: Request):
+    """Link existing username/password account with Firebase (Google/Phone)."""
+    body = await request.json()
+    user_id = body.get('user_id', '')
+    id_token = body.get('id_token', '')
+
+    if not user_id or not id_token:
+        raise HTTPException(status_code=400, detail="user_id y id_token requeridos")
+
+    if not FIREBASE_AVAILABLE:
+        raise HTTPException(status_code=500, detail="Firebase no configurado")
+
+    try:
+        decoded = firebase_auth.verify_id_token(id_token)
+    except Exception:
+        raise HTTPException(status_code=401, detail="Token invalido")
+
+    firebase_uid = decoded.get('uid', '')
+    email = decoded.get('email', '')
+    phone = decoded.get('phone_number', '')
+    photo = decoded.get('picture', '')
+
+    # Check if firebase_uid already linked to another account
+    conflict = await db.users.find_one({"firebase_uid": firebase_uid, "id": {"$ne": user_id}})
+    if conflict:
+        raise HTTPException(status_code=409, detail="Esta cuenta de Google/telefono ya esta vinculada a otro usuario")
+
+    update_data = {"firebase_uid": firebase_uid, "is_verified": True}
+    if email:
+        update_data["email"] = email
+    if phone:
+        update_data["phone"] = phone
+    if photo:
+        update_data["avatar"] = photo
+
+    await db.users.update_one({"id": user_id}, {"$set": update_data})
+    updated = await db.users.find_one({"id": user_id})
+    return {"success": True, "user": serialize_user(updated)}
+
+
+@router.post("/admin/ban-device")
+async def ban_device(device_id: str, admin_id: str, reason: str = "Fraude"):
+    """Ban a device by device_id. Admin only."""
+    admin = await db.users.find_one({"id": admin_id})
+    if not admin or admin.get('role') not in ('dueño', 'admin'):
+        raise HTTPException(status_code=403, detail="No autorizado")
+
+    await db.banned_devices.update_one(
+        {"device_id": device_id},
+        {"$set": {"device_id": device_id, "banned_by": admin_id, "reason": reason, "banned_at": datetime.now(timezone.utc).isoformat()}},
+        upsert=True
+    )
+
+    # Also ban any user linked to this device
+    await db.users.update_many({"device_id": device_id}, {"$set": {"is_banned": True}})
+
+    return {"success": True, "message": f"Dispositivo {device_id} baneado"}
+
+
+@router.post("/admin/unban-device")
+async def unban_device(device_id: str, admin_id: str):
+    """Unban a device."""
+    admin = await db.users.find_one({"id": admin_id})
+    if not admin or admin.get('role') not in ('dueño', 'admin'):
+        raise HTTPException(status_code=403, detail="No autorizado")
+    await db.banned_devices.delete_one({"device_id": device_id})
+    return {"success": True}
 
 @router.get("/users/{user_id}")
 async def get_user(user_id: str):

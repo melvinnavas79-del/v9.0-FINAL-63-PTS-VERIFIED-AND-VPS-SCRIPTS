@@ -158,6 +158,11 @@ def serialize_user(user: Dict[str, Any]) -> Dict[str, Any]:
         "total_gifts_received": user.get("total_gifts_received", 0),
         "total_games_won": user.get("total_games_won", 0),
         "badges_earned": user.get("badges_earned", []),
+        "email": user.get("email", ""),
+        "phone": user.get("phone", ""),
+        "auth_provider": user.get("auth_provider", "password"),
+        "device_id": user.get("device_id", ""),
+        "firebase_uid": user.get("firebase_uid", ""),
         "created_at": user.get("created_at", ""),
     }
 
