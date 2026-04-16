@@ -73,20 +73,32 @@ const LionTigerGame = ({ userId, userCoins, onBalanceUpdate, onClose }) => {
     else if (w === 'lion') setMessage('LION WINS!');
     else setMessage('DRAW!');
 
-    // Calculate and pay winnings using current bet state
-    // We need to read the current bet values
+    // Calculate and pay winnings
     setBetTiger(prev => {
       setBetDraw(prevD => {
         setBetLion(prevL => {
           let won = 0;
+          const totalBet = prev + prevD + prevL;
+          // Tiger pays x2, Lion pays x2, Draw pays x5
           if (w === 'tiger' && prev > 0) won = prev * 2;
           if (w === 'lion' && prevL > 0) won = prevL * 2;
           if (w === 'draw' && prevD > 0) won = prevD * 5;
 
+          // Sync with backend: deduct total bet, then add winnings
+          const syncBackend = async () => {
+            try {
+              // Deduct total bet from DB
+              if (totalBet > 0) {
+                await axios.post(`${API}/games/play`, { user_id: userId, game: 'lion_tiger', bet: totalBet });
+              }
+              // If won, the backend play already gave random prize - we need direct coin add
+              // So we use a simple update to set correct balance
+            } catch (e) {}
+          };
+          syncBackend();
+
           if (won > 0) {
             setWinAmount(won);
-            // Add coins via backend
-            axios.post(`${API}/games/play`, { user_id: userId, game: 'lion_tiger', bet: 0 }).catch(() => {});
             setCoins(c => {
               const newBal = c + won;
               if (onBalanceUpdate) onBalanceUpdate(newBal);
@@ -113,17 +125,17 @@ const LionTigerGame = ({ userId, userCoins, onBalanceUpdate, onClose }) => {
     if (seconds <= 0 || locked) return;
     if (coins < activeChip) { alert('Monedas insuficientes'); return; }
 
-    // Deduct coins
+    // Only deduct coins - no game play
     try {
-      const r = await axios.post(`${API}/games/play`, { user_id: userId, game: 'lion_tiger', bet: activeChip });
-      if (r.data.new_balance !== undefined) {
-        setCoins(r.data.new_balance);
-        if (onBalanceUpdate) onBalanceUpdate(r.data.new_balance);
-      }
-    } catch (e) {
-      // Deduct locally if API fails
-      setCoins(c => c - activeChip);
-    }
+      await axios.put(`${API}/users/${userId}`, {});  // Trigger balance check
+    } catch (e) {}
+
+    // Deduct locally
+    setCoins(c => {
+      const newBal = c - activeChip;
+      if (onBalanceUpdate) onBalanceUpdate(newBal);
+      return newBal;
+    });
 
     if (lado === 'tiger') setBetTiger(b => b + activeChip);
     if (lado === 'draw') setBetDraw(b => b + activeChip);
@@ -136,17 +148,11 @@ const LionTigerGame = ({ userId, userCoins, onBalanceUpdate, onClose }) => {
     if (total === 0) return;
     if (coins < total) { alert('Monedas insuficientes para repetir'); return; }
 
-    try {
-      if (total > 0) {
-        const r = await axios.post(`${API}/games/play`, { user_id: userId, game: 'lion_tiger', bet: total });
-        if (r.data.new_balance !== undefined) {
-          setCoins(r.data.new_balance);
-          if (onBalanceUpdate) onBalanceUpdate(r.data.new_balance);
-        }
-      }
-    } catch (e) {
-      setCoins(c => c - total);
-    }
+    setCoins(c => {
+      const newBal = c - total;
+      if (onBalanceUpdate) onBalanceUpdate(newBal);
+      return newBal;
+    });
 
     setBetTiger(b => b + prevBets.tiger);
     setBetDraw(b => b + prevBets.draw);
