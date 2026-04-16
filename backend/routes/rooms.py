@@ -195,10 +195,13 @@ async def get_chat(room_id: str, limit: int = 50, user_id: str = None):
 
 @router.post("/rooms/{room_id}/mark-join")
 async def mark_join(room_id: str, user_id: str):
-    """Mark Join."""
-    existing = await db.room_joins.find_one({"user_id": user_id, "room_id": room_id})
-    if not existing:
-        await db.room_joins.insert_one({"user_id": user_id, "room_id": room_id, "joined_at": datetime.now(timezone.utc).isoformat()})
+    """Mark user join time. Updates every time user enters the room so old messages don't reappear."""
+    now = datetime.now(timezone.utc).isoformat()
+    await db.room_joins.update_one(
+        {"user_id": user_id, "room_id": room_id},
+        {"$set": {"joined_at": now}},
+        upsert=True
+    )
     return {"success": True}
 
 @router.post("/rooms/{room_id}/welcome")

@@ -37,6 +37,7 @@ const RoomView = ({ roomId, onBack }) => {
   const [botOn, setBotOn] = useState(false);
   const [minimized, setMinimized] = useState(false);
   const [showLionTiger, setShowLionTiger] = useState(false);
+  const [musicPlaying, setMusicPlaying] = useState(false);
   const [floatingGift, setFloatingGift] = useState(null);
 
   const clientRef = useRef(null);
@@ -50,7 +51,7 @@ const RoomView = ({ roomId, onBack }) => {
 
   useEffect(() => {
     leaveAgora();
-    loadRoom(); loadChat(); loadGifts(); loadSobres(); loadCofres(); checkBotActive(); loadMyEvents(); loadPendingRequests(); loadPK();
+    loadRoom(); markJoinAndLoadChat(); loadGifts(); loadSobres(); loadCofres(); checkBotActive(); loadMyEvents(); loadPendingRequests(); loadPK();
     const r = setInterval(loadRoom, 3000);
     const c = setInterval(loadChat, 2000);
     const cf = setInterval(loadCofres, 5000);
@@ -77,10 +78,14 @@ const RoomView = ({ roomId, onBack }) => {
   };
   const loadChat = async () => {
     try {
-      // Ensure join record exists
-      await axios.post(`${API}/rooms/${roomId}/mark-join?user_id=${user.id}`).catch(() => {});
       const r = await axios.get(`${API}/rooms/${roomId}/chat?limit=30&user_id=${user.id}`);
       setChatMessages(r.data);
+    } catch (e) {}
+  };
+  const markJoinAndLoadChat = async () => {
+    try {
+      await axios.post(`${API}/rooms/${roomId}/mark-join?user_id=${user.id}`);
+      await loadChat();
     } catch (e) {}
   };
   const loadGifts = async () => { try { const r = await axios.get(`${API}/gifts`); setGifts(r.data); } catch (e) {} };
@@ -192,8 +197,34 @@ const RoomView = ({ roomId, onBack }) => {
       fd.append('file', f);
       await axios.post(`${API}/rooms/${roomId}/music?owner_id=${user.id}`, fd, { headers: { 'Content-Type': 'multipart/form-data' } });
       loadRoom();
+      setMusicPlaying(true);
     } catch (err) { alert(err.response?.data?.detail || 'Error al subir musica'); }
     if (musicRef.current) musicRef.current.value = '';
+  };
+
+  const toggleMusic = () => {
+    const audio = audioElementRef.current;
+    if (!audio) return;
+    if (musicPlaying) {
+      audio.pause();
+      setMusicPlaying(false);
+    } else {
+      audio.play().catch(() => {});
+      setMusicPlaying(true);
+    }
+  };
+
+  const stopMusic = async () => {
+    // Stop locally
+    if (audioElementRef.current) {
+      audioElementRef.current.pause();
+      audioElementRef.current.currentTime = 0;
+    }
+    setMusicPlaying(false);
+    // Remove from server (owner only)
+    if (room?.owner_id === user.id) {
+      try { await axios.delete(`${API}/rooms/${roomId}/music?owner_id=${user.id}`); loadRoom(); } catch (e) {}
+    }
   };
 
   const sendGift = async (type, targetOverride) => {
@@ -652,9 +683,9 @@ const RoomView = ({ roomId, onBack }) => {
       )}
 
       {/* HEADER */}
-      <div className="flex-shrink-0 px-3 pb-1" style={{paddingTop: 'max(16px, env(safe-area-inset-top, 16px))'}}>
+      <div className="flex-shrink-0 px-3 pb-1" style={{paddingTop: 'calc(env(safe-area-inset-top, 20px) + 8px)'}}>
         <div className="flex items-center justify-between">
-          <button data-testid="room-back-btn" onClick={() => { leaveAgora(); onBack(); }} className="bg-white/15 text-white px-5 py-2.5 rounded-full text-sm font-bold min-h-[44px] min-w-[80px] active:scale-95 transition-transform">← Salir</button>
+          <button data-testid="room-back-btn" onClick={() => { leaveAgora(); onBack(); }} className="bg-white/15 text-white px-5 py-2.5 rounded-full text-sm font-bold min-h-[44px] min-w-[80px] active:scale-95 transition-transform" style={{WebkitTapHighlightColor: 'transparent'}}>← Salir</button>
           <div className="text-center flex-1 mx-2">
             <h2 className="text-white text-sm font-bold truncate">{room.name}</h2>
           </div>
@@ -811,12 +842,26 @@ const RoomView = ({ roomId, onBack }) => {
 
       {/* BOTTOM BAR - ALWAYS VISIBLE */}
       <div className="flex-shrink-0 bg-black/90 border-t border-white/5 px-3" style={{paddingTop: '10px', paddingBottom: 'max(14px, env(safe-area-inset-bottom, 14px))'}}>
+        {/* Music Controls - visible when music exists */}
+        {room.music_url && (
+          <div className="flex items-center justify-center gap-2 mb-2">
+            <button onClick={toggleMusic} data-testid="music-play-pause"
+              className={`w-9 h-9 rounded-full flex items-center justify-center text-sm ${musicPlaying ? 'bg-green-500' : 'bg-white/10'}`}>
+              {musicPlaying ? '⏸' : '▶️'}
+            </button>
+            <div className="flex-1 bg-white/5 rounded-full h-1.5 mx-1 overflow-hidden">
+              <div className={`h-full bg-purple-400 rounded-full ${musicPlaying ? 'animate-pulse' : ''}`} style={{width: musicPlaying ? '60%' : '0%'}} />
+            </div>
+            <button onClick={stopMusic} data-testid="music-stop"
+              className="w-9 h-9 rounded-full bg-red-500/60 flex items-center justify-center text-sm">⏹</button>
+          </div>
+        )}
         <div className="flex items-center justify-center gap-3">
           {/* Gift */}
           <button data-testid="gift-bottom-btn" onClick={() => setPanel('gifts-all')}
             className="w-14 h-14 rounded-full bg-pink-500 flex items-center justify-center text-2xl active:scale-90 shadow-lg shadow-pink-500/30">🎁</button>
 
-          {/* Music */}
+          {/* Music Upload */}
           <button data-testid="music-btn" onClick={() => musicRef.current?.click()}
             className="w-12 h-12 rounded-full bg-purple-600/80 flex items-center justify-center text-lg active:scale-90">🎵</button>
           <input ref={musicRef} type="file" accept="audio/*" onChange={uploadMusic} className="hidden" />
@@ -837,11 +882,13 @@ const RoomView = ({ roomId, onBack }) => {
           <button data-testid="leave-room-btn" onClick={() => { leaveAgora(); onBack(); }}
             className="w-14 h-14 rounded-full bg-red-600 flex items-center justify-center text-2xl active:scale-90 border-2 border-red-400">✕</button>
         </div>
+        {/* Hidden audio element - NO autoPlay, NO loop */}
         {room.music_url && (
           <audio
             ref={audioElementRef}
             src={room.music_url.startsWith('/api') ? `${process.env.REACT_APP_BACKEND_URL}${room.music_url}` : room.music_url}
-            autoPlay loop className="hidden"
+            onEnded={() => setMusicPlaying(false)}
+            className="hidden"
           />
         )}
       </div>
