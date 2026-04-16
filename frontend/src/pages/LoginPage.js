@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import axios from 'axios';
 import { useUser } from '../contexts/UserContext';
-import { auth, googleProvider, RecaptchaVerifier, signInWithPhoneNumber, signInWithPopup } from '../lib/firebase';
+import { auth, googleProvider, RecaptchaVerifier, signInWithPhoneNumber, signInWithPopup, signInWithRedirect, getRedirectResult } from '../lib/firebase';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -47,24 +47,54 @@ const LoginPage = ({ onLogin }) => {
     }
   };
 
+  // Check for redirect result on page load (after Google redirect)
+  useEffect(() => {
+    const checkRedirect = async () => {
+      try {
+        const result = await getRedirectResult(auth);
+        if (result?.user) {
+          setLoading('google');
+          const idToken = await result.user.getIdToken();
+          await sendToBackend(idToken);
+        }
+      } catch (err) {
+        if (err.response?.data?.detail) setError(err.response.data.detail);
+      }
+    };
+    checkRedirect();
+  }, []);
+
   // Google Sign-In
   const handleGoogle = async () => {
     setError('');
     setLoading('google');
     try {
+      // Try popup first (desktop), fall back to redirect (mobile/restrictive domains)
       const result = await signInWithPopup(auth, googleProvider);
       const idToken = await result.user.getIdToken();
       await sendToBackend(idToken);
     } catch (err) {
       if (err.code === 'auth/popup-closed-by-user') {
         setError('Login cancelado');
+        setLoading('');
+      } else if (err.code === 'auth/popup-blocked' || err.code === 'auth/unauthorized-domain' || err.code === 'auth/invalid-action-code') {
+        // Popup blocked or domain issue — use redirect instead
+        try {
+          await signInWithRedirect(auth, googleProvider);
+          // Page will reload, result handled in useEffect above
+          return;
+        } catch (redirectErr) {
+          setError('Error con Google. Verifica que tu dominio este en Firebase Authorized Domains.');
+          setLoading('');
+        }
       } else if (err.response?.data?.detail) {
         setError(err.response.data.detail);
+        setLoading('');
       } else {
-        setError('Error con Google. Intenta de nuevo.');
+        setError('Error con Google: ' + (err.message || 'Intenta de nuevo'));
+        setLoading('');
       }
     }
-    setLoading('');
   };
 
   // Phone: Send OTP
