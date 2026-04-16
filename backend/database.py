@@ -154,6 +154,10 @@ def serialize_user(user: Dict[str, Any]) -> Dict[str, Any]:
         "is_banned": user.get("is_banned", False),
         "entry_animation": user.get("entry_animation", "none"),
         "total_spent": user.get("total_spent", 0),
+        "total_gifts_sent": user.get("total_gifts_sent", 0),
+        "total_gifts_received": user.get("total_gifts_received", 0),
+        "total_games_won": user.get("total_games_won", 0),
+        "badges_earned": user.get("badges_earned", []),
         "created_at": user.get("created_at", ""),
     }
 

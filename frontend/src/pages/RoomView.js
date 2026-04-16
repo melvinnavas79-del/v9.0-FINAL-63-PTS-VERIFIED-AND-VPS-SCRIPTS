@@ -10,6 +10,15 @@ const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 const COFRE_COLORS = ['#b45309','#c2410c','#dc2626','#db2777','#9333ea','#4f46e5','#2563eb','#0891b2','#059669','#d97706'];
 
+// Global coin formatter
+const formatCoins = (n) => {
+  if (!n && n !== 0) return '0';
+  if (n >= 1e9) return `${(n/1e9).toFixed(1)}B`;
+  if (n >= 1e6) return `${(n/1e6).toFixed(1)}M`;
+  if (n >= 1e3) return `${(n/1e3).toFixed(0)}K`;
+  return n.toLocaleString();
+};
+
 const RoomView = ({ roomId, onBack }) => {
   const { user, updateUser } = useUser();
   const [room, setRoom] = useState(null);
@@ -187,10 +196,11 @@ const RoomView = ({ roomId, onBack }) => {
     if (musicRef.current) musicRef.current.value = '';
   };
 
-  const sendGift = async (type) => {
-    if (!giftTarget) return;
+  const sendGift = async (type, targetOverride) => {
+    const target = targetOverride || giftTarget;
+    if (!target) return;
     try {
-      const r = await axios.post(`${API}/gifts/send`, { sender_id: user.id, receiver_id: giftTarget.user_id, gift_type: type, room_id: roomId });
+      const r = await axios.post(`${API}/gifts/send`, { sender_id: user.id, receiver_id: target.user_id, gift_type: type, room_id: roomId });
       if (r.data.new_balance !== undefined) updateUser({ coins: r.data.new_balance });
       // Trigger float animation for gift
       setFloatingGift({ emoji: gifts[type]?.emoji || '🎁', key: Date.now() });
@@ -501,7 +511,7 @@ const RoomView = ({ roomId, onBack }) => {
                   <button key={k} data-testid={`gift-${k}`} onClick={() => sendGift(k)} className="bg-white/5 rounded-xl p-2 text-center active:scale-95 transition-all border border-white/5">
                     <div className="text-xl">{g.emoji}</div>
                     <div className="text-white text-[8px]">{g.name}</div>
-                    <div className="text-yellow-400 text-[8px]">{g.cost >= 1e6 ? `${(g.cost/1e6).toFixed(0)}M` : `${(g.cost/1e3).toFixed(0)}K`}</div>
+                    <div className="text-yellow-400 text-[8px]">{formatCoins(g.cost)}</div>
                   </button>
                 ))}
               </div>
@@ -509,25 +519,42 @@ const RoomView = ({ roomId, onBack }) => {
 
             {panel === 'gifts-all' && (
               <>
-                <p className="text-white/40 text-xs mb-2">Elige a quién enviar</p>
-                <div className="flex gap-2 mb-3 overflow-x-auto">
-                  {room.seats.filter(s => s && s.user_id !== user.id).map((s, i) => (
-                    <button key={i} onClick={() => { setGiftTarget(s); setPanel('gifts'); }}
-                      className="flex-shrink-0 bg-white/10 rounded-xl p-2 text-center hover:bg-white/20">
-                      <img src={s.avatar} alt="" className="w-10 h-10 rounded-full mx-auto mb-1" />
-                      <div className="text-white text-[9px]">{s.username}</div>
-                    </button>
-                  ))}
-                </div>
+                {room.seats.filter(s => s && s.user_id !== user.id).length > 0 ? (
+                  <>
+                    <p className="text-white/40 text-xs mb-2">Elige a quién enviar</p>
+                    <div className="flex gap-2 mb-3 overflow-x-auto">
+                      {room.seats.filter(s => s && s.user_id !== user.id).map((s, i) => (
+                        <button key={i} onClick={() => { setGiftTarget(s); setPanel('gifts'); }}
+                          className="flex-shrink-0 bg-white/10 rounded-xl p-2 text-center hover:bg-white/20 active:scale-95 transition-all">
+                          <img src={s.avatar} alt="" className="w-10 h-10 rounded-full mx-auto mb-1" />
+                          <div className="text-white text-[9px]">{s.username}</div>
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                ) : (
+                  <div className="text-center py-4 mb-3">
+                    <div className="text-3xl mb-2">👥</div>
+                    <p className="text-white/40 text-xs">No hay otros usuarios en la sala para enviar regalos</p>
+                    <p className="text-white/30 text-[10px]">Invita amigos a tu sala</p>
+                  </div>
+                )}
                 <p className="text-white/40 text-xs mb-2">Regalos</p>
                 <div className="grid grid-cols-4 gap-2 mb-3">
-                  {Object.entries(gifts).filter(([k]) => !k.startsWith('sobre_')).map(([k, g]) => (
-                    <div key={k} className="bg-white/5 rounded-xl p-2 text-center border border-white/5">
-                      <div className="text-xl">{g.emoji}</div>
-                      <div className="text-white text-[8px]">{g.name}</div>
-                      <div className="text-yellow-400 text-[8px]">{g.cost >= 1e6 ? `${(g.cost/1e6).toFixed(0)}M` : `${(g.cost/1e3).toFixed(0)}K`}</div>
-                    </div>
-                  ))}
+                  {Object.entries(gifts).filter(([k]) => !k.startsWith('sobre_')).map(([k, g]) => {
+                    const others = room.seats.filter(s => s && s.user_id !== user.id);
+                    return (
+                      <button key={k} onClick={() => {
+                        if (others.length === 0) { alert('No hay usuarios en la sala para enviar regalos'); return; }
+                        if (others.length === 1) { sendGift(k, others[0]); return; }
+                        setGiftTarget(others[0]); setPanel('gifts');
+                      }} className="bg-white/5 rounded-xl p-2 text-center border border-white/5 active:scale-95 transition-all">
+                        <div className="text-xl">{g.emoji}</div>
+                        <div className="text-white text-[8px]">{g.name}</div>
+                        <div className="text-yellow-400 text-[8px]">{formatCoins(g.cost)}</div>
+                      </button>
+                    );
+                  })}
                 </div>
                 <p className="text-white/40 text-xs mb-2">Sobres (Lluvia de Oro para todos)</p>
                 <div className="grid grid-cols-4 gap-2">
@@ -535,7 +562,7 @@ const RoomView = ({ roomId, onBack }) => {
                     <button key={s.id} onClick={() => throwSobre(s.id)} className="bg-red-900/30 border border-red-500/20 rounded-xl p-2 text-center active:scale-95">
                       <div className="text-lg">{s.emoji}</div>
                       <div className="text-white text-[8px]">{s.name}</div>
-                      <div className="text-red-300 text-[8px]">{s.amount >= 1e6 ? `${(s.amount/1e6).toFixed(0)}M` : `${(s.amount/1e3).toFixed(0)}K`}</div>
+                      <div className="text-red-300 text-[8px]">{formatCoins(s.amount)}</div>
                     </button>
                   ))}
                 </div>
@@ -548,7 +575,7 @@ const RoomView = ({ roomId, onBack }) => {
                   <button key={s.id} data-testid={`sobre-${s.id}`} onClick={() => throwSobre(s.id)} className="bg-gradient-to-b from-red-900/50 to-red-950/50 border border-red-500/20 rounded-xl p-3 text-center active:scale-95 transition-all">
                     <div className="text-2xl">{s.emoji}</div>
                     <div className="text-white text-[9px] font-bold">{s.name}</div>
-                    <div className="text-red-300 text-[8px]">{s.amount >= 1e6 ? `${(s.amount/1e6).toFixed(0)}M` : `${(s.amount/1e3).toFixed(0)}K`}</div>
+                    <div className="text-red-300 text-[8px]">{formatCoins(s.amount)}</div>
                   </button>
                 ))}
               </div>
@@ -615,7 +642,7 @@ const RoomView = ({ roomId, onBack }) => {
               </div>
             )}
 
-            <p className="text-yellow-400/50 text-[10px] text-center mt-2">Tus monedas: {user.coins >= 1e9 ? `${(user.coins/1e9).toFixed(1)}B` : user.coins >= 1e6 ? `${(user.coins/1e6).toFixed(1)}M` : user.coins >= 1e3 ? `${(user.coins/1e3).toFixed(0)}K` : (user.coins || 0).toLocaleString()}</p>
+            <p className="text-yellow-400/50 text-[10px] text-center mt-2">Tus monedas: {formatCoins(user.coins)}</p>
           </div>
         </div>
       )}
@@ -671,7 +698,7 @@ const RoomView = ({ roomId, onBack }) => {
             <span className="text-base">🛒</span><span className="text-purple-300 text-xs font-bold">Tienda</span>
           </button>
           <div className="ml-auto bg-white/5 rounded-full px-3 py-2 flex items-center min-h-[40px]">
-            <span className="text-yellow-400 text-xs font-bold">💰 {user.coins >= 1e9 ? `${(user.coins/1e9).toFixed(1)}B` : user.coins >= 1e6 ? `${(user.coins/1e6).toFixed(1)}M` : user.coins >= 1e3 ? `${(user.coins/1e3).toFixed(0)}K` : (user.coins || 0).toLocaleString()}</span>
+            <span className="text-yellow-400 text-xs font-bold">💰 {formatCoins(user.coins)}</span>
           </div>
         </div>
       </div>

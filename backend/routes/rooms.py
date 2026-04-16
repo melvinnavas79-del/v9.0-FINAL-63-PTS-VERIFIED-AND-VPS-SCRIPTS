@@ -73,6 +73,10 @@ async def get_or_create_my_room(user_id: str):
         "created_at": datetime.now(timezone.utc).isoformat()
     }
     await db.rooms.insert_one(room_doc)
+    # Track room creation for badges
+    await db.users.update_one({"id": user_id}, {"$inc": {"rooms_created": 1}})
+    from routes.badges import check_and_award_badges
+    await check_and_award_badges(user_id)
     return serialize_room(room_doc)
 
 # ==================== SEAT MANAGEMENT ====================

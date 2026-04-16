@@ -1,14 +1,36 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import axios from 'axios';
 import { useUser } from '../contexts/UserContext';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
+const formatCoins = (n) => {
+  if (!n && n !== 0) return '0';
+  if (n >= 1e9) return `${(n/1e9).toFixed(1)}B`;
+  if (n >= 1e6) return `${(n/1e6).toFixed(1)}M`;
+  if (n >= 1e3) return `${(n/1e3).toFixed(0)}K`;
+  return n.toLocaleString();
+};
+
 const ProfileView = ({ onBack, onNavigate }) => {
   const { user, logout, updateUser } = useUser();
   const [ghostMode, setGhostMode] = useState(user?.ghost_mode || false);
   const [uploading, setUploading] = useState(false);
+  const [badgesData, setBadgesData] = useState(null);
   const fileInputRef = useRef(null);
+
+  useEffect(() => {
+    loadBadges();
+  }, []);
+
+  const loadBadges = async () => {
+    try {
+      // Trigger badge check first
+      await axios.post(`${API}/badges/${user.id}/check`);
+      const r = await axios.get(`${API}/badges/${user.id}`);
+      setBadgesData(r.data);
+    } catch (e) { console.error(e); }
+  };
 
   const toggleGhostMode = async () => {
     try {
@@ -91,13 +113,18 @@ const ProfileView = ({ onBack, onNavigate }) => {
 
         {/* Badges */}
         <div className="flex flex-wrap justify-center gap-2 mb-3">
-          {(user.badges || []).map((badge, i) => (
-            <span key={i} className="bg-white/20 text-white text-xs px-3 py-1 rounded-full font-bold backdrop-blur">
-              {badge}
+          {badgesData?.badges?.filter(b => b.earned).map((badge) => (
+            <span key={badge.id} className="bg-white/20 text-white text-xs px-3 py-1 rounded-full font-bold backdrop-blur">
+              {badge.icon} {badge.name}
             </span>
           ))}
           {user.role === 'dueño' && (
             <span className="bg-yellow-500/80 text-white text-xs px-3 py-1 rounded-full font-bold">👑 Dueño</span>
+          )}
+          {badgesData && (
+            <span className="bg-white/10 text-white/60 text-[10px] px-2 py-1 rounded-full">
+              {badgesData.earned_count}/{badgesData.total} medallas
+            </span>
           )}
         </div>
 
@@ -115,19 +142,35 @@ const ProfileView = ({ onBack, onNavigate }) => {
           <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 text-center">
             <div className="text-3xl mb-1">💰</div>
             <div className="text-gray-500 text-sm">Monedas</div>
-            <div className="text-2xl font-bold text-gray-800">{(user.coins || 0).toLocaleString()}</div>
+            <div className="text-2xl font-bold text-gray-800">{formatCoins(user.coins)}</div>
           </div>
           <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 text-center">
             <div className="text-3xl mb-1">💎</div>
             <div className="text-gray-500 text-sm">Diamantes</div>
-            <div className="text-2xl font-bold text-gray-800">{(user.diamonds || 0).toLocaleString()}</div>
+            <div className="text-2xl font-bold text-gray-800">{formatCoins(user.diamonds)}</div>
           </div>
           <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 text-center">
             <div className="text-3xl mb-1">💸</div>
             <div className="text-gray-500 text-sm">Total Gastado</div>
-            <div className="text-2xl font-bold text-gray-800">{(user.total_spent || 0).toLocaleString()}</div>
+            <div className="text-2xl font-bold text-gray-800">{formatCoins(user.total_spent)}</div>
           </div>
         </div>
+
+        {/* Badge Collection */}
+        {badgesData && badgesData.badges && (
+          <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 mb-4">
+            <h3 className="text-lg font-bold text-gray-800 mb-3">Medallas ({badgesData.earned_count}/{badgesData.total})</h3>
+            <div className="grid grid-cols-4 gap-2">
+              {badgesData.badges.map(b => (
+                <div key={b.id} className={`rounded-xl p-2 text-center ${b.earned ? 'bg-yellow-50 border border-yellow-200' : 'bg-gray-50 border border-gray-100 opacity-40'}`}>
+                  <div className="text-2xl mb-0.5">{b.icon}</div>
+                  <div className={`text-[9px] font-bold ${b.earned ? 'text-gray-800' : 'text-gray-400'}`}>{b.name}</div>
+                  <div className="text-[8px] text-gray-400">{b.category}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Info cards */}
         {(user.clan_name || user.cp_partner) && (

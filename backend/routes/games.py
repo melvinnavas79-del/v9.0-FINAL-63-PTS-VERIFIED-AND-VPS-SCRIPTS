@@ -107,12 +107,15 @@ async def play_generic(play: GenericPlay):
         
         if won and mult > 0:
             prize = play.bet * mult
-            await db.users.update_one({"id": play.user_id}, {"$inc": {"coins": prize}})
+            await db.users.update_one({"id": play.user_id}, {"$inc": {"coins": prize, "total_games_won": 1}})
             updated = await db.users.find_one({"id": play.user_id})
             await db.event_requests.update_one(
                 {"user_id": play.user_id, "status": "approved", "event_type": {"$regex": "^king"}},
                 {"$inc": {"game_progress": play.bet}}
             )
+            # Check badges
+            from routes.badges import check_and_award_badges
+            await check_and_award_badges(play.user_id)
             return {"won": True, "prize": prize, "multiplier": mult, "new_balance": updated['coins'], "game_data": game_data}
         updated = await db.users.find_one({"id": play.user_id})
         await db.event_requests.update_one(
@@ -567,6 +570,9 @@ async def lion_tiger_win(user_id: str, amount: int):
     user = await db.users.find_one({"id": user_id})
     if not user:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
-    await db.users.update_one({"id": user_id}, {"$inc": {"coins": amount}})
+    await db.users.update_one({"id": user_id}, {"$inc": {"coins": amount, "total_games_won": 1}})
     updated = await db.users.find_one({"id": user_id})
+    # Check badges
+    from routes.badges import check_and_award_badges
+    await check_and_award_badges(user_id)
     return {"success": True, "new_balance": updated['coins']}

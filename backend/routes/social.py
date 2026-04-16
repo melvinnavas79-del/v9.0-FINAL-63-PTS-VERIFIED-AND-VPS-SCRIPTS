@@ -185,8 +185,8 @@ async def send_gift(gift: GiftSend):
         raise HTTPException(status_code=404, detail="Receiver no encontrado")
     
     # Deduct from sender, add to receiver
-    await db.users.update_one({"id": gift.sender_id}, {"$inc": {"coins": -g['cost'], "total_spent": g['cost']}})
-    await db.users.update_one({"id": gift.receiver_id}, {"$inc": {"coins": g['value'], "total_received": g['value']}})
+    await db.users.update_one({"id": gift.sender_id}, {"$inc": {"coins": -g['cost'], "total_spent": g['cost'], "total_gifts_sent": 1}})
+    await db.users.update_one({"id": gift.receiver_id}, {"$inc": {"coins": g['value'], "total_received": g['value'], "total_gifts_received": 1}})
     
     # Log gift
     gift_doc = {
@@ -236,7 +236,12 @@ async def send_gift(gift: GiftSend):
     if gift.room_id:
         await db.rooms.update_one({"id": gift.room_id}, {"$inc": {"cofre_progress": g['cost']}})
     
-    return {"success": True, "gift": gift_doc, "new_balance": updated_sender['coins']}
+    # Check badges for sender and receiver
+    from routes.badges import check_and_award_badges
+    sender_new = await check_and_award_badges(gift.sender_id)
+    receiver_new = await check_and_award_badges(gift.receiver_id)
+    
+    return {"success": True, "gift": gift_doc, "new_balance": updated_sender['coins'], "new_badges": sender_new}
 
 # ==================== SOBRES (LLUVIA DE ORO) ====================
 
