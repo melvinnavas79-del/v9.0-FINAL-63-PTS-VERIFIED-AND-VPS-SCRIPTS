@@ -20,7 +20,7 @@ const formatCoins = (n) => {
 };
 
 const RoomView = ({ roomId, onBack }) => {
-  const { user, updateUser } = useUser();
+  const { user, updateUser, syncUser } = useUser();
   const [room, setRoom] = useState(null);
   const [mySeat, setMySeat] = useState(null);
   const [isMuted, setIsMuted] = useState(true);
@@ -206,6 +206,8 @@ const RoomView = ({ roomId, onBack }) => {
       setFloatingGift({ emoji: gifts[type]?.emoji || '🎁', key: Date.now() });
       setTimeout(() => setFloatingGift(null), 2000);
       setPanel(null); setGiftTarget(null); loadChat(); loadCofres();
+      // Force sync from server to ensure accuracy
+      setTimeout(() => syncUser(), 1000);
     } catch (e) {
       const msg = e.response?.data?.detail || 'Error al enviar regalo';
       if (msg === 'No tienes suficientes monedas') {
@@ -223,6 +225,7 @@ const RoomView = ({ roomId, onBack }) => {
       setFloatingGift({ emoji: '🧧', key: Date.now() });
       setTimeout(() => setFloatingGift(null), 2000);
       setPanel(null); loadChat(); loadCofres();
+      setTimeout(() => syncUser(), 1000);
     } catch (e) {
       const msg = e.response?.data?.detail || 'Error';
       if (msg === 'Monedas insuficientes') {
@@ -382,8 +385,8 @@ const RoomView = ({ roomId, onBack }) => {
         <LionTigerGame
           userId={user.id}
           userCoins={user.coins || 0}
-          onBalanceUpdate={(newBal) => updateUser({ coins: newBal })}
-          onClose={() => setShowLionTiger(false)}
+          onBalanceUpdate={(newBal) => { updateUser({ coins: newBal }); }}
+          onClose={() => { setShowLionTiger(false); syncUser(); }}
         />
       )}
 
@@ -610,8 +613,9 @@ const RoomView = ({ roomId, onBack }) => {
                   if (data.new_balance !== undefined) updateUser({ coins: data.new_balance });
                   setGameResult(data);
                   setTimeout(() => setGameResult(null), 4000);
+                  setTimeout(() => syncUser(), 1500);
                 }}
-                onClose={() => setPanel(null)}
+                onClose={() => { setPanel(null); syncUser(); }}
                 onStartPK={() => {
                   const others = room.seats.filter(s => s && s.user_id !== user.id);
                   if (others.length === 0) { alert('No hay otros usuarios en la sala'); return; }
