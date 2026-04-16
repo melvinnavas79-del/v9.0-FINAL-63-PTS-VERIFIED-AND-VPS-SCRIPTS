@@ -7,9 +7,10 @@ Full-stack social audio streaming platform ("Lluvia Live") with:
 - Economy: Coins, Diamonds, Stripe Payments, Treasure Chests, Coin rains
 - Interactive Mini-games: Ludo, Lion vs Tiger, and other casino/betting style games
 - Master Control Panel: Manage users, voices, prizes, configurations
-- Autonomous AI Admin Bot: Global floating bot + in-room moderation, voice TTS/STT, session memory
+- Autonomous AI Admin Bot: Global floating bot + in-room moderation
 - PWA, Android build script, iOS setup
-- Brand: "Lluvia Live" with zero third-party/Emergent branding
+- Brand: "Lluvia Live" with zero third-party branding
+- Automatic Badge/Medal system (29 achievements across 7 categories)
 
 ## Tech Stack
 - Frontend: React.js, TailwindCSS, JS viewport scaling for Android PWA
@@ -25,7 +26,7 @@ Full-stack social audio streaming platform ("Lluvia Live") with:
   server.py          - Clean entry point
   database.py        - MongoDB, models, helpers
   routes/
-    auth.py          - Register, Login, User profile, Ghost mode, Entry animations
+    auth.py          - Register, Login, User profile, Entry animations
     rooms.py         - Room CRUD, Seats, Chat, Photos, Agora tokens
     games.py         - All games, PK battles, Lion vs Tiger
     bot.py           - AI Bot, missions, monitoring
@@ -34,12 +35,10 @@ Full-stack social audio streaming platform ("Lluvia Live") with:
     social.py        - Clanes, Parejas, Gifts, Sobres, Cofres
     store.py         - Stripe checkout
     notifications.py - Notification CRUD
-/app/frontend/src/
-  pages/             - RoomView, Dashboard, LoginPage, StorePage, etc.
-  components/        - LionTigerGame, RoomGames, Animations, etc.
+    badges.py        - Automatic badge/medal system (29 badges)
 ```
 
-## What's Been Implemented
+## What's Been Implemented (Complete)
 - Full auth system (register, login, case-insensitive)
 - Audio rooms with Agora WebRTC (9 seats, auto-mute)
 - Complete gamification (aristocracy, VIP levels, CP, clanes)
@@ -50,27 +49,24 @@ Full-stack social audio streaming platform ("Lluvia Live") with:
 - Control Panel for admin management
 - Stripe payment integration
 - Notification system
-- Android Studio build skeleton
-- iOS project structure
+- Android Studio build skeleton, iOS project structure
 - Comprehensive Pytest test suite
-
-## Completed Fixes (Latest Session - Apr 16, 2026)
-1. Entry Announcements: Role-based welcome messages ("Melvin, el dueño de Lluvia Live, acaba de ingresar")
-2. Gift Deduction Bug: Fixed NameError (BIG_GIFTS undefined) in social.py
-3. Lion vs Tiger Math: Verified x2/x5 payouts with separate bet/win endpoints
-4. iOS Buttons: Salir (88x44px), Minimizar (44x44px) meet iOS touch requirements
-5. Gift Float Animations: CSS @keyframes giftFloat on gift send
-6. Audio Cleanup: audioElementRef cleanup on unmount/leave, owner leave clears music
-7. Number Formatting: K/M/B abbreviations for coin displays
-8. Tienda: Full-height scrollable panel (80vh), 6 store categories
-9. Branding: All text is "Lluvia Live", no Emergent mentions
+- Entry announcements & VIP hierarchy (role-based)
+- Gift deduction bug fixed (BIG_GIFTS)
+- Lion vs Tiger multiplier math verified (x2/x5)
+- iOS buttons fixed (44px minimum touch targets)
+- Gift float animations + chat bubble animations
+- Audio cleanup on room leave/unmount
+- Number formatting (K, M, B) across all views
+- Automatic Badge System (29 badges, 7 categories, auto-award)
+- Badge display in profile with collection grid
 
 ## Remaining Backlog
 ### P1
 - TTS Voice Integration (Google Cloud/Azure) for natural bot voices
-- More casino mini-games
 
 ### P2
+- More casino mini-games
 - Enhanced StorePage with actual Stripe product catalog
 - Push notifications
 - More entry animations per aristocracy level
