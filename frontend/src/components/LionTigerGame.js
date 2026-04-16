@@ -81,7 +81,7 @@ const LionTigerGame = ({ userId, userCoins, onBalanceUpdate, onClose }) => {
           let won = 0;
           if (w === 'tiger' && prev > 0) won = prev * 2;
           if (w === 'lion' && prevL > 0) won = prevL * 2;
-          if (w === 'draw' && prevD > 0) won = prevD * 8;
+          if (w === 'draw' && prevD > 0) won = prevD * 5;
 
           if (won > 0) {
             setWinAmount(won);
@@ -277,7 +277,7 @@ const LionTigerGame = ({ userId, userCoins, onBalanceUpdate, onClose }) => {
         </button>
         <button onClick={() => apostar('draw')} data-testid="bet-draw"
           className="flex-1 text-center py-3 rounded-xl" style={{ background: 'rgba(0,0,0,0.6)', border: '1px solid #ffcc00' }}>
-          <div className="text-white font-bold text-sm">DRAW <span className="text-xs">(x8)</span></div>
+          <div className="text-white font-bold text-sm">DRAW <span className="text-xs">(x5)</span></div>
           <div className="font-bold text-base" style={{ color: '#ffcc00' }}>{formatBet(betDraw)}</div>
         </button>
         <button onClick={() => apostar('lion')} data-testid="bet-lion"
