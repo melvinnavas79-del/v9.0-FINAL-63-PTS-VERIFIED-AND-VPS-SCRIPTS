@@ -1,22 +1,21 @@
 # Lluvia Live - .gitignore
 
-# Dependencies
+# Dependencias
 node_modules/
 venv/
 .venv/
 
-# Python cache
+# Cache de Python
 __pycache__/
 *.pyc
 *.pyo
 
-# Environment (cada servidor tiene el suyo)
+# Variables de entorno (cada servidor tiene las suyas)
 .env
 .env.*
-*.env
-.env.bak
+!.env.example
 
-# Build outputs
+# Builds
 /build
 dist/
 frontend/build/
@@ -27,8 +26,9 @@ frontend/build/
 *.swp
 *~
 
-# System
+# Sistema
 .DS_Store
+Thumbs.db
 *.pem
 *.key
 
@@ -37,27 +37,16 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# Testing/Development
+# Testing
 coverage/
 .pytest_cache/
 .ruff_cache/
-test_reports/
-test_result.md
 
-# Platform artifacts (NO subir)
-.platform/
-.gitconfig
-memory/
-*.pack
-
-# Archives
+# Archivos comprimidos
 *.zip
 *.tar.gz
 *.tar
 *.tgz
-*.deb
-
-# Mobile cache
-android-sdk/
+*.pack
 frontend/node_modules/.cache/default-development/41.pack
 frontend/node_modules/.cache/default-development/0.pack
