@@ -2,7 +2,7 @@
 Social routes: Clanes, Parejas (CP), Gifts, Sobres, Cofres.
 """
 from fastapi import APIRouter, HTTPException, UploadFile, File
-from database import db, ClanCreate, GiftSend, serialize_user, uuid, datetime, timezone, create_notification
+from database import db, ClanCreate, GiftSend, serialize_user, uuid, datetime, timezone, create_notification, UPLOAD_DIR
 from pydantic import BaseModel
 import random
 
@@ -142,11 +142,7 @@ async def cp_level_up(cp_id: str):
 
 # ==================== GIFTS (REGALOS) ====================
 
-class GiftSend(BaseModel):
-    sender_id: str
-    receiver_id: str
-    gift_type: str
-    room_id: str = ""
+BIG_GIFTS = ["dragon", "castillo", "lluvia_oro", "mega_crown"]
 
 GIFTS = {
     "rosa": {"name": "Rosa", "emoji": "🌹", "cost": 100, "value": 80},

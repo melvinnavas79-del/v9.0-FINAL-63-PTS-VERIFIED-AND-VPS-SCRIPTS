@@ -135,7 +135,7 @@ async def toggle_mute(room_id: str, user_id: str):
 
 @router.post("/rooms/{room_id}/leave")
 async def leave_room(room_id: str, user_id: str):
-    """Leave Room."""
+    """Leave Room. If owner leaves, clear music state."""
     room = await db.rooms.find_one({"id": room_id})
     if not room:
         raise HTTPException(status_code=404, detail="Sala no encontrada")
@@ -147,7 +147,11 @@ async def leave_room(room_id: str, user_id: str):
             changed = True
     if changed:
         ac = sum(1 for s in seats if s is not None)
-        await db.rooms.update_one({"id": room_id}, {"$set": {"seats": seats, "active_users": ac}})
+        update_fields = {"seats": seats, "active_users": ac}
+        # Clear music when owner leaves
+        if room.get('owner_id') == user_id:
+            update_fields["music_url"] = None
+        await db.rooms.update_one({"id": room_id}, {"$set": update_fields})
     return {"success": True}
 
 # ==================== CHAT ====================
@@ -199,17 +203,45 @@ async def welcome_message(room_id: str, user_id: str):
     user = await db.users.find_one({"id": user_id})
     if not user:
         return {"success": False}
-    entry_anim = user.get('entry_animation', 'none')
+    role = user.get('role', 'usuario')
     aristocracy = user.get('aristocracy', 0)
-    if aristocracy >= 8:
+    username = user['username']
+
+    # Role-based welcome messages
+    if role == 'dueño':
+        welcome_text = f"⛈️ {username}, el dueño de Lluvia Live, acaba de ingresar ☔"
+        entry_anim = 'storm'
+    elif role == 'admin':
+        welcome_text = f"⚡ {username}, Administrador de Lluvia Live, ha entrado"
         entry_anim = 'dragon'
-    elif aristocracy >= 6:
-        entry_anim = 'luxury_car'
-    elif aristocracy >= 4:
-        entry_anim = 'fireworks'
-    elif aristocracy >= 2:
-        entry_anim = 'sparkle'
-    welcome_text = f"👋 Bienvenido/a! {user['username']} entro a la sala"
+    elif role == 'moderador':
+        welcome_text = f"🛡️ {username}, Moderador, ha entrado a la sala"
+        entry_anim = 'eagle'
+    elif role == 'vip':
+        welcome_text = f"⭐ {username}, VIP, ha entrado a la sala"
+        entry_anim = 'lion'
+    else:
+        welcome_text = f"👋 {username} entro a la sala"
+        entry_anim = 'none'
+
+    # Aristocracy overrides for higher ranks
+    if aristocracy >= 9:
+        entry_anim = 'dragon'
+        if role not in ('dueño',):
+            welcome_text = f"🐉 {username}, Aristocracia {aristocracy}, ha entrado"
+    elif aristocracy >= 7:
+        entry_anim = 'phoenix' if role != 'dueño' else entry_anim
+        if role not in ('dueño', 'admin'):
+            welcome_text = f"🔥 {username}, Aristocracia {aristocracy}, ha entrado"
+    elif aristocracy >= 5:
+        if entry_anim == 'none':
+            entry_anim = 'tiger'
+        if role not in ('dueño', 'admin', 'moderador'):
+            welcome_text = f"🐅 {username}, Aristocracia {aristocracy}, ha entrado"
+    elif aristocracy >= 3:
+        if entry_anim == 'none':
+            entry_anim = 'eagle'
+
     msg_doc = {
         "id": str(uuid.uuid4()), "room_id": room_id,
         "user_id": "system", "username": "Sistema",
@@ -217,29 +249,10 @@ async def welcome_message(room_id: str, user_id: str):
         "type": "welcome", "created_at": datetime.now(timezone.utc).isoformat()
     }
     await db.room_chat.insert_one(msg_doc)
-    return {"success": True, "entry_animation": entry_anim, "username": user['username']}
+    msg_doc.pop('_id', None)
+    return {"success": True, "entry_animation": entry_anim, "username": username}
 
-# ==================== MUSIC & PHOTOS ====================
-
-@router.post("/rooms/{room_id}/music")
-async def set_room_music(room_id: str, owner_id: str, file: UploadFile = File(...)):
-    """Upload background music for a room."""
-    room = await db.rooms.find_one({"id": room_id})
-    if not room:
-        raise HTTPException(status_code=404, detail="Sala no encontrada")
-    filename = f"music_{room_id}_{uuid.uuid4().hex[:8]}{os.path.splitext(file.filename)[1]}"
-    filepath = UPLOAD_DIR / filename
-    with open(filepath, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
-    music_url = f"/api/uploads/{filename}"
-    await db.rooms.update_one({"id": room_id}, {"$set": {"music_url": music_url}})
-    return {"success": True, "music_url": music_url}
-
-@router.delete("/rooms/{room_id}/music")
-async def remove_room_music(room_id: str, owner_id: str):
-    """Remove Room Music."""
-    await db.rooms.update_one({"id": room_id}, {"$unset": {"music_url": 1}})
-    return {"success": True}
+# ==================== CHAT PHOTOS ====================
 
 @router.post("/rooms/{room_id}/chat-photo")
 async def send_chat_photo(room_id: str, user_id: str, file: UploadFile = File(...)):

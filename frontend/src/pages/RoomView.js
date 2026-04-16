@@ -28,6 +28,7 @@ const RoomView = ({ roomId, onBack }) => {
   const [botOn, setBotOn] = useState(false);
   const [minimized, setMinimized] = useState(false);
   const [showLionTiger, setShowLionTiger] = useState(false);
+  const [floatingGift, setFloatingGift] = useState(null);
 
   const clientRef = useRef(null);
   const localTrackRef = useRef(null);
@@ -36,6 +37,7 @@ const RoomView = ({ roomId, onBack }) => {
   const prevMsgCount = useRef(0);
   const photoRef = useRef(null);
   const musicRef = useRef(null);
+  const audioElementRef = useRef(null);
 
   useEffect(() => {
     leaveAgora();
@@ -43,7 +45,16 @@ const RoomView = ({ roomId, onBack }) => {
     const r = setInterval(loadRoom, 3000);
     const c = setInterval(loadChat, 2000);
     const cf = setInterval(loadCofres, 5000);
-    return () => { clearInterval(r); clearInterval(c); clearInterval(cf); leaveAgora(); };
+    return () => {
+      clearInterval(r); clearInterval(c); clearInterval(cf);
+      leaveAgora();
+      // Cleanup audio element on unmount
+      if (audioElementRef.current) {
+        audioElementRef.current.pause();
+        audioElementRef.current.src = '';
+        audioElementRef.current = null;
+      }
+    };
   }, [roomId]);
 
   useEffect(() => {
@@ -96,17 +107,34 @@ const RoomView = ({ roomId, onBack }) => {
       clientRef.current = client;
       client.on('user-published', async (u, m) => { if (m === 'audio') { await client.subscribe(u, 'audio'); u.audioTrack?.play(); } });
       await client.join(t.data.app_id, `room_${roomId}`, t.data.token, t.data.uid);
-      // DON'T create mic track yet - only when user unmutes
-      // This prevents the "recording" indicator on phone
       setAudioStatus('on'); setIsMuted(true);
-      await axios.post(`${API}/rooms/${roomId}/welcome?user_id=${user.id}`);
+      // Welcome message + entry animation from backend
+      const welcomeRes = await axios.post(`${API}/rooms/${roomId}/welcome?user_id=${user.id}`);
+      if (welcomeRes.data?.entry_animation && welcomeRes.data.entry_animation !== 'none') {
+        setEntryAnim({ animation: welcomeRes.data.entry_animation, username: welcomeRes.data.username || user.username });
+      }
       loadChat();
-      try { const a = await axios.get(`${API}/users/${user.id}/entry-animation`); if (a.data.special) setEntryAnim({ animation: a.data.animation, username: user.username }); } catch (e) {}
+      // Also check entry-animation endpoint for VIP/role-based animations
+      try {
+        const a = await axios.get(`${API}/users/${user.id}/entry-animation`);
+        if (a.data.special && !welcomeRes.data?.entry_animation) {
+          setEntryAnim({ animation: a.data.animation, username: user.username });
+        }
+      } catch (e) {}
     } catch (e) { setAudioStatus('error'); }
   };
 
   const leaveAgora = async () => {
-    try { localTrackRef.current?.close(); localTrackRef.current = null; await clientRef.current?.leave(); clientRef.current = null; setAudioStatus('off'); clearTimeout(autoMuteRef.current); } catch (e) {}
+    try {
+      localTrackRef.current?.close(); localTrackRef.current = null;
+      await clientRef.current?.leave(); clientRef.current = null;
+      setAudioStatus('off'); clearTimeout(autoMuteRef.current);
+      // Stop room music on leave
+      if (audioElementRef.current) {
+        audioElementRef.current.pause();
+        audioElementRef.current.src = '';
+      }
+    } catch (e) {}
   };
 
   const toggleMute = async () => {
@@ -164,16 +192,35 @@ const RoomView = ({ roomId, onBack }) => {
     try {
       const r = await axios.post(`${API}/gifts/send`, { sender_id: user.id, receiver_id: giftTarget.user_id, gift_type: type, room_id: roomId });
       if (r.data.new_balance !== undefined) updateUser({ coins: r.data.new_balance });
+      // Trigger float animation for gift
+      setFloatingGift({ emoji: gifts[type]?.emoji || '🎁', key: Date.now() });
+      setTimeout(() => setFloatingGift(null), 2000);
       setPanel(null); setGiftTarget(null); loadChat(); loadCofres();
-    } catch (e) { alert(e.response?.data?.detail || 'Error'); }
+    } catch (e) {
+      const msg = e.response?.data?.detail || 'Error al enviar regalo';
+      if (msg === 'No tienes suficientes monedas') {
+        alert('No tienes suficientes monedas. Contacta a Soporte de Lluvia Live para recargar.');
+      } else {
+        alert(msg);
+      }
+    }
   };
 
   const throwSobre = async (sobreId) => {
     try {
       const r = await axios.post(`${API}/sobres/throw`, { sender_id: user.id, room_id: roomId, sobre_id: sobreId });
       if (r.data.new_balance !== undefined) updateUser({ coins: r.data.new_balance });
+      setFloatingGift({ emoji: '🧧', key: Date.now() });
+      setTimeout(() => setFloatingGift(null), 2000);
       setPanel(null); loadChat(); loadCofres();
-    } catch (e) { alert(e.response?.data?.detail || 'Error'); }
+    } catch (e) {
+      const msg = e.response?.data?.detail || 'Error';
+      if (msg === 'Monedas insuficientes') {
+        alert('Monedas insuficientes. Contacta a Soporte de Lluvia Live para recargar.');
+      } else {
+        alert(msg);
+      }
+    }
   };
 
   const tryOpenCofre = async () => {
@@ -282,9 +329,9 @@ const RoomView = ({ roomId, onBack }) => {
           </div>
           <div className="flex items-center gap-2">
             {mySeat !== null && (
-              <button onClick={toggleMute} className={`w-8 h-8 rounded-full flex items-center justify-center text-sm ${isMuted ? 'bg-red-500' : 'bg-green-500'}`}>{isMuted ? '🔇' : '🎤'}</button>
+              <button onClick={toggleMute} className={`w-10 h-10 rounded-full flex items-center justify-center text-base ${isMuted ? 'bg-red-500' : 'bg-green-500'}`}>{isMuted ? '🔇' : '🎤'}</button>
             )}
-            <button data-testid="maximize-btn" onClick={() => setMinimized(false)} className="bg-cyan-500 text-white px-3 py-1 rounded-full text-xs font-bold">Abrir</button>
+            <button data-testid="maximize-btn" onClick={() => setMinimized(false)} className="bg-cyan-500 text-white px-4 py-2 rounded-full text-sm font-bold min-h-[40px] active:scale-95">Abrir</button>
           </div>
         </div>
       </div>
@@ -306,6 +353,10 @@ const RoomView = ({ roomId, onBack }) => {
 
   return (
     <div className="h-screen flex flex-col overflow-hidden relative" style={{background: 'linear-gradient(to bottom, #1e1b4b, #0f172a, #111827)', ...bgStyle}}>
+      <style>{`
+        @keyframes fadeInUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes giftBubble { 0% { opacity: 0; transform: translateY(20px) scale(0.8); } 50% { opacity: 1; transform: translateY(-5px) scale(1.05); } 100% { opacity: 1; transform: translateY(0) scale(1); } }
+      `}</style>
       {entryAnim && <EntryAnimation animation={entryAnim.animation} username={entryAnim.username} onComplete={() => setEntryAnim(null)} />}
 
       {/* PHOTO ZOOM MODAL */}
@@ -438,7 +489,7 @@ const RoomView = ({ roomId, onBack }) => {
       {/* PANEL OVERLAY */}
       {panel && (
         <div className="absolute inset-0 z-50 bg-black/80 flex items-end" onClick={() => { setPanel(null); setGiftTarget(null); }}>
-          <div className="w-full bg-gray-950 rounded-t-3xl p-4 max-h-[60vh] overflow-y-auto border-t border-white/10" onClick={e => e.stopPropagation()}>
+          <div className="w-full bg-gray-950 rounded-t-3xl p-4 max-h-[80vh] overflow-y-auto border-t border-white/10" style={{paddingBottom: 'max(20px, env(safe-area-inset-bottom, 20px))'}} onClick={e => e.stopPropagation()}>
             <div className="flex justify-between mb-3">
               <h3 className="text-white font-bold text-sm">{panel === 'gifts' ? `Regalos → ${giftTarget?.username}` : panel === 'gifts-all' ? 'Regalos' : panel === 'sobres' ? 'Lluvia de Oro' : panel === 'games' ? 'Juegos en Sala' : 'Cofres'}</h3>
               <button data-testid="close-panel" onClick={() => { setPanel(null); setGiftTarget(null); }} className="text-white/40">✕</button>
@@ -546,7 +597,7 @@ const RoomView = ({ roomId, onBack }) => {
 
             {/* TIENDA */}
             {panel === 'tienda' && (
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-3 gap-3">
                 {[
                   { name: 'Oros', emoji: '🪙', desc: 'Comprar monedas', color: 'from-yellow-500/30 to-amber-600/30' },
                   { name: 'Aristocracia', emoji: '👑', desc: 'Niveles VIP', color: 'from-purple-500/30 to-indigo-600/30' },
@@ -555,8 +606,8 @@ const RoomView = ({ roomId, onBack }) => {
                   { name: 'Anillo', emoji: '💍', desc: 'Anillos de CP', color: 'from-pink-500/30 to-rose-600/30' },
                   { name: 'Supermercado', emoji: '🛒', desc: 'Todo en oferta', color: 'from-green-500/30 to-emerald-600/30' },
                 ].map(item => (
-                  <button key={item.name} className={`bg-gradient-to-b ${item.color} border border-white/10 rounded-xl p-3 text-center active:scale-95 transition-all`}>
-                    <div className="text-3xl mb-1">{item.emoji}</div>
+                  <button key={item.name} className={`bg-gradient-to-b ${item.color} border border-white/10 rounded-xl p-4 text-center active:scale-95 transition-all min-h-[100px]`}>
+                    <div className="text-3xl mb-2">{item.emoji}</div>
                     <div className="text-white text-xs font-bold">{item.name}</div>
                     <div className="text-white/40 text-[9px]">{item.desc}</div>
                   </button>
@@ -564,27 +615,27 @@ const RoomView = ({ roomId, onBack }) => {
               </div>
             )}
 
-            <p className="text-yellow-400/50 text-[10px] text-center mt-2">Tus monedas: {(user.coins || 0).toLocaleString()}</p>
+            <p className="text-yellow-400/50 text-[10px] text-center mt-2">Tus monedas: {user.coins >= 1e9 ? `${(user.coins/1e9).toFixed(1)}B` : user.coins >= 1e6 ? `${(user.coins/1e6).toFixed(1)}M` : user.coins >= 1e3 ? `${(user.coins/1e3).toFixed(0)}K` : (user.coins || 0).toLocaleString()}</p>
           </div>
         </div>
       )}
 
       {/* HEADER */}
-      <div className="flex-shrink-0 px-3 pb-1" style={{paddingTop: 'max(12px, env(safe-area-inset-top, 12px))'}}>
+      <div className="flex-shrink-0 px-3 pb-1" style={{paddingTop: 'max(16px, env(safe-area-inset-top, 16px))'}}>
         <div className="flex items-center justify-between">
-          <button data-testid="room-back-btn" onClick={() => { leaveAgora(); onBack(); }} className="bg-white/10 text-white px-4 py-2 rounded-full text-sm font-medium min-h-[36px]">← Salir</button>
+          <button data-testid="room-back-btn" onClick={() => { leaveAgora(); onBack(); }} className="bg-white/15 text-white px-5 py-2.5 rounded-full text-sm font-bold min-h-[44px] min-w-[80px] active:scale-95 transition-transform">← Salir</button>
           <div className="text-center flex-1 mx-2">
             <h2 className="text-white text-sm font-bold truncate">{room.name}</h2>
           </div>
           <div className="flex items-center gap-2">
-            {/* Minimize */}
-            <button data-testid="minimize-btn" onClick={() => onBack()} className="bg-white/10 w-8 h-8 rounded-full flex items-center justify-center text-sm">⬇️</button>
+            {/* Minimize - bigger for iOS touch */}
+            <button data-testid="minimize-btn" onClick={() => setMinimized(true)} className="bg-white/15 min-w-[44px] min-h-[44px] rounded-full flex items-center justify-center text-base font-bold active:scale-95 transition-transform">⬇️</button>
             {/* Bot ON/OFF */}
             {user.role === 'dueño' && (
-              <button data-testid="bot-toggle-room" onClick={toggleBot} className={`w-8 h-8 rounded-full flex items-center justify-center text-sm ${botOn ? 'bg-green-500' : 'bg-gray-600'}`}>🤖</button>
+              <button data-testid="bot-toggle-room" onClick={toggleBot} className={`min-w-[44px] min-h-[44px] rounded-full flex items-center justify-center text-base ${botOn ? 'bg-green-500' : 'bg-gray-600'}`}>🤖</button>
             )}
-            {/* Events trigger - visible for all users */}
-            <button data-testid="events-room-btn" onClick={() => { setEventPanel(true); loadMyEvents(); loadPendingRequests(); }} className="w-8 h-8 rounded-full bg-yellow-600 flex items-center justify-center text-sm">👑</button>
+            {/* Events trigger */}
+            <button data-testid="events-room-btn" onClick={() => { setEventPanel(true); loadMyEvents(); loadPendingRequests(); }} className="min-w-[44px] min-h-[44px] rounded-full bg-yellow-600 flex items-center justify-center text-base">👑</button>
             <span className={`w-2.5 h-2.5 rounded-full ${audioStatus === 'on' ? 'bg-green-400' : 'bg-red-400'}`} />
             <span className="text-white/50 text-xs">{room.active_users}</span>
           </div>
@@ -620,7 +671,7 @@ const RoomView = ({ roomId, onBack }) => {
             <span className="text-base">🛒</span><span className="text-purple-300 text-xs font-bold">Tienda</span>
           </button>
           <div className="ml-auto bg-white/5 rounded-full px-3 py-2 flex items-center min-h-[40px]">
-            <span className="text-yellow-400 text-xs font-bold">💰 {user.coins >= 1e6 ? `${(user.coins/1e6).toFixed(1)}M` : (user.coins || 0).toLocaleString()}</span>
+            <span className="text-yellow-400 text-xs font-bold">💰 {user.coins >= 1e9 ? `${(user.coins/1e9).toFixed(1)}B` : user.coins >= 1e6 ? `${(user.coins/1e6).toFixed(1)}M` : user.coins >= 1e3 ? `${(user.coins/1e3).toFixed(0)}K` : (user.coins || 0).toLocaleString()}</span>
           </div>
         </div>
       </div>
@@ -679,9 +730,9 @@ const RoomView = ({ roomId, onBack }) => {
             {chatMessages.map(m => (
               <div key={m.id} className={m.type === 'welcome' || m.type === 'gift' ? 'text-center' : ''}>
                 {m.type === 'welcome' ? (
-                  <span className="bg-yellow-500/10 text-yellow-300/70 text-xs px-2 py-1 rounded-full">{m.text}</span>
+                  <span className="bg-yellow-500/10 text-yellow-300/70 text-xs px-2 py-1 rounded-full inline-block" style={{animation: 'fadeInUp 0.5s ease-out'}}>{m.text}</span>
                 ) : m.type === 'gift' ? (
-                  <span className="bg-pink-500/10 text-pink-300/80 text-xs px-2 py-1 rounded-full">{m.text}</span>
+                  <span className="bg-pink-500/10 text-pink-300/80 text-xs px-2 py-1 rounded-full inline-block" style={{animation: 'giftBubble 0.6s ease-out'}}>{m.text}</span>
                 ) : m.type === 'photo' ? (
                   <div className="flex items-start gap-1.5">
                     <img src={m.avatar || ''} alt="" className="w-6 h-6 rounded-full mt-0.5" />
@@ -711,6 +762,22 @@ const RoomView = ({ roomId, onBack }) => {
         </div>
       </div>
 
+      {/* FLOATING GIFT ANIMATION */}
+      {floatingGift && (
+        <div key={floatingGift.key} className="fixed inset-0 z-[55] pointer-events-none flex items-center justify-center">
+          <div className="text-6xl" style={{
+            animation: 'giftFloat 2s ease-out forwards',
+          }}>{floatingGift.emoji}</div>
+          <style>{`
+            @keyframes giftFloat {
+              0% { opacity: 1; transform: translateY(0) scale(1); }
+              50% { opacity: 1; transform: translateY(-120px) scale(1.5); }
+              100% { opacity: 0; transform: translateY(-250px) scale(0.5); }
+            }
+          `}</style>
+        </div>
+      )}
+
       {/* BOTTOM BAR - ALWAYS VISIBLE */}
       <div className="flex-shrink-0 bg-black/90 border-t border-white/5 px-3" style={{paddingTop: '10px', paddingBottom: 'max(14px, env(safe-area-inset-bottom, 14px))'}}>
         <div className="flex items-center justify-center gap-3">
@@ -736,11 +803,15 @@ const RoomView = ({ roomId, onBack }) => {
             }`}>{isDeafened ? '🔕' : '🔊'}</button>
 
           {/* Close/Leave */}
-          <button data-testid="pk-battle-btn" onClick={() => { leaveAgora(); onBack(); }}
+          <button data-testid="leave-room-btn" onClick={() => { leaveAgora(); onBack(); }}
             className="w-14 h-14 rounded-full bg-red-600 flex items-center justify-center text-2xl active:scale-90 border-2 border-red-400">✕</button>
         </div>
         {room.music_url && (
-          <audio src={room.music_url.startsWith('/api') ? `${process.env.REACT_APP_BACKEND_URL}${room.music_url}` : room.music_url} autoPlay loop className="hidden" />
+          <audio
+            ref={audioElementRef}
+            src={room.music_url.startsWith('/api') ? `${process.env.REACT_APP_BACKEND_URL}${room.music_url}` : room.music_url}
+            autoPlay loop className="hidden"
+          />
         )}
       </div>
     </div>

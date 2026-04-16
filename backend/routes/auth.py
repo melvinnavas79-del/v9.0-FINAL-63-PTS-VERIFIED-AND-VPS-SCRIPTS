@@ -94,6 +94,34 @@ async def toggle_ghost_mode(user_id: str):
     await db.users.update_one({"id": user_id}, {"$set": {"ghost_mode": new_mode}})
     return {"success": True, "ghost_mode": new_mode}
 
+@router.get("/users/{user_id}/entry-animation")
+async def get_entry_animation(user_id: str):
+    """Get entry animation data based on user role and aristocracy level."""
+    user = await db.users.find_one({"id": user_id})
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    arist = user.get('aristocracy', 0)
+    level = user.get('level', 1)
+    role = user.get('role', 'usuario')
+
+    if role == 'dueño':
+        return {"animation": "storm", "emoji": "⛈️☔", "text": "⛈️ ¡LA TORMENTA DE LLUVIA LIVE! ☔ ¡EL DUEÑO HA LLEGADO!", "color": "gold", "special": True}
+    elif arist >= 9 or level >= 90:
+        return {"animation": "dragon", "emoji": "🐉", "text": "🐉 ¡EL DRAGÓN SUPREMO HA LLEGADO! 🐉", "color": "gold", "special": True}
+    elif arist >= 8 or level >= 80:
+        return {"animation": "phoenix", "emoji": "🔥🦅", "text": "🔥 ¡EL FÉNIX RENACE EN LA SALA! 🔥", "color": "red", "special": True}
+    elif arist >= 7 or level >= 70:
+        return {"animation": "lion", "emoji": "🦁", "text": "🦁 ¡EL LEÓN DE LA SELVA HA RUGIDO! 🦁", "color": "orange", "special": True}
+    elif arist >= 6 or level >= 60:
+        return {"animation": "tiger", "emoji": "🐅", "text": "🐅 ¡EL TIGRE ACECHA LA SALA! 🐅", "color": "amber", "special": True}
+    elif arist >= 5 or level >= 50:
+        return {"animation": "eagle", "emoji": "🦅", "text": "🦅 ¡EL ÁGUILA HA ATERRIZADO! 🦅", "color": "silver", "special": True}
+    elif arist >= 3 or level >= 30:
+        return {"animation": "fire", "emoji": "🔥", "text": "🔥 ¡Fuego en la sala!", "color": "orange", "special": False}
+    elif arist >= 1 or level >= 10:
+        return {"animation": "star", "emoji": "⭐", "text": f"⭐ {user['username']} llega con estilo", "color": "blue", "special": False}
+    return {"animation": "none", "emoji": "👋", "text": f"👋 {user['username']} entró a la sala", "color": "gray", "special": False}
+
 @router.get("/rankings/coins")
 async def get_coins_ranking():
     """Top 50 users by coins (excludes ghost mode users)."""
