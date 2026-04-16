@@ -99,9 +99,4 @@ certbot --nginx -d tu-dominio.com
 - agora-token-builder (tokens audio)
 
 ## Archivos a eliminar en produccion
-- server_backup.py
-- backend_test.py
-- test_reports/
-- test_result.md
-- memory/
-- .emergent/
+- server_backup.py (si existe)
