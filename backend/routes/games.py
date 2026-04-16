@@ -545,3 +545,28 @@ async def play_slot_machine(bet: GameBet):
         "net": net,
         "new_balance": updated_user['coins']
     }
+
+
+# ==================== LION VS TIGER (Dedicated) ====================
+
+@router.post("/games/lion-tiger/bet")
+async def lion_tiger_bet(user_id: str, amount: int):
+    """Deduct bet amount from user balance. Returns new balance."""
+    user = await db.users.find_one({"id": user_id})
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    if user.get('coins', 0) < amount:
+        raise HTTPException(status_code=400, detail="Monedas insuficientes")
+    await db.users.update_one({"id": user_id}, {"$inc": {"coins": -amount}})
+    updated = await db.users.find_one({"id": user_id})
+    return {"success": True, "new_balance": updated['coins']}
+
+@router.post("/games/lion-tiger/win")
+async def lion_tiger_win(user_id: str, amount: int):
+    """Add winnings to user balance. Returns new balance."""
+    user = await db.users.find_one({"id": user_id})
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    await db.users.update_one({"id": user_id}, {"$inc": {"coins": amount}})
+    updated = await db.users.find_one({"id": user_id})
+    return {"success": True, "new_balance": updated['coins']}
