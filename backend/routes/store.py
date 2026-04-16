@@ -1,11 +1,11 @@
 """
-Store routes: Packages, Stripe checkout, payment verification.
-Uses the official 'stripe' Python SDK directly. No third-party wrappers.
+Store routes: Coin packages, PayPal checkout, payment verification.
+Uses the official 'paypalrestsdk' Python SDK directly.
 """
 from fastapi import APIRouter, HTTPException, Request
 from database import db, uuid, datetime, timezone
 import os
-import stripe
+import paypalrestsdk
 
 router = APIRouter()
 
@@ -20,6 +20,21 @@ COIN_PACKAGES = {
 }
 
 
+def get_paypal_api():
+    """Configure PayPal SDK with env credentials."""
+    mode = os.environ.get('PAYPAL_MODE', 'sandbox')
+    client_id = os.environ.get('PAYPAL_CLIENT_ID', '')
+    client_secret = os.environ.get('PAYPAL_CLIENT_SECRET', '')
+    if not client_id or not client_secret:
+        return None
+    paypalrestsdk.configure({
+        "mode": mode,
+        "client_id": client_id,
+        "client_secret": client_secret,
+    })
+    return True
+
+
 @router.get("/store/packages")
 async def get_packages():
     """Get available coin packages."""
@@ -28,7 +43,7 @@ async def get_packages():
 
 @router.post("/store/checkout")
 async def create_checkout(package_id: str, user_id: str, request: Request):
-    """Create Stripe checkout session using the official stripe SDK."""
+    """Create PayPal payment for a coin package."""
     if package_id not in COIN_PACKAGES:
         raise HTTPException(status_code=400, detail="Paquete invalido")
 
@@ -37,109 +52,124 @@ async def create_checkout(package_id: str, user_id: str, request: Request):
     if not user:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
 
-    api_key = os.environ.get('STRIPE_API_KEY')
-    if not api_key:
-        raise HTTPException(status_code=500, detail="Stripe no configurado. Contacta a Soporte de Lluvia Live.")
+    if not get_paypal_api():
+        raise HTTPException(status_code=500, detail="PayPal no configurado. Contacta a Soporte de Lluvia Live.")
 
-    stripe.api_key = api_key
     origin_url = request.headers.get('origin', str(request.base_url).rstrip('/'))
-    success_url = f"{origin_url}?payment=success&session_id={{CHECKOUT_SESSION_ID}}"
-    cancel_url = f"{origin_url}?payment=cancelled"
+    tx_id = str(uuid.uuid4())
 
-    session = stripe.checkout.Session.create(
-        payment_method_types=["card"],
-        line_items=[{
-            "price_data": {
-                "currency": "usd",
-                "unit_amount": int(pkg['price'] * 100),
-                "product_data": {"name": pkg['name']},
+    payment = paypalrestsdk.Payment({
+        "intent": "sale",
+        "payer": {"payment_method": "paypal"},
+        "redirect_urls": {
+            "return_url": f"{origin_url}?payment=success&tx_id={tx_id}",
+            "cancel_url": f"{origin_url}?payment=cancelled",
+        },
+        "transactions": [{
+            "item_list": {
+                "items": [{
+                    "name": pkg['name'],
+                    "sku": package_id,
+                    "price": f"{pkg['price']:.2f}",
+                    "currency": "USD",
+                    "quantity": 1,
+                }]
             },
-            "quantity": 1,
+            "amount": {
+                "total": f"{pkg['price']:.2f}",
+                "currency": "USD",
+            },
+            "description": f"Lluvia Live - {pkg['name']}",
         }],
-        mode="payment",
-        success_url=success_url,
-        cancel_url=cancel_url,
-        metadata={"user_id": user_id, "package_id": package_id, "username": user['username']},
-    )
-
-    await db.payment_transactions.insert_one({
-        "id": str(uuid.uuid4()),
-        "session_id": session.id,
-        "user_id": user_id,
-        "username": user['username'],
-        "package_id": package_id,
-        "package_name": pkg['name'],
-        "amount": pkg['price'],
-        "currency": "usd",
-        "coins": pkg['coins'],
-        "diamonds": pkg.get('diamonds', 0),
-        "payment_status": "pending",
-        "created_at": datetime.now(timezone.utc).isoformat()
     })
 
-    return {"url": session.url, "session_id": session.id}
+    if payment.create():
+        # Find approval URL
+        approval_url = None
+        for link in payment.links:
+            if link.rel == "approval_url":
+                approval_url = link.href
+                break
+
+        await db.payment_transactions.insert_one({
+            "id": tx_id,
+            "paypal_payment_id": payment.id,
+            "user_id": user_id,
+            "username": user['username'],
+            "package_id": package_id,
+            "package_name": pkg['name'],
+            "amount": pkg['price'],
+            "currency": "usd",
+            "coins": pkg['coins'],
+            "diamonds": pkg.get('diamonds', 0),
+            "payment_status": "pending",
+            "created_at": datetime.now(timezone.utc).isoformat()
+        })
+
+        return {"url": approval_url, "payment_id": payment.id, "tx_id": tx_id}
+    else:
+        raise HTTPException(status_code=500, detail=f"Error de PayPal: {payment.error}")
 
 
-@router.get("/store/status/{session_id}")
-async def check_payment(session_id: str):
-    """Check payment status using Stripe SDK."""
-    api_key = os.environ.get('STRIPE_API_KEY')
-    if not api_key:
-        raise HTTPException(status_code=500, detail="Stripe no configurado")
+@router.post("/store/execute-payment")
+async def execute_payment(payment_id: str, payer_id: str):
+    """Execute PayPal payment after user approval."""
+    if not get_paypal_api():
+        raise HTTPException(status_code=500, detail="PayPal no configurado")
 
-    stripe.api_key = api_key
-    session = stripe.checkout.Session.retrieve(session_id)
+    payment = paypalrestsdk.Payment.find(payment_id)
 
-    tx = await db.payment_transactions.find_one({"session_id": session_id})
-    if tx and session.payment_status == 'paid' and tx.get('payment_status') != 'completed':
-        await db.payment_transactions.update_one(
-            {"session_id": session_id},
-            {"$set": {"payment_status": "completed"}}
-        )
-        pkg = COIN_PACKAGES.get(tx['package_id'], {})
-        await db.users.update_one(
-            {"id": tx['user_id']},
-            {"$inc": {"coins": pkg.get('coins', 0), "diamonds": pkg.get('diamonds', 0)}}
-        )
+    if payment.execute({"payer_id": payer_id}):
+        # Payment successful - deliver coins
+        tx = await db.payment_transactions.find_one({"paypal_payment_id": payment_id})
+        if tx and tx.get('payment_status') != 'completed':
+            await db.payment_transactions.update_one(
+                {"paypal_payment_id": payment_id},
+                {"$set": {"payment_status": "completed", "payer_id": payer_id}}
+            )
+            pkg = COIN_PACKAGES.get(tx['package_id'], {})
+            await db.users.update_one(
+                {"id": tx['user_id']},
+                {"$inc": {"coins": pkg.get('coins', 0), "diamonds": pkg.get('diamonds', 0)}}
+            )
+            return {"success": True, "coins_added": pkg.get('coins', 0), "diamonds_added": pkg.get('diamonds', 0)}
+        return {"success": True, "message": "Pago ya procesado"}
+    else:
+        raise HTTPException(status_code=500, detail=f"Error al ejecutar pago: {payment.error}")
 
-    return {"status": session.status, "payment_status": session.payment_status}
 
+@router.get("/store/status/{tx_id}")
+async def check_payment(tx_id: str):
+    """Check payment status by transaction ID."""
+    tx = await db.payment_transactions.find_one({"id": tx_id})
+    if not tx:
+        raise HTTPException(status_code=404, detail="Transaccion no encontrada")
 
-@router.post("/webhook/stripe")
-async def stripe_webhook(request: Request):
-    """Handle Stripe webhook events."""
-    body = await request.body()
-    sig = request.headers.get("Stripe-Signature", "")
-    api_key = os.environ.get('STRIPE_API_KEY')
-    webhook_secret = os.environ.get('STRIPE_WEBHOOK_SECRET', '')
-
-    if not api_key:
-        return {"status": "error", "message": "Stripe no configurado"}
-
-    stripe.api_key = api_key
-
-    try:
-        if webhook_secret:
-            event = stripe.Webhook.construct_event(body, sig, webhook_secret)
-        else:
-            import json
-            event = stripe.Event.construct_from(json.loads(body), stripe.api_key)
-
-        if event.type == 'checkout.session.completed':
-            session = event.data.object
-            if session.payment_status == 'paid':
-                tx = await db.payment_transactions.find_one({"session_id": session.id})
-                if tx and tx.get('payment_status') != 'completed':
+    # If pending, try to check PayPal status
+    if tx.get('payment_status') == 'pending' and tx.get('paypal_payment_id'):
+        if get_paypal_api():
+            try:
+                payment = paypalrestsdk.Payment.find(tx['paypal_payment_id'])
+                if payment.state == 'approved':
                     await db.payment_transactions.update_one(
-                        {"session_id": session.id},
-                        {"$set": {"payment_status": "completed"}}
+                        {"id": tx_id}, {"$set": {"payment_status": "completed"}}
                     )
                     pkg = COIN_PACKAGES.get(tx['package_id'], {})
                     await db.users.update_one(
                         {"id": tx['user_id']},
                         {"$inc": {"coins": pkg.get('coins', 0), "diamonds": pkg.get('diamonds', 0)}}
                     )
+                    return {"status": "completed", "payment_status": "paid"}
+            except Exception:
+                pass
 
-        return {"status": "ok"}
-    except Exception as e:
-        return {"status": "error", "message": str(e)}
+    return {"status": tx.get('payment_status', 'unknown'), "payment_status": tx.get('payment_status', 'unknown')}
+
+
+@router.get("/store/paypal-client-id")
+async def get_paypal_client_id():
+    """Return the PayPal Client ID for frontend SDK."""
+    client_id = os.environ.get('PAYPAL_CLIENT_ID', '')
+    if not client_id:
+        raise HTTPException(status_code=500, detail="PayPal no configurado")
+    return {"client_id": client_id}
