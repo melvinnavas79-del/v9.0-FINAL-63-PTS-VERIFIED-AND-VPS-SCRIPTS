@@ -5,12 +5,12 @@ import LudoGame from './LudoGame';
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 const GAME_IMAGES = {
-  tablita: 'https://static.prod-images.emergentagent.com/jobs/99d578fb-5926-4256-87ab-1ac36cc938b1/images/c3d50fb7daef574602dfa808b3ca651d9a893d98df30968efca120046da02cc3.png',
-  pk: 'https://static.prod-images.emergentagent.com/jobs/99d578fb-5926-4256-87ab-1ac36cc938b1/images/c2bf374aeac7beb5bee0543eecea7c123ec2ca0258f80994073aef7ad0d4dfa6.png',
-  ludo: 'https://static.prod-images.emergentagent.com/jobs/99d578fb-5926-4256-87ab-1ac36cc938b1/images/e6db59d2ec0616f95209ba1899746a1e15b0aef0b9edbe045e5c095a7eec169c.png',
-  uno: 'https://static.prod-images.emergentagent.com/jobs/99d578fb-5926-4256-87ab-1ac36cc938b1/images/bce1ce156d3a4d9f804f706a166433de1d6aa440b50c9b9461515a976f79538e.png',
+  tablita: '/api/uploads/game_tablita.png',
+  pk: '/api/uploads/game_pk.png',
+  ludo: '/api/uploads/game_ludo.png',
+  uno: '/api/uploads/game_uno.png',
   domino: 'https://images.unsplash.com/photo-1603290989526-572939369f38?w=400&h=200&fit=crop',
-  monster: 'https://static.prod-images.emergentagent.com/jobs/99d578fb-5926-4256-87ab-1ac36cc938b1/images/c12cd7f0f3ed3d00f61156fbbc1e0a136731d693b1b60c1c8f965c99a0cca0f2.png',
+  monster: '/api/uploads/game_monster.png',
   corona: 'https://images.unsplash.com/photo-1617300067484-314ed2cfd9a6?w=400&h=200&fit=crop',
   jackaroo: 'https://images.unsplash.com/photo-1723688958678-6c471759df97?w=400&h=200&fit=crop',
 };

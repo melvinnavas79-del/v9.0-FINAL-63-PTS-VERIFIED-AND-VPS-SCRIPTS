@@ -1,17 +1,54 @@
 """
 Bot routes: AI assistant, auto-reply, missions, room monitoring.
+Uses Google Generative AI SDK directly. No third-party wrappers.
 """
 from fastapi import APIRouter, HTTPException
 from database import db, BotMessage, WatchMission, uuid, datetime, timezone, create_notification
 import os
 
 try:
-    from emergentintegrations.llm.chat import LlmChat, UserMessage
+    from google import genai
+    GENAI_AVAILABLE = True
 except ImportError:
-    LlmChat = None
-    UserMessage = None
+    GENAI_AVAILABLE = False
 
 router = APIRouter()
+
+# In-memory session storage for conversation context
+_bot_sessions = {}
+
+async def gemini_chat(system_message: str, user_text: str, session_id: str = None):
+    """Send a message to Gemini using the official google-genai SDK."""
+    api_key = os.environ.get('GEMINI_API_KEY') or os.environ.get('GOOGLE_API_KEY')
+    if not api_key or not GENAI_AVAILABLE:
+        return "Bot no disponible. Configura GEMINI_API_KEY en el archivo .env"
+
+    client = genai.Client(api_key=api_key)
+
+    if session_id and session_id in _bot_sessions:
+        history = _bot_sessions[session_id]
+    else:
+        history = []
+        if session_id:
+            _bot_sessions[session_id] = history
+
+    history.append({"role": "user", "parts": [{"text": user_text}]})
+
+    response = client.models.generate_content(
+        model="gemini-2.0-flash",
+        contents=history,
+        config=genai.types.GenerateContentConfig(
+            system_instruction=system_message,
+            max_output_tokens=500,
+        )
+    )
+
+    reply = response.text or ""
+    history.append({"role": "model", "parts": [{"text": reply}]})
+    if len(history) > 20:
+        _bot_sessions[session_id] = history[-20:]
+
+    return reply
 
 @router.post("/bot/command")
 async def bot_command(msg: BotMessage):
@@ -94,16 +131,12 @@ REGLAS:
         notes_text = "\n".join(notes_lines)
         context += f"\n\nNOTAS GUARDADAS DEL DUEÑO:\n{notes_text}"
     
-    llm_key = os.environ.get('EMERGENT_LLM_KEY')
-    chat = LlmChat(
-        api_key=llm_key,
-        session_id=f"admin_bot_{msg.admin_id}",
-        system_message=f"Eres el Bot personal de Melvin, dueño de Lluvia Live. Eres su amigo y asistente. Hablas de cualquier tema: noticias, consejos, chistes, tecnologia, vida, lo que sea. Eres como Gemini o ChatGPT pero con personalidad amigable y en español. Tambien administras Lluvia Live. Tu dueño te habla por voz y la app lee tus respuestas en voz alta, asi que responde de forma natural y conversacional. NUNCA digas que no puedes hablar por voz porque SI PUEDES. Si te piden una accion de la app, responde SOLO con el JSON de accion. Si es conversacion normal o preguntas de cualquier tema, responde como amigo. Se conciso.\n\n{context}"
+    llm_key = os.environ.get('GEMINI_API_KEY') or os.environ.get('GOOGLE_API_KEY')
+    response = await gemini_chat(
+        system_message=f"Eres el Bot personal de Melvin, dueño de Lluvia Live. Eres su amigo y asistente. Hablas de cualquier tema: noticias, consejos, chistes, tecnologia, vida, lo que sea. Eres como Gemini o ChatGPT pero con personalidad amigable y en español. Tambien administras Lluvia Live. Tu dueño te habla por voz y la app lee tus respuestas en voz alta, asi que responde de forma natural y conversacional. NUNCA digas que no puedes hablar por voz porque SI PUEDES. Si te piden una accion de la app, responde SOLO con el JSON de accion. Si es conversacion normal o preguntas de cualquier tema, responde como amigo. Se conciso.\n\n{context}",
+        user_text=msg.message,
+        session_id=f"admin_bot_{msg.admin_id}"
     )
-    chat.with_model("gemini", "gemini-2.5-flash")
-    
-    user_msg = UserMessage(text=msg.message)
-    response = await chat.send_message(user_msg)
     
     # Check if response has action
     action_result = None
@@ -375,14 +408,12 @@ async def bot_reply_in_room(admin_id: str, room_id: str, question: str):
     if not room:
         raise HTTPException(status_code=404, detail="Sala no encontrada")
     
-    llm_key = os.environ.get('EMERGENT_LLM_KEY')
-    chat = LlmChat(
-        api_key=llm_key,
-        session_id=f"bot_room_{room_id}",
-        system_message="Eres el Bot oficial de Lluvia Live. Eres amigable, divertido y ayudas a todos en la sala. Respondes en español, de forma corta y natural. No reveles informacion privada del dueño."
+    llm_key = os.environ.get('GEMINI_API_KEY') or os.environ.get('GOOGLE_API_KEY')
+    response = await gemini_chat(
+        system_message="Eres el Bot oficial de Lluvia Live. Eres amigable, divertido y ayudas a todos en la sala. Respondes en español, de forma corta y natural. No reveles informacion privada del dueño.",
+        user_text=question,
+        session_id=f"bot_room_{room_id}"
     )
-    chat.with_model("gemini", "gemini-2.5-flash")
-    response = await chat.send_message(UserMessage(text=question))
     
     chat_doc = {
         "id": str(uuid.uuid4()), "room_id": room_id,
@@ -662,12 +693,9 @@ async def bot_auto_reply(room_id: str, username: str, text: str):
     chat_context = "\n".join([f"{m.get('username','')}: {m.get('text','')}" for m in recent if m.get('text')])
     
     try:
-        llm_key = os.environ.get('EMERGENT_LLM_KEY')
+        llm_key = os.environ.get('GEMINI_API_KEY') or os.environ.get('GOOGLE_API_KEY')
         personality = mode_prompts.get(bot_mode, mode_prompts['normal'])
-        chat = LlmChat(
-            api_key=llm_key,
-            session_id=f"bot_auto_{room_id}_{bot_mode}",
-            system_message=f"""Eres Bot Lluvia en una sala de chat en vivo de Lluvia Live.
+        system_msg = f"""Eres Bot Lluvia en una sala de chat en vivo de Lluvia Live.
 {personality}
 Respondes en español. MAXIMO 1-2 oraciones. Se breve.
 NO digas que eres IA. Actua como persona real.
@@ -678,9 +706,11 @@ Chat reciente:
 
 {username} dice: {text}
 Responde brevemente:"""
+        response = await gemini_chat(
+            system_message=system_msg,
+            user_text=f"{username}: {text}",
+            session_id=f"bot_auto_{room_id}_{bot_mode}"
         )
-        chat.with_model("gemini", "gemini-2.5-flash")
-        response = await chat.send_message(UserMessage(text=f"{username}: {text}"))
         
         if response and response.strip():
             await db.room_chat.insert_one({

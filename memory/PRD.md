@@ -1,72 +1,56 @@
 # Lluvia Live - Product Requirements Document
 
 ## Original Problem Statement
-Full-stack social audio streaming platform ("Lluvia Live") with:
-- Audio Streaming Rooms via Agora.io (Mic/Speaker, auto-mute, no duplicate seats)
-- Gamification: VIP Entrances, Aristocracy levels, CP (Couples) system, Clanes
-- Economy: Coins, Diamonds, Stripe Payments, Treasure Chests, Coin rains
-- Interactive Mini-games: Ludo, Lion vs Tiger, and other casino/betting style games
-- Master Control Panel: Manage users, voices, prizes, configurations
-- Autonomous AI Admin Bot: Global floating bot + in-room moderation
-- PWA, Android build script, iOS setup
-- Brand: "Lluvia Live" with zero third-party branding
-- Automatic Badge/Medal system (29 achievements across 7 categories)
+Full-stack social audio streaming platform ("Lluvia Live") - 100% autónomo e independiente.
 
-## Tech Stack
-- Frontend: React.js, TailwindCSS, JS viewport scaling for Android PWA
-- Backend: FastAPI, Motor (Async MongoDB), Modular Routers
-- Real-time Audio: Agora.io WebRTC
-- AI Bot: Gemini via Emergent LLM Key
-- Payments: Stripe
-- Database: MongoDB
+## Tech Stack (100% Directo, Sin Wrappers)
+- Frontend: React.js, TailwindCSS
+- Backend: FastAPI, Motor (MongoDB async)
+- Pagos: **stripe** (SDK oficial de Python)
+- Bot AI: **google-genai** (SDK oficial de Google)
+- Audio: Agora.io WebRTC
+- Base de datos: MongoDB
 
-## Architecture
+## Dependencias Directas (Sin intermediarios)
+- `stripe` → Pagos con tarjeta
+- `google-genai` → Bot AI con Gemini
+- `agora-token-builder` → Tokens de audio
+- `bcrypt` → Contraseñas
+- `motor` → MongoDB async
+- `fastapi` / `uvicorn` → Servidor
+
+## Variables de Entorno del Backend (.env)
 ```
-/app/backend/
-  server.py          - Clean entry point
-  database.py        - MongoDB, models, helpers
-  routes/
-    auth.py          - Register, Login, User profile, Entry animations
-    rooms.py         - Room CRUD, Seats, Chat, Photos, Agora tokens
-    games.py         - All games, PK battles, Lion vs Tiger
-    bot.py           - AI Bot, missions, monitoring
-    events.py        - King/CP events, cashback
-    admin.py         - Console, roles, config
-    social.py        - Clanes, Parejas, Gifts, Sobres, Cofres
-    store.py         - Stripe checkout
-    notifications.py - Notification CRUD
-    badges.py        - Automatic badge/medal system (29 badges)
+MONGO_URL=mongodb://localhost:27017
+DB_NAME=lluvia_live_db
+CORS_ORIGINS=https://tu-dominio.com
+AGORA_APP_ID=tu_app_id
+AGORA_APP_CERTIFICATE=tu_certificate
+STRIPE_API_KEY=sk_live_tu_clave
+STRIPE_WEBHOOK_SECRET=whsec_tu_secret
+GEMINI_API_KEY=tu_clave_google_ai
 ```
 
-## What's Been Implemented (Complete)
-- Full auth system (register, login, case-insensitive)
-- Audio rooms with Agora WebRTC (9 seats, auto-mute)
-- Complete gamification (aristocracy, VIP levels, CP, clanes)
-- Economy (coins, diamonds, gifts, sobres, cofres)
-- 12 interactive mini-games including Lion vs Tiger casino
-- AI Admin Bot with Gemini integration
-- Event request/approval system (King, CP)
-- Control Panel for admin management
-- Stripe payment integration
-- Notification system
-- Android Studio build skeleton, iOS project structure
-- Comprehensive Pytest test suite
-- Entry announcements & VIP hierarchy (role-based)
-- Gift deduction bug fixed (BIG_GIFTS)
-- Lion vs Tiger multiplier math verified (x2/x5)
-- iOS buttons fixed (44px minimum touch targets)
-- Gift float animations + chat bubble animations
-- Audio cleanup on room leave/unmount
-- Number formatting (K, M, B) across all views
-- Automatic Badge System (29 badges, 7 categories, auto-award)
-- Badge display in profile with collection grid
+## Lo que se ha completado
+- Sistema de auth (login, registro, case-insensitive)
+- Salas de audio con Agora WebRTC (9 asientos, auto-mute)
+- Gamificación (aristocracia, VIP, CP, clanes)
+- Economía (monedas, diamantes, regalos, sobres, cofres)
+- 12 mini-juegos incluyendo Lion vs Tiger casino
+- Bot AI con Gemini (SDK directo google-genai)
+- Sistema de eventos King/CP con aprobación
+- Panel de control administrativo
+- Pagos con Stripe (SDK directo)
+- Sistema de notificaciones
+- 29 medallas automáticas en 7 categorías
+- Anuncios de entrada por rol (dueño, admin, VIP, aristocracia)
+- Formato de números K/M/B
+- Limpieza de audio al salir de sala
+- Código 100% limpio sin dependencias de terceros innecesarias
+- Imágenes de juegos almacenadas localmente en /uploads/
 
-## Remaining Backlog
-### P1
-- TTS Voice Integration (Google Cloud/Azure) for natural bot voices
-
-### P2
-- More casino mini-games
-- Enhanced StorePage with actual Stripe product catalog
-- Push notifications
-- More entry animations per aristocracy level
+## Archivos a eliminar en producción
+- `server_backup.py` (monolito antiguo)
+- `backend_test.py` (tests de desarrollo)
+- `test_reports/` (reportes de testing)
+- `memory/` (archivos de desarrollo)
