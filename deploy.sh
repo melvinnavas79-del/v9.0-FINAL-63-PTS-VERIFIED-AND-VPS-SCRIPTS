@@ -37,7 +37,17 @@ echo "[3/8] Configurando backend..."
 cd $APP_DIR/backend
 python3 -m venv venv
 source venv/bin/activate
-pip install -r requirements.txt
+
+# Limpiar cualquier pip.conf con indices externos
+mkdir -p /root/.config/pip
+echo "[global]" > /root/.config/pip/pip.conf
+echo "# Solo PyPI oficial" >> /root/.config/pip/pip.conf
+
+# Instalar SOLO desde PyPI oficial
+pip install --index-url https://pypi.org/simple/ -r requirements.txt
+
+# Verificar que NO se instalo emergentintegrations
+pip uninstall -y emergentintegrations 2>/dev/null || true
 
 # Verificar que .env existe
 if [ ! -f .env ]; then
