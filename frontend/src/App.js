@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import "@/App.css";
+import "./App.css";
 import { UserProvider, useUser } from './contexts/UserContext';
 import LoginPage from './pages/LoginPage';
 import Dashboard from './pages/Dashboard';
