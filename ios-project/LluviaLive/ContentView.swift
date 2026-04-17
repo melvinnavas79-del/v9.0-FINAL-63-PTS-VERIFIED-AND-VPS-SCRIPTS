@@ -13,7 +13,7 @@ struct LluviaLiveApp: App {
 
 struct ContentView: View {
     var body: some View {
-        WebView(url: URL(string: "https://lluvialive.com")!)
+        WebView(url: URL(string: "https://lluvia-live.com")!)
             .edgesIgnoringSafeArea(.all)
     }
 }

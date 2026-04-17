@@ -10,7 +10,7 @@ echo "  LLUVIA LIVE - Instalacion en Servidor"
 echo "============================================="
 
 # Variables - EDITAR ANTES DE EJECUTAR
-DOMAIN="lluvialive.com"
+DOMAIN="lluvia-live.com"
 APP_DIR="/root/lluvia-live"
 REPO_URL="PEGA_TU_URL_DE_GITHUB_AQUI"
 
