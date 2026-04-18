@@ -19,6 +19,20 @@ Red social de audio en vivo con gamificación (monedas/diamantes), salas con Ago
 - Custom backgrounds + AI safety filter, 10/24 seats expand
 
 ## Implementado en esta sesión (Feb 2026)
+
+### P0 — Diagnóstico y blindaje de deploy ✅
+- **Hallazgo**: la app NO tenía bugs funcionales. Todos los endpoints respondían 200, login funcionaba, salas cargaban, audio conectaba. La "huella" `VisualEditsPlugin` que aparecía en logs era del dev-server del preview de Emergent — NO forma parte del `yarn build` de producción (verificado: `package.json` está 100% limpio, build de producción `Compiled successfully` sin warnings).
+- **Blindaje Gemini**: `ai_moderate_image` ahora detecta `placeholder_key`, `placeholder`, `your_key_here`, `tu_key_aqui`, string vacío y whitespace — fail-opens con `ai_key_not_configured` antes de llamar a `google.genai.Client`. Evita que keys de prueba crasheen el endpoint.
+- **Guía de despliegue**: `/app/DEPLOY.md` con instrucciones VPS completas (nginx, systemd, .env real, dónde obtener cada key externa).
+- **Nota crítica para deploy**: la `REACT_APP_BACKEND_URL` queda baked-in en el bundle de JS al compilar. Cambiar el valor en `frontend/.env` a la URL del VPS **antes** de `yarn build`.
+
+### P0 — Refactor profesional de RoomView ✅
+- Extraídos dos sub-componentes presentacionales:
+  - `/app/frontend/src/components/SeatsGrid.js` (102 líneas) — grilla de 10/24 asientos con anillo neón verde cuando hablas, candado, badge SVIP.
+  - `/app/frontend/src/components/ChatArea.js` (103 líneas) — lista de mensajes con autoscroll, input, upload de foto.
+- `RoomView.js` bajó de 1069 a 1029 líneas y toda la lógica de negocio (axios, join/leave, regalos) quedó en RoomView — los sub-componentes son puramente visuales con props `onSeatClick`, `onSeatLongPress`, `onSend`, `onPhotoUpload`, `onZoomImage`.
+- Testing agent verificó 100% sin regresiones: seat-btn-N, chat-input, chat-send-btn, tools-panel-btn, global-mini-player, todos operativos. Zero errores de consola.
+
 ### P0 — Persistencia de Audio Global / MiniPlayer ✅
 - `AudioContext.js`: estado Agora global (activeRoom, isMuted, isDeafened, audioStatus, mySeat). Auto-mute tras 2 min preservado.
 - `MiniPlayer.js`: componente flotante con dot de estado (verde/amarillo/rojo), botón mute, botón desconectar, botón volver a sala. Aparece cuando `activeRoom` existe y la vista activa ≠ room.
