@@ -793,51 +793,73 @@ const RoomView = ({ roomId, onBack }) => {
         />
       )}
 
-      {/* SEATS - 10 seats grid */}
-      <div className="flex-shrink-0 px-3 mb-1 overflow-y-auto" style={{maxHeight: '34vh'}}>
+      {/* SEATS - Dynamic grid (10 or 24) */}
+      <div className="flex-shrink-0 px-2 mb-1 overflow-y-auto" style={{maxHeight: '38vh'}}>
         {/* Owner controls */}
         {room.owner_id === user.id && (
-          <div className="flex gap-1 mb-1 justify-end">
-            <button onClick={async () => { await axios.post(`${API}/rooms/${roomId}/lock-all?owner_id=${user.id}`); loadRoom(); }}
-              className="text-[9px] bg-red-500/20 text-red-300 px-2 py-1 rounded-lg">Cerrar Todo</button>
-            <button onClick={async () => { await axios.post(`${API}/rooms/${roomId}/unlock-all?owner_id=${user.id}`); loadRoom(); }}
-              className="text-[9px] bg-green-500/20 text-green-300 px-2 py-1 rounded-lg">Abrir Todo</button>
+          <div className="flex gap-1 mb-1 justify-between">
+            <div className="flex gap-1">
+              <button onClick={async () => { await axios.post(`${API}/rooms/${roomId}/lock-all?owner_id=${user.id}`); loadRoom(); }}
+                className="text-[9px] bg-red-500/20 text-red-300 px-2 py-1 rounded-lg active:scale-95">Cerrar</button>
+              <button onClick={async () => { await axios.post(`${API}/rooms/${roomId}/unlock-all?owner_id=${user.id}`); loadRoom(); }}
+                className="text-[9px] bg-green-500/20 text-green-300 px-2 py-1 rounded-lg active:scale-95">Abrir</button>
+            </div>
+            {user.role === 'dueño' && (
+              <button onClick={async () => {
+                const newSize = (room.max_seats || 10) === 10 ? 24 : 10;
+                await axios.post(`${API}/rooms/${roomId}/expand-seats?admin_id=${user.id}&max_seats=${newSize}`);
+                loadRoom();
+              }} data-testid="toggle-event-mode"
+                className={`text-[9px] px-3 py-1 rounded-lg font-bold active:scale-95 ${(room.max_seats || 10) === 24 ? 'bg-yellow-500/30 text-yellow-300 border border-yellow-500/30' : 'bg-blue-500/20 text-blue-300'}`}>
+                {(room.max_seats || 10) === 24 ? '24 Mics (Evento)' : '10 Mics → 24'}
+              </button>
+            )}
           </div>
         )}
-        <div className="grid grid-cols-5 gap-1.5">
-          {(room.seats || []).slice(0, 10).map((seat, i) => {
-            const isLocked = room.seat_locks?.[i];
-            return (
-            <button key={i} data-testid={`seat-btn-${i}`}
-              onClick={() => {
-                if (isLocked && room.owner_id === user.id) { axios.post(`${API}/rooms/${roomId}/lock-seat?owner_id=${user.id}&seat_index=${i}`).then(() => loadRoom()); return; }
-                if (isLocked) return;
-                if (seat?.user_id === user.id) leaveSeat(); else if (seat) openGiftPanel(seat); else joinSeat(i);
-              }}
-              onContextMenu={(e) => { e.preventDefault(); if (seat) setProfileTarget(seat); }}
-              className={`relative h-[72px] rounded-xl border transition-all ${isLocked && !seat ? 'bg-red-500/5 border-red-500/20' : seat ? seat.user_id === user.id ? 'bg-green-500/10 border-green-500/30' : 'bg-white/[0.03] border-white/[0.08]' : 'bg-white/[0.02] border-white/[0.05]'}`}>
-              <div className="flex flex-col items-center justify-center h-full">
-                {seat ? (
-                  <>
-                    <img src={seat.avatar} alt="" className="w-10 h-10 rounded-full object-cover" onClick={(e) => { e.stopPropagation(); setProfileTarget(seat); }} />
-                    <div className="flex items-center gap-0.5 mt-0.5">
-                      {seat.country_flag && <span className="text-[8px]">{seat.country_flag}</span>}
-                      {seat.svip_level > 0 && <span className="text-[6px] bg-yellow-500/80 text-white px-0.5 rounded">S{seat.svip_level}</span>}
-                      <span className="text-white text-[9px] truncate max-w-[50px] font-medium">{seat.username}</span>
+        {(() => {
+          const maxSeats = room.max_seats || 10;
+          const seats = (room.seats || []).slice(0, maxSeats);
+          const cols = maxSeats <= 10 ? 5 : 6;
+          const seatSize = maxSeats <= 10 ? 'h-[72px]' : 'h-[62px]';
+          const avatarSize = maxSeats <= 10 ? 'w-10 h-10' : 'w-8 h-8';
+          const fontSize = maxSeats <= 10 ? 'text-[9px]' : 'text-[7px]';
+          return (
+            <div className={`grid gap-1`} style={{gridTemplateColumns: `repeat(${cols}, 1fr)`}}>
+              {seats.map((seat, i) => {
+                const isLocked = room.seat_locks?.[i];
+                return (
+                  <button key={i} data-testid={`seat-btn-${i}`}
+                    onClick={() => {
+                      if (isLocked && room.owner_id === user.id) { axios.post(`${API}/rooms/${roomId}/lock-seat?owner_id=${user.id}&seat_index=${i}`).then(() => loadRoom()); return; }
+                      if (isLocked) return;
+                      if (seat?.user_id === user.id) leaveSeat(); else if (seat) openGiftPanel(seat); else joinSeat(i);
+                    }}
+                    onContextMenu={(e) => { e.preventDefault(); if (seat) setProfileTarget(seat); }}
+                    className={`relative ${seatSize} rounded-xl border transition-all ${isLocked && !seat ? 'bg-red-500/5 border-red-500/20' : seat ? seat.user_id === user.id ? 'bg-green-500/10 border-green-500/30' : 'bg-white/[0.03] border-white/[0.08]' : 'bg-white/[0.02] border-white/[0.05]'}`}>
+                    <div className="flex flex-col items-center justify-center h-full">
+                      {seat ? (
+                        <>
+                          <img src={seat.avatar} alt="" className={`${avatarSize} rounded-full object-cover`} onClick={(e) => { e.stopPropagation(); setProfileTarget(seat); }} />
+                          <div className="flex items-center gap-0.5 mt-0.5">
+                            {seat.country_flag && <span className={fontSize}>{seat.country_flag}</span>}
+                            {seat.svip_level > 0 && <span className="text-[5px] bg-yellow-500/80 text-white px-0.5 rounded">S{seat.svip_level}</span>}
+                            <span className={`text-white ${fontSize} truncate max-w-[45px] font-medium`}>{seat.username}</span>
+                          </div>
+                          {seat.user_id !== user.id && <div className="absolute bottom-0 right-0 text-[8px]">🎁</div>}
+                          {seat.user_id === user.id && <div className={`absolute top-0.5 right-0.5 w-3.5 h-3.5 rounded-full flex items-center justify-center text-[7px] ${isMuted ? 'bg-red-500' : 'bg-green-500'}`}>{isMuted ? '🔇' : '🎤'}</div>}
+                        </>
+                      ) : isLocked ? (
+                        <div className="text-red-400/40 text-sm">🔒</div>
+                      ) : (
+                        <div className="text-white/15 text-xs font-medium">{i + 1}</div>
+                      )}
                     </div>
-                    {seat.user_id !== user.id && <div className="absolute bottom-0.5 right-0.5 text-[10px]">🎁</div>}
-                    {seat.user_id === user.id && <div className={`absolute top-0.5 right-0.5 w-4 h-4 rounded-full flex items-center justify-center text-[8px] ${isMuted ? 'bg-red-500' : 'bg-green-500'}`}>{isMuted ? '🔇' : '🎤'}</div>}
-                  </>
-                ) : isLocked ? (
-                  <div className="text-red-400/40 text-lg">🔒</div>
-                ) : (
-                  <div className="text-white/15 text-sm font-medium">{i + 1}</div>
-                )}
-              </div>
-            </button>
-            );
-          })}
-        </div>
+                  </button>
+                );
+              })}
+            </div>
+          );
+        })()}
       </div>
 
       {/* CHAT */}

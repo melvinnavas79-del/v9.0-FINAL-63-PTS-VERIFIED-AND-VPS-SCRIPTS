@@ -393,9 +393,32 @@ async def unlock_all_seats(room_id: str, owner_id: str):
         raise HTTPException(status_code=404, detail="Sala no encontrada")
     if room['owner_id'] != owner_id:
         raise HTTPException(status_code=403, detail="Solo el dueno de la sala")
-    locks = [False] * 10
+    max_seats = room.get('max_seats', 10)
+    locks = [False] * max_seats
     await db.rooms.update_one({"id": room_id}, {"$set": {"seat_locks": locks}})
     return {"success": True, "seat_locks": locks}
+
+@router.post("/rooms/{room_id}/expand-seats")
+async def expand_seats(room_id: str, admin_id: str, max_seats: int = 24):
+    """Expand room to 24 seats (Modo Evento). Only dueño can activate."""
+    admin = await db.users.find_one({"id": admin_id})
+    if not admin or admin.get('role') != 'dueño':
+        raise HTTPException(status_code=403, detail="Solo el dueno de Lluvia Live puede activar Modo Evento")
+    if max_seats not in (10, 24):
+        raise HTTPException(status_code=400, detail="Solo 10 o 24 asientos permitidos")
+    room = await db.rooms.find_one({"id": room_id})
+    if not room:
+        raise HTTPException(status_code=404, detail="Sala no encontrada")
+    current_seats = room.get('seats', [])
+    current_locks = room.get('seat_locks', [])
+    if max_seats > len(current_seats):
+        current_seats.extend([None] * (max_seats - len(current_seats)))
+        current_locks.extend([False] * (max_seats - len(current_locks)))
+    elif max_seats < len(current_seats):
+        current_seats = current_seats[:max_seats]
+        current_locks = current_locks[:max_seats]
+    await db.rooms.update_one({"id": room_id}, {"$set": {"max_seats": max_seats, "seats": current_seats, "seat_locks": current_locks}})
+    return {"success": True, "max_seats": max_seats}
 
 # ==================== AGORA TOKEN ====================
 

@@ -182,6 +182,7 @@ def serialize_room(room: Dict[str, Any]) -> Dict[str, Any]:
         "owner_name": room.get("owner_name", ""),
         "owner_svip": room.get("owner_svip", 0),
         "active_users": room.get("active_users", 0),
+        "max_seats": room.get("max_seats", 10),
         "seats": room.get("seats", [None]*10),
         "seat_locks": room.get("seat_locks", [False]*10),
         "background": room.get("background"),
