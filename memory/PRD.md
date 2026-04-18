@@ -18,6 +18,12 @@ Red social de audio en vivo con gamificación (monedas/diamantes), salas con Ago
 - SVIP hierarchy (1-10), Device/IP banning, Regional selectors
 - Custom backgrounds + AI safety filter, 10/24 seats expand
 
+### P0 — Limpieza visual de la sala (Feb 2026) ✅
+- **Eliminados botones duplicados** de la barra superior de RoomView: `bar-cofres`, `bar-sobres`, `bar-juegos`, `bar-tienda`. Toda la acción ahora vive en el ToolsPanel. Solo queda el indicador de monedas 💰 y (para el dueño) el botón `bar-fondo`.
+- **GameResultToast** (`/app/frontend/src/components/GameResultToast.js`): toast flotante premium con animación grt-in cubic-bezier, fondo glass, bordes dorados cuando se gana. Muestra dados reales dibujados con puntos (DiceFace 1-6), reels de slots o multiplicador. Auto-dismiss ~3.2s.
+- **Bug fix backend `/api/games/play` para `dados`**: `play_generic` ahora tiene rama explícita que rolea 2 dados aleatorios y devuelve `game_data={dice1,dice2,total}`. Gana si total ≥ 8 (mult 2 para 8-10, mult 3 para 11-12).
+- **ToolsPanel BubbleCircle** repotenciado con 3 capas de highlights para look 3D/glossy Grandes Ligas: top specular gloss, punto especular, rim shadow inferior.
+
 ## Implementado en esta sesión (Feb 2026)
 
 ### P0 — Diagnóstico y blindaje de deploy ✅
