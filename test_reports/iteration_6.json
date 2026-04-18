@@ -1,0 +1,36 @@
+{
+  "summary": "Iteration 6 — Validated PayPal LIVE config/status, Agora token generation, complete Levels module (me/leaderboard/heartbeat+throttle), XP integration for games (dados win) and gifts (sender+receiver), and auth smoke. All 9 backend pytest tests PASS against the public URL. Frontend code review confirms LevelBadge (data-testid=level-badge), ToolsPanel voz rename (data-testid=tool-voz with dynamic ON/OFF label), useTTS hook with localStorage key 'lluvia_tts_enabled', and RoomView integration are correctly wired. Could not fully exercise in-room UI via headless Playwright (login cycle + SPA room-card navigation not selector-friendly without room-card data-testid); static code inspection verified the integration.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Home (room list)", "issues": ["Popular room cards lack a data-testid (e.g. room-card-{id}) which makes them hard to drive from automated tests. Suggest adding data-testid=room-card-{room_id} to each card wrapper."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration_6.py",
+    "/app/test_reports/pytest/iteration_6.xml"
+  ],
+  "action_items": [
+    "(Optional) Add data-testid=\"room-card-{id}\" to popular/recent/mine room cards for robust E2E entry into RoomView.",
+    "(Optional) Add data-testid=\"home-link\" or \"enter-room-btn\" for simpler automated navigation.",
+    "No functional fixes required — all features requested by Melvin are working on backend; frontend code is correctly wired."
+  ],
+  "critical_code_review_comments": [
+    "routes/levels.py add_xp() correctly computes level-up, grants milestone coins (LEVEL_REWARDS), and inserts a 'level_up' notification. Level 1->2 requires 141 XP (100*1^1.5=100 wrong — actually xp_needed_for_level(2)=int(100*1^1.5)=100, not 141 as stated in docstring). VERIFY: xp_needed_for_level(2)=100, (3)=282, etc. Docstring says 141 but code returns 100. Low priority: docstring-only drift.",
+    "routes/games.py record_daily_win awards XP on any win with 3 + bet//100 formula as documented.",
+    "routes/social.py send_gift awards 2*cost XP to sender and 1*cost XP to receiver — this is VERY generous (a 100-coin rosa gives 200 XP to sender). Consider dividing by 100 if level curve is meant to scale like the docstring says ('2 XP por cada moneda gastada' matches the code literally; just confirm this is intended balancing).",
+    "routes/levels.py heartbeat uses a 55s throttle window and 10 XP/tick (~10.9 XP/min). Correctly returns {throttled:true, seconds_until_next} on early recall.",
+    "ToolsPanel.js tool-voz label switches between 'Voz ON' and 'Voz OFF' based on ttsEnabled prop; data-testid='tool-voz' correctly generated from id.",
+    "LevelBadge.js polls /api/levels/me/{userId} every 30s, has data-testid='level-badge' and colored progress bar. RoomView.js line 871 renders <LevelBadge userId={user.id}/> in the header."
+  ],
+  "updated_files": ["/app/backend/tests/test_iteration_6.py"],
+  "success_rate": {"backend": "100% (9/9 pytest passed)", "frontend": "code-review only — features wired correctly; live UI not drill-tested because of SPA auth+navigation complexity in headless mode"},
+  "test_credentials": "Melvin_Live / test123 (owner id b45958bc-2c6b-49ea-8102-a11197001e53).",
+  "seed_data_creation": "None — reused owner.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend fully validated for iteration 6 (PayPal live, Agora, Levels). For frontend UI automation in future runs, ask main agent to add data-testid='room-card-{id}' to each room card wrapper in Home.js / PopularList so Playwright can click and enter a room reliably. Useful fixture flow: POST /api/login -> get user.id -> GET /api/rooms to pick a live room id -> navigate directly to /room/{room_id} rather than clicking through the home list. test_iteration_6.py is the single source of truth for this iteration's backend regression.",
+  "rca of the issue": "No bugs found. Minor doc-vs-code drift: levels.py docstring mentions 'Nivel 1 -> 2: 141 XP' but xp_needed_for_level(2) = int(100 * 1^1.5) = 100. Either tweak the formula to 100*(level-1)^1.5 + something, or update the docstring. Does not affect behavior — leveling still works; just thresholds are a bit lower than documented."
+}

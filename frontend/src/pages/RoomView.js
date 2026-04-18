@@ -12,6 +12,9 @@ import ToolsPanel from '../components/ToolsPanel';
 import SeatsGrid from '../components/SeatsGrid';
 import ChatArea from '../components/ChatArea';
 import GameResultToast from '../components/GameResultToast';
+import LevelBadge from '../components/LevelBadge';
+import useLevelHeartbeat from '../hooks/useLevelHeartbeat';
+import useTTS from '../hooks/useTTS';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -61,6 +64,12 @@ const RoomView = ({ roomId, onBack }) => {
   const [globalBanner, setGlobalBanner] = useState(null);
   const [toolsOpen, setToolsOpen] = useState(false);
   const [effectBurst, setEffectBurst] = useState(null);
+
+  // Level-up: heartbeat cuando hay mic activo
+  useLevelHeartbeat({ userId: user?.id, isInRoomMicActive: mySeat !== null && !isMuted });
+  // TTS nativo (Web Speech API) - lee los mensajes de chat entrantes si está activo
+  const tts = useTTS();
+  const lastSpokenRef = useRef(0);
 
   const photoRef = useRef(null);
   const musicRef = useRef(null);
@@ -132,7 +141,21 @@ const RoomView = ({ roomId, onBack }) => {
   const loadChat = async () => {
     try {
       const r = await axios.get(`${API}/rooms/${roomId}/chat?limit=30&user_id=${user.id}`);
-      setChatMessages(r.data);
+      const newMessages = r.data;
+      // TTS nativo: leer los mensajes nuevos (no los propios) cuando TTS esté activo
+      if (tts.enabled) {
+        const prevLast = lastSpokenRef.current;
+        newMessages.forEach((m) => {
+          const ts = new Date(m.created_at || 0).getTime();
+          if (ts > prevLast && m.user_id !== user.id && m.type !== 'photo' && m.text) {
+            tts.speak(`${m.username}: ${m.text}`);
+          }
+        });
+        if (newMessages.length) {
+          lastSpokenRef.current = Math.max(...newMessages.map(m => new Date(m.created_at || 0).getTime()));
+        }
+      }
+      setChatMessages(newMessages);
     } catch (e) {}
   };
   const markJoinAndLoadChat = async () => {
@@ -432,6 +455,10 @@ const RoomView = ({ roomId, onBack }) => {
       case 'switch': toggleGhostMode(); break;
       case 'clear': setChatMessages([]); break;
       case 'music': musicRef.current?.click(); break;
+      case 'voz':
+        tts.setEnabled(!tts.enabled);
+        if (!tts.enabled) tts.speak('Voz activada');
+        break;
       case 'effect': triggerEffect(); break;
       default: break;
     }
@@ -462,7 +489,7 @@ const RoomView = ({ roomId, onBack }) => {
       {premiumAnim && <PremiumGiftAnimation giftType={premiumAnim.type} senderName={premiumAnim.sender} onComplete={() => setPremiumAnim(null)} />}
 
       {/* TOOLS PANEL — Premium glass panel with 8 circular tools */}
-      <ToolsPanel open={toolsOpen} onClose={() => setToolsOpen(false)} onAction={handleToolAction} />
+      <ToolsPanel open={toolsOpen} onClose={() => setToolsOpen(false)} onAction={handleToolAction} ttsEnabled={tts.enabled} />
 
       {/* GAME RESULT TOAST — feedback visual premium para Número/Dado/Mora */}
       <GameResultToast result={gameResult} onDone={() => setGameResult(null)} />
@@ -840,8 +867,11 @@ const RoomView = ({ roomId, onBack }) => {
               <input ref={bgRef} type="file" accept="image/*" onChange={uploadBackground} className="hidden" />
             </>
           )}
-          <div className="ml-auto bg-white/5 rounded-full px-3 py-2 flex items-center min-h-[40px]">
-            <span className="text-yellow-400 text-xs font-bold">💰 {formatCoins(user.coins)}</span>
+          <div className="ml-auto flex items-center gap-2">
+            <LevelBadge userId={user.id} />
+            <div className="bg-white/5 rounded-full px-3 py-2 flex items-center min-h-[40px]">
+              <span className="text-yellow-400 text-xs font-bold">💰 {formatCoins(user.coins)}</span>
+            </div>
           </div>
         </div>
       </div>

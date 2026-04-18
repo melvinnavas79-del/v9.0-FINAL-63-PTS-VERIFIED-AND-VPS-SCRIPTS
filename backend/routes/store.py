@@ -41,6 +41,53 @@ async def get_packages():
     return COIN_PACKAGES
 
 
+@router.get("/store/paypal/config")
+async def paypal_config():
+    """Public PayPal configuration for frontend SDK init (client_id + mode only)."""
+    mode = os.environ.get('PAYPAL_MODE', 'sandbox')
+    client_id = os.environ.get('PAYPAL_CLIENT_ID', '')
+    return {
+        "mode": mode,
+        "client_id": client_id,
+        "configured": bool(client_id and os.environ.get('PAYPAL_CLIENT_SECRET')),
+        "currency": "USD",
+    }
+
+
+@router.get("/store/paypal/status")
+async def paypal_status():
+    """Live status check: verifies PayPal credentials by requesting an OAuth token.
+    Returns authenticated=True if PayPal accepts our keys."""
+    import requests
+    mode = os.environ.get('PAYPAL_MODE', 'sandbox')
+    client_id = os.environ.get('PAYPAL_CLIENT_ID', '')
+    client_secret = os.environ.get('PAYPAL_CLIENT_SECRET', '')
+    if not client_id or not client_secret:
+        return {"authenticated": False, "mode": mode, "error": "credentials_missing"}
+    base = "https://api-m.paypal.com" if mode == "live" else "https://api-m.sandbox.paypal.com"
+    try:
+        r = requests.post(
+            f"{base}/v1/oauth2/token",
+            auth=(client_id, client_secret),
+            data={"grant_type": "client_credentials"},
+            headers={"Accept": "application/json"},
+            timeout=10,
+        )
+        if r.status_code == 200:
+            j = r.json()
+            return {
+                "authenticated": True,
+                "mode": mode,
+                "app_id": j.get("app_id"),
+                "scope_count": len((j.get("scope") or "").split()),
+                "token_type": j.get("token_type"),
+                "expires_in": j.get("expires_in"),
+            }
+        return {"authenticated": False, "mode": mode, "error": f"http_{r.status_code}", "detail": r.text[:200]}
+    except Exception as e:
+        return {"authenticated": False, "mode": mode, "error": "connection_error", "detail": str(e)[:200]}
+
+
 @router.post("/store/checkout")
 async def create_checkout(package_id: str, user_id: str, request: Request):
     """Create PayPal payment for a coin package."""

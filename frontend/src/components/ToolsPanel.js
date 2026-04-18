@@ -165,7 +165,7 @@ const BubbleCircle = ({ gradient, children }) => (
   </div>
 );
 
-const ToolsPanel = ({ open, onClose, onAction }) => {
+const ToolsPanel = ({ open, onClose, onAction, ttsEnabled = false }) => {
   const [mounted, setMounted] = useState(open);
   useEffect(() => {
     if (open) setMounted(true);
@@ -185,7 +185,9 @@ const ToolsPanel = ({ open, onClose, onAction }) => {
     { id: 'switch', label: 'Conmutación\u00A0Id', grad: 'linear-gradient(135deg,#d9b8ff 0%,#9b5bef 55%,#6b2db8 100%)', Icon: SwitchIdIcon },
     { id: 'clear', label: 'Borrar todo', grad: 'linear-gradient(135deg,#cfe3ff 0%,#6fa7ef 55%,#3d7bcf 100%)', Icon: TrashIcon },
     { id: 'music', label: 'Música', grad: 'linear-gradient(135deg,#a8f5d2 0%,#2fd897 55%,#12a86e 100%)', Icon: MusicIcon },
-    { id: 'effect', label: 'Efecto', grad: 'linear-gradient(135deg,#d0e8ff 0%,#79b3f7 55%,#4080d4 100%)', Icon: EffectIcon },
+    { id: 'voz', label: ttsEnabled ? 'Voz ON' : 'Voz OFF', grad: ttsEnabled
+        ? 'linear-gradient(135deg,#d0e8ff 0%,#79b3f7 55%,#4080d4 100%)'
+        : 'linear-gradient(135deg,#bcbcbc 0%,#6b7280 55%,#374151 100%)', Icon: EffectIcon },
   ];
 
   return (

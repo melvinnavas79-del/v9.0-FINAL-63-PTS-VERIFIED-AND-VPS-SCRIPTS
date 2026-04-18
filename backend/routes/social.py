@@ -204,6 +204,14 @@ async def send_gift(gift: GiftSend):
         "created_at": datetime.now(timezone.utc).isoformat()
     }
     await db.gifts.insert_one(gift_doc)
+
+    # Level-up XP: sender gets 2 XP per coin spent; receiver gets 1 XP per coin received
+    try:
+        from routes.levels import add_xp
+        await add_xp(gift.sender_id, int(g['cost']) * 2, source="gift_sent")
+        await add_xp(gift.receiver_id, int(g['cost']) * 1, source="gift_received")
+    except Exception:
+        pass
     
     # Add to chat if in room
     if gift.room_id:

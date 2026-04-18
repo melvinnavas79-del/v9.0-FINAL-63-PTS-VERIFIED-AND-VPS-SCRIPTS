@@ -27,6 +27,13 @@ async def record_daily_win(user_id: str, winnings: int, bet: int = 0):
         {"$inc": {"total_won": max(0, int(winnings)), "total_bet": max(0, int(bet)), "games_played": 1}},
         upsert=True,
     )
+    # Level-up XP: 3 XP per win (when winnings>0), +1 XP per 100 coins bet
+    if winnings > 0:
+        try:
+            from routes.levels import add_xp
+            await add_xp(user_id, 3 + max(0, bet // 100), source="game_win")
+        except Exception:
+            pass
 
 async def distribute_yesterday_rewards():
     """Idempotent: distribute 3M/2M/1M to yesterday's top 3 if not yet done."""
