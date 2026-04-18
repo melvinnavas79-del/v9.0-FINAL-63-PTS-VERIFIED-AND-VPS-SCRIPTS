@@ -24,22 +24,6 @@ const GiftBagIcon = () => (
   </svg>
 );
 
-const EnvelopeIcon = () => (
-  <svg viewBox="0 0 48 48" className="w-8 h-8">
-    <defs>
-      <linearGradient id="env1" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0" stopColor="#ffd3d3" />
-        <stop offset="0.5" stopColor="#e91e63" />
-        <stop offset="1" stopColor="#9d0047" />
-      </linearGradient>
-    </defs>
-    <rect x="8" y="12" width="32" height="26" rx="3" fill="url(#env1)" />
-    <path d="M8 14l16 12 16-12" fill="none" stroke="#fff" strokeWidth="2" opacity="0.6" />
-    <circle cx="24" cy="28" r="5" fill="#ffd700" stroke="#fff" strokeWidth="1.5" />
-    <text x="24" y="31" fontSize="6" fontWeight="bold" fill="#9d0047" textAnchor="middle">$</text>
-  </svg>
-);
-
 const DiceIcon = () => (
   <svg viewBox="0 0 48 48" className="w-8 h-8">
     <defs>
