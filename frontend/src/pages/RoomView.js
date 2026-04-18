@@ -8,6 +8,7 @@ import LionTigerGame from '../components/LionTigerGame';
 import UserProfileModal from '../components/UserProfileModal';
 import PKBattle from '../components/PKBattle';
 import PremiumGiftAnimation from '../components/PremiumGiftAnimation';
+import ToolsPanel from '../components/ToolsPanel';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -55,6 +56,8 @@ const RoomView = ({ roomId, onBack }) => {
   const [rechargePackages, setRechargePackages] = useState({});
   const [premiumAnim, setPremiumAnim] = useState(null);
   const [globalBanner, setGlobalBanner] = useState(null);
+  const [toolsOpen, setToolsOpen] = useState(false);
+  const [effectBurst, setEffectBurst] = useState(null);
 
   const chatRef = useRef(null);
   const prevMsgCount = useRef(0);
@@ -382,6 +385,63 @@ const RoomView = ({ roomId, onBack }) => {
     } catch (e) {}
   };
 
+  // ==================== TOOLS PANEL HANDLERS ====================
+  const toggleGhostMode = async () => {
+    try {
+      const r = await axios.post(`${API}/users/${user.id}/ghost-mode`);
+      updateUser({ ghost_mode: r.data.ghost_mode });
+      alert(r.data.ghost_mode ? '👤 Modo fantasma ACTIVADO (oculto de rankings)' : '👤 Modo fantasma desactivado');
+    } catch (e) { alert('Error al cambiar identidad'); }
+  };
+
+  const quickDados = async () => {
+    try {
+      const r = await axios.post(`${API}/games/play`, { user_id: user.id, game: 'dados', bet: 1000 });
+      if (r.data.new_balance !== undefined) updateUser({ coins: r.data.new_balance });
+      setGameResult(r.data);
+      setTimeout(() => setGameResult(null), 3500);
+    } catch (e) { alert(e.response?.data?.detail || 'Error'); }
+  };
+  const quickRuleta = async () => {
+    try {
+      const r = await axios.post(`${API}/games/ruleta`, { user_id: user.id, bet_amount: 1000 });
+      if (r.data.new_balance !== undefined) updateUser({ coins: r.data.new_balance });
+      setGameResult({ won: r.data.multiplier > 0, prize: r.data.winnings, multiplier: r.data.multiplier, result: r.data.result });
+      setTimeout(() => setGameResult(null), 3500);
+    } catch (e) { alert(e.response?.data?.detail || 'Error'); }
+  };
+  const quickMora = async () => {
+    const choices = ['piedra', 'papel', 'tijera'];
+    const pick = choices[Math.floor(Math.random() * 3)];
+    try {
+      const r = await axios.post(`${API}/games/piedra-papel-tijera`, { user_id: user.id, choice: pick, bet_amount: 1000 });
+      if (r.data.new_balance !== undefined) updateUser({ coins: r.data.new_balance });
+      setGameResult({ won: r.data.multiplier > 0, prize: r.data.winnings, result: `Tú: ${r.data.player_choice} vs ${r.data.computer_choice} — ${r.data.result}` });
+      setTimeout(() => setGameResult(null), 4000);
+    } catch (e) { alert(e.response?.data?.detail || 'Error'); }
+  };
+
+  const triggerEffect = () => {
+    const effects = ['✨', '💥', '🎆', '⚡', '🌟', '🎇'];
+    const e = effects[Math.floor(Math.random() * effects.length)];
+    setEffectBurst({ emoji: e, key: Date.now() });
+    setTimeout(() => setEffectBurst(null), 1800);
+  };
+
+  const handleToolAction = (id) => {
+    switch (id) {
+      case 'sorpresa': setPanel('cofres'); break;
+      case 'numero': quickRuleta(); break;
+      case 'dado': quickDados(); break;
+      case 'mora': quickMora(); break;
+      case 'switch': toggleGhostMode(); break;
+      case 'clear': setChatMessages([]); break;
+      case 'music': musicRef.current?.click(); break;
+      case 'effect': triggerEffect(); break;
+      default: break;
+    }
+  };
+
   if (!room) return <div className="h-screen bg-gradient-to-b from-indigo-950 via-slate-900 to-gray-950 flex items-center justify-center"><div className="text-white">Cargando...</div></div>;
 
   const opened = cofresData?.cofres_opened || 0;
@@ -405,6 +465,17 @@ const RoomView = ({ roomId, onBack }) => {
       `}</style>
       {entryAnim && <EntryAnimation animation={entryAnim.animation} username={entryAnim.username} onComplete={() => setEntryAnim(null)} />}
       {premiumAnim && <PremiumGiftAnimation giftType={premiumAnim.type} senderName={premiumAnim.sender} onComplete={() => setPremiumAnim(null)} />}
+
+      {/* TOOLS PANEL — Premium glass panel with 8 circular tools */}
+      <ToolsPanel open={toolsOpen} onClose={() => setToolsOpen(false)} onAction={handleToolAction} />
+
+      {/* EFFECT BURST — triggered by Efecto tool */}
+      {effectBurst && (
+        <div key={effectBurst.key} className="fixed inset-0 z-[75] pointer-events-none flex items-center justify-center">
+          <div className="text-[120px]" style={{ animation: 'effectBurst 1.8s ease-out forwards' }}>{effectBurst.emoji}</div>
+          <style>{`@keyframes effectBurst { 0% { opacity: 0; transform: scale(0.3) rotate(-15deg); } 30% { opacity: 1; transform: scale(1.4) rotate(5deg); } 100% { opacity: 0; transform: scale(2.2) rotate(15deg); } }`}</style>
+        </div>
+      )}
 
       {/* GLOBAL BANNER */}
       {globalBanner && (
@@ -1001,6 +1072,17 @@ const RoomView = ({ roomId, onBack }) => {
           {/* Close/Leave - Desconecta audio Y sale de la sala */}
           <button data-testid="leave-room-btn" onClick={async () => { await leaveRoom(); onBack(); }}
             className="w-14 h-14 rounded-full bg-red-600 flex items-center justify-center text-2xl active:scale-90 border-2 border-red-400" title="Salir y desconectar">✕</button>
+
+          {/* 4-squares Tools button — opens premium ToolsPanel */}
+          <button data-testid="tools-panel-btn" onClick={() => setToolsOpen(true)}
+            className="w-12 h-12 rounded-full bg-white/10 border border-white/20 flex items-center justify-center active:scale-90 transition-transform" title="Herramientas">
+            <svg viewBox="0 0 24 24" className="w-6 h-6">
+              <rect x="3" y="3" width="7" height="7" rx="1.5" fill="#fff" />
+              <rect x="14" y="3" width="7" height="7" rx="1.5" fill="#fff" />
+              <rect x="3" y="14" width="7" height="7" rx="1.5" fill="#fff" />
+              <rect x="14" y="14" width="7" height="7" rx="1.5" fill="#fff" />
+            </svg>
+          </button>
         </div>
         {/* Hidden audio element - NO autoPlay, NO loop */}
         {room.music_url && (

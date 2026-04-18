@@ -308,9 +308,46 @@ async def send_chat_photo(room_id: str, user_id: str, file: UploadFile = File(..
 
 UNSAFE_KEYWORDS = ['nude', 'nsfw', 'porn', 'sex', 'weapon', 'gun', 'knife', 'blood', 'gore', 'violence']
 
+async def ai_moderate_image(image_bytes: bytes, mime_type: str = 'image/jpeg') -> tuple[bool, str]:
+    """Use Gemini Vision to detect unsafe content (nudity, weapons, violence, blood, gore).
+    Returns (is_safe, reason). Fails OPEN (allows upload) if AI unavailable, to not block the product.
+    """
+    api_key = os.environ.get('GEMINI_API_KEY') or os.environ.get('GOOGLE_API_KEY')
+    if not api_key:
+        return True, "ai_unavailable"
+    try:
+        from google import genai
+        from google.genai import types
+        client = genai.Client(api_key=api_key)
+        prompt = (
+            "Eres un moderador de contenido para una app social. Analiza esta imagen y responde SOLO con "
+            "'SAFE' si es completamente apta como fondo de sala pública, o 'UNSAFE: <razon breve>' si contiene "
+            "cualquiera de: desnudez, contenido sexual/erotico, armas (pistolas, cuchillos, rifles), violencia, "
+            "sangre, gore, drogas, odio, o simbolos extremistas. Sé estricto."
+        )
+        resp = client.models.generate_content(
+            model="gemini-2.0-flash",
+            contents=[
+                types.Content(role="user", parts=[
+                    types.Part.from_bytes(data=image_bytes, mime_type=mime_type),
+                    types.Part.from_text(text=prompt),
+                ])
+            ],
+            config=types.GenerateContentConfig(max_output_tokens=50),
+        )
+        text = (resp.text or "").strip().upper()
+        if text.startswith("UNSAFE"):
+            reason = text.split(":", 1)[1].strip() if ":" in text else "contenido no permitido"
+            return False, reason
+        return True, "ok"
+    except Exception as e:
+        # Fail open but log — don't block uploads on API outage
+        print(f"[ai_moderate_image] falla: {e}")
+        return True, "ai_error"
+
 @router.post("/rooms/{room_id}/background")
 async def set_room_background(room_id: str, owner_id: str, file: UploadFile = File(...)):
-    """Upload room background image with basic content safety check."""
+    """Upload room background image with AI content safety check (Gemini Vision)."""
     room = await db.rooms.find_one({"id": room_id})
     if not room:
         raise HTTPException(status_code=404, detail="Sala no encontrada")
@@ -324,11 +361,16 @@ async def set_room_background(room_id: str, owner_id: str, file: UploadFile = Fi
     content = await file.read()
     if len(content) > 5 * 1024 * 1024:
         raise HTTPException(status_code=400, detail="Imagen muy grande (max 5MB)")
-    # Basic filename safety check
+    # Basic filename safety check (fast path)
     fname_lower = file.filename.lower()
     for kw in UNSAFE_KEYWORDS:
         if kw in fname_lower:
             raise HTTPException(status_code=400, detail="Imagen rechazada por politica de seguridad")
+    # AI vision moderation (Gemini) — blocks nudity, weapons, blood, gore, violence, drugs, hate
+    mime_map = {'.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.webp': 'image/webp', '.gif': 'image/gif'}
+    is_safe, reason = await ai_moderate_image(content, mime_map.get(ext, 'image/jpeg'))
+    if not is_safe:
+        raise HTTPException(status_code=400, detail=f"Imagen rechazada por IA: {reason}")
     # Save
     filename = f"bg_{room_id}_{uuid.uuid4().hex[:8]}{ext}"
     filepath = UPLOAD_DIR / filename
