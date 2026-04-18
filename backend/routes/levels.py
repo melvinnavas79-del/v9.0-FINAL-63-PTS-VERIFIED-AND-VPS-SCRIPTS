@@ -9,11 +9,11 @@ Fuentes de XP (integradas via hooks):
 - Tiempo activo (heartbeat): 10 XP por minuto en sala con mic activo (hasta 120 XP/hora)
 - Login diario: 50 XP bonus
 
-Curva de niveles: xp_needed(level) = 100 * level^1.5
-- Nivel 1 -> 2: 141 XP
-- Nivel 10 -> 11: 3162 XP
-- Nivel 50 -> 51: 35355 XP
-- Nivel 100 -> 101: 100000 XP
+Curva de niveles: xp_needed(level) = 100 * (level-1)^1.5
+- Nivel 1 -> 2: 100 XP
+- Nivel 10 -> 11: 2846 XP
+- Nivel 50 -> 51: 34300 XP
+- Nivel 100 -> 101: 98500 XP
 
 Recompensas automáticas cada cierto nivel (cofre de monedas):
 - Nivel 5, 10, 20, 30, 50, 75, 100 => premios escalonados

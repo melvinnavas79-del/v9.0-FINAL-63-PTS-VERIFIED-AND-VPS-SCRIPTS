@@ -18,7 +18,27 @@ Red social de audio en vivo con gamificación (monedas/diamantes), salas con Ago
 - SVIP hierarchy (1-10), Device/IP banning, Regional selectors
 - Custom backgrounds + AI safety filter, 10/24 seats expand
 
-### P0 — Limpieza visual de la sala (Feb 2026) ✅
+### P0 — PayPal /config endpoint + Level-up automático + TTS nativo (Feb 2026) ✅
+- **PayPal endpoints nuevos**:
+  - `GET /api/store/paypal/config` → retorna `{mode, client_id, configured, currency}` para init del SDK en frontend.
+  - `GET /api/store/paypal/status` → verifica credenciales vía OAuth real contra `api-m.paypal.com`. Retorna `authenticated:true` con `app_id APP-9E950290LB550220K`, scope_count, token_type, expires_in.
+- **Level-up automático** (`/app/backend/routes/levels.py`):
+  - Sistema de XP con curva `100*(level-1)^1.5`, niveles 1-500.
+  - Fuentes: regalos enviados (+2 XP/coin), regalos recibidos (+1 XP/coin), juegos ganados (+3 +bet/100 XP), heartbeat (+10 XP/min con mic activo, throttled a 55s).
+  - Milestone rewards en niveles 2/5/10/15/20/30/40/50/60/75/100 con premios escalonados (5K → 25M monedas).
+  - Auto-notificación al subir de nivel con bonus coins.
+  - Endpoints: `/api/levels/me/:id`, `/api/levels/leaderboard`, `/api/levels/heartbeat/:id`.
+  - Frontend: `LevelBadge` con polling 30s + barra de progreso con gradiente neón (gris→cyan→violeta→rosa según nivel); `useLevelHeartbeat` hook que envía heartbeat cada minuto mientras mic activo.
+- **TTS nativo (Web Speech API)** (`useTTS` hook + integración en RoomView):
+  - 100% local (sin costo, sin cuota, sin servicio externo).
+  - Toggle desde ToolsPanel: antes "Efecto" → ahora "Voz ON/OFF" con label dinámico.
+  - Selecciona voz española automáticamente (prefiere female).
+  - Lee mensajes nuevos del chat de OTROS usuarios cuando está activado.
+  - Persiste preferencia en localStorage `lluvia_tts_enabled`.
+- **Agora cert**: casing exacto `C25be026f8444fbca9ab71c0c0cdc465` según especificación.
+- **Testing**: 9/9 backend pytest pasando, frontend wiring validado.
+
+### P0 — Limpieza visual de la sala ✅
 - **Eliminados botones duplicados** de la barra superior de RoomView: `bar-cofres`, `bar-sobres`, `bar-juegos`, `bar-tienda`. Toda la acción ahora vive en el ToolsPanel. Solo queda el indicador de monedas 💰 y (para el dueño) el botón `bar-fondo`.
 - **GameResultToast** (`/app/frontend/src/components/GameResultToast.js`): toast flotante premium con animación grt-in cubic-bezier, fondo glass, bordes dorados cuando se gana. Muestra dados reales dibujados con puntos (DiceFace 1-6), reels de slots o multiplicador. Auto-dismiss ~3.2s.
 - **Bug fix backend `/api/games/play` para `dados`**: `play_generic` ahora tiene rama explícita que rolea 2 dados aleatorios y devuelve `game_data={dice1,dice2,total}`. Gana si total ≥ 8 (mult 2 para 8-10, mult 3 para 11-12).
