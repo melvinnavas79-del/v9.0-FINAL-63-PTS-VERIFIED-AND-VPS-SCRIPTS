@@ -82,3 +82,6 @@ Red social de audio en vivo con gamificación (monedas/diamantes), salas con Ago
 
 ## Credenciales de prueba
 Ver `/app/memory/test_credentials.md`
+
+## Base de datos
+MongoDB `lluvia_live` (renombrada desde `test_database` en Feb 2026). Test artifacts purgados. 39 usuarios productivos, 11 salas.

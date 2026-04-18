@@ -130,11 +130,34 @@ curl https://tu-dominio.com/api/rooms               # → 200
 curl https://tu-dominio.com/api/rankings/daily-games # → 200 con rewards [3M,2M,1M]
 ```
 
-## Comportamiento sin API Keys
+## Estado actual de Producción (Feb 2026) ✅
 
-- **Sin `GEMINI_API_KEY` configurada** (o con valor placeholder): el filtro AI de fondos NO analiza píxeles, solo bloquea por palabras sospechosas en el nombre del archivo. El bot del chat responderá "Bot no disponible". Todo lo demás funciona.
-- **Sin `AGORA_*`**: las salas cargan pero el audio no conecta.
-- **Sin `PAYPAL_*`**: las recargas fallan con mensaje claro.
+| Servicio | Estado | Notas |
+|---|---|---|
+| **Agora LIVE** | ✅ OPERATIVO | App ID `eccc14...2ce542` + Cert configurados. Tokens generan OK (139 chars, uid dinámico). |
+| **PayPal LIVE** | ✅ OPERATIVO | OAuth retorna access_token 200 de `api-m.paypal.com`. App ID: `APP-9E950290LB550220K`. Modo `live`. |
+| **Firebase Auth** | ✅ CONFIGURADO | Proyecto `lluvia-live-69a05`, auth Google + Phone. |
+| **MongoDB** | ✅ `lluvia_live` | DB renombrada (sin rastro "test"). 39 usuarios, 11 salas reales. Test artifacts purgados. |
+| **Gemini Vision** | ⚠️ KEY INVALIDA | Google rechaza la key `AIzaSy...tLlgws` con `API_KEY_INVALID`. Código hace fail-open (no bloquea fondos). Ver sección abajo. |
+
+## ⚠️ Cómo reparar la Gemini API Key
+
+Google responde `API_KEY_INVALID` a tu key actual. Causas típicas:
+
+1. **Key no tiene habilitada la "Generative Language API"**:
+   - Ve a https://console.cloud.google.com/apis/library/generativelanguage.googleapis.com
+   - Selecciona tu proyecto → botón **ENABLE**
+
+2. **Key restringida por IP/dominio**:
+   - Ve a https://console.cloud.google.com/apis/credentials
+   - Click en tu key → **Application restrictions: None** (para pruebas) o whitelist la IP del VPS.
+
+3. **Forma alternativa (más simple)**:
+   - Ve a https://aistudio.google.com/apikey → **Create API Key** → copia la nueva.
+   - Pega en `backend/.env` como `GEMINI_API_KEY=AIza...`
+   - Reinicia backend: `sudo supervisorctl restart backend`.
+
+Mientras la key no sea válida, el filtro de fondos de sala solo bloquea por nombre de archivo sospechoso (nude, gun, etc.) — ya es una capa de protección. Una vez arreglada la key, Gemini 2.0 Flash analiza los píxeles en tiempo real.
 
 ## Pruebas
 
