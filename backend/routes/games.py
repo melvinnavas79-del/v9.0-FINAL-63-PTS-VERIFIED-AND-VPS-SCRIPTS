@@ -7,6 +7,99 @@ import random
 
 router = APIRouter()
 
+
+# ==================== DAILY GAME RANKING ====================
+DAILY_REWARDS = [3_000_000, 2_000_000, 1_000_000]  # 1st, 2nd, 3rd
+
+def _today_utc():
+    return datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+def _yesterday_utc():
+    return (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d")
+
+async def record_daily_win(user_id: str, winnings: int, bet: int = 0):
+    """Increment user's daily game winnings (used by every game endpoint)."""
+    if winnings <= 0 and bet <= 0:
+        return
+    today = _today_utc()
+    await db.daily_game_stats.update_one(
+        {"user_id": user_id, "date": today},
+        {"$inc": {"total_won": max(0, int(winnings)), "total_bet": max(0, int(bet)), "games_played": 1}},
+        upsert=True,
+    )
+
+async def distribute_yesterday_rewards():
+    """Idempotent: distribute 3M/2M/1M to yesterday's top 3 if not yet done."""
+    yday = _yesterday_utc()
+    flag = await db.system_flags.find_one({"key": f"daily_reward_{yday}"})
+    if flag and flag.get("distributed"):
+        return
+    top = await db.daily_game_stats.find(
+        {"date": yday, "total_won": {"$gt": 0}}
+    ).sort("total_won", -1).limit(3).to_list(3)
+    winners = []
+    for idx, row in enumerate(top):
+        reward = DAILY_REWARDS[idx]
+        uid = row["user_id"]
+        u = await db.users.find_one({"id": uid})
+        if not u:
+            continue
+        await db.users.update_one({"id": uid}, {"$inc": {"coins": reward}})
+        await db.notifications.insert_one({
+            "id": str(uuid.uuid4()),
+            "user_id": uid,
+            "type": "daily_reward",
+            "title": f"🏆 Ganaste el Ranking Diario #{idx+1}!",
+            "message": f"Te premiamos con {reward:,} monedas por quedar #{idx+1} en el ranking de juegos del {yday}.",
+            "read": False,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        })
+        winners.append({"rank": idx+1, "user_id": uid, "username": u.get("username"), "reward": reward, "total_won": row.get("total_won", 0)})
+    await db.system_flags.update_one(
+        {"key": f"daily_reward_{yday}"},
+        {"$set": {"distributed": True, "date": yday, "winners": winners, "processed_at": datetime.now(timezone.utc).isoformat()}},
+        upsert=True,
+    )
+    return winners
+
+
+@router.get("/rankings/daily-games")
+async def daily_games_ranking(limit: int = 10):
+    """Top N users by game winnings today. Also triggers lazy distribution of yesterday's rewards."""
+    # Lazy distribute yesterday's rewards on any query (safe & idempotent)
+    try:
+        await distribute_yesterday_rewards()
+    except Exception:
+        pass
+    today = _today_utc()
+    rows = await db.daily_game_stats.find({"date": today, "total_won": {"$gt": 0}}).sort("total_won", -1).limit(max(1, min(limit, 50))).to_list(50)
+    out = []
+    for i, r in enumerate(rows):
+        u = await db.users.find_one({"id": r["user_id"]})
+        if not u or u.get("ghost_mode"):
+            continue
+        out.append({
+            "rank": i + 1,
+            "user_id": r["user_id"],
+            "username": u.get("username"),
+            "avatar": u.get("avatar"),
+            "country_flag": u.get("country_flag"),
+            "total_won": r.get("total_won", 0),
+            "games_played": r.get("games_played", 0),
+            "reward_preview": DAILY_REWARDS[i] if i < len(DAILY_REWARDS) else 0,
+        })
+    return {"date": today, "rewards": DAILY_REWARDS, "leaderboard": out}
+
+
+@router.get("/rankings/daily-games/yesterday")
+async def daily_games_yesterday():
+    """Yesterday's final top 3 + distribution status."""
+    await distribute_yesterday_rewards()
+    yday = _yesterday_utc()
+    flag = await db.system_flags.find_one({"key": f"daily_reward_{yday}"})
+    winners = (flag or {}).get("winners", [])
+    return {"date": yday, "winners": winners, "rewards": DAILY_REWARDS}
+
 @router.post("/games/play")
 async def play_generic(play: GenericPlay):
     """Play Generic."""
@@ -113,6 +206,8 @@ async def play_generic(play: GenericPlay):
                 {"user_id": play.user_id, "status": "approved", "event_type": {"$regex": "^king"}},
                 {"$inc": {"game_progress": play.bet}}
             )
+            # Daily ranking tracking (winnings only)
+            await record_daily_win(play.user_id, winnings=prize - play.bet, bet=play.bet)
             # Check badges
             from routes.badges import check_and_award_badges
             await check_and_award_badges(play.user_id)
@@ -122,6 +217,7 @@ async def play_generic(play: GenericPlay):
             {"user_id": play.user_id, "status": "approved", "event_type": {"$regex": "^king"}},
             {"$inc": {"game_progress": play.bet}}
         )
+        await record_daily_win(play.user_id, winnings=0, bet=play.bet)
         return {"won": False, "prize": 0, "new_balance": updated['coins'], "game_data": game_data}
     
     raise HTTPException(status_code=400, detail="Juego no válido")
@@ -233,6 +329,8 @@ async def end_pk_battle(battle_id: str):
     
     await db.users.update_one({"id": winner_id}, {"$inc": {"coins": total_pot}})
     await db.pk_battles.update_one({"id": battle_id}, {"$set": {"status": "finished", "winner": winner_id}})
+    # Daily ranking tracking for PK winner
+    await record_daily_win(winner_id, winnings=total_pot - battle['bet_amount'], bet=battle['bet_amount'])
     
     await db.room_chats.insert_one({
         "id": str(uuid.uuid4()), "room_id": battle['room_id'],
@@ -280,6 +378,7 @@ async def play_ruleta(bet: GameBet):
         {"id": bet.user_id},
         {"$inc": {"coins": net}}
     )
+    await record_daily_win(bet.user_id, winnings=max(0, net), bet=bet.bet_amount)
     
     updated_user = await db.users.find_one({"id": bet.user_id})
     
@@ -327,6 +426,7 @@ async def play_dados(bet: GameBet):
         {"id": bet.user_id},
         {"$inc": {"coins": net}}
     )
+    await record_daily_win(bet.user_id, winnings=max(0, net), bet=bet.bet_amount)
     
     updated_user = await db.users.find_one({"id": bet.user_id})
     
@@ -538,6 +638,7 @@ async def play_slot_machine(bet: GameBet):
     net = winnings - bet.bet_amount
     
     await db.users.update_one({"id": bet.user_id}, {"$inc": {"coins": net}})
+    await record_daily_win(bet.user_id, winnings=max(0, net), bet=bet.bet_amount)
     updated_user = await db.users.find_one({"id": bet.user_id})
     
     return {
@@ -572,6 +673,7 @@ async def lion_tiger_win(user_id: str, amount: int):
     if not user:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
     await db.users.update_one({"id": user_id}, {"$inc": {"coins": amount, "total_games_won": 1}})
+    await record_daily_win(user_id, winnings=amount, bet=0)
     updated = await db.users.find_one({"id": user_id})
     # Check badges
     from routes.badges import check_and_award_badges

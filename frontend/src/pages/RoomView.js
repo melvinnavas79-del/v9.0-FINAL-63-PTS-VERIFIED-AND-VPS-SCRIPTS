@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
-import AgoraRTC from 'agora-rtc-sdk-ng';
 import { useUser } from '../contexts/UserContext';
+import { useAudio } from '../contexts/AudioContext';
 import { EntryAnimation, ProfileFrame } from '../components/Animations';
 import RoomGames from '../components/RoomGames';
 import LionTigerGame from '../components/LionTigerGame';
@@ -24,13 +24,22 @@ const formatCoins = (n) => {
 
 const RoomView = ({ roomId, onBack }) => {
   const { user, updateUser, syncUser } = useUser();
+  const {
+    activeRoom,
+    audioStatus,
+    isMuted,
+    isDeafened,
+    mySeat: ctxSeat,
+    setMySeat: setCtxSeat,
+    joinRoom,
+    leaveRoom,
+    toggleMute,
+    toggleDeafen,
+  } = useAudio();
   const [room, setRoom] = useState(null);
   const [mySeat, setMySeat] = useState(null);
-  const [isMuted, setIsMuted] = useState(true);
-  const [isDeafened, setIsDeafened] = useState(false);
   const [chatMessages, setChatMessages] = useState([]);
   const [chatInput, setChatInput] = useState('');
-  const [audioStatus, setAudioStatus] = useState('off');
   const [entryAnim, setEntryAnim] = useState(null);
   const [panel, setPanel] = useState(null);
   const [giftTarget, setGiftTarget] = useState(null);
@@ -38,7 +47,6 @@ const RoomView = ({ roomId, onBack }) => {
   const [sobres, setSobres] = useState([]);
   const [cofresData, setCofresData] = useState(null);
   const [botOn, setBotOn] = useState(false);
-  const [minimized, setMinimized] = useState(false);
   const [showLionTiger, setShowLionTiger] = useState(false);
   const [musicPlaying, setMusicPlaying] = useState(false);
   const [floatingGift, setFloatingGift] = useState(null);
@@ -48,19 +56,35 @@ const RoomView = ({ roomId, onBack }) => {
   const [premiumAnim, setPremiumAnim] = useState(null);
   const [globalBanner, setGlobalBanner] = useState(null);
 
-  const clientRef = useRef(null);
-  const localTrackRef = useRef(null);
-  const autoMuteRef = useRef(null);
   const chatRef = useRef(null);
   const prevMsgCount = useRef(0);
   const photoRef = useRef(null);
   const musicRef = useRef(null);
   const audioElementRef = useRef(null);
   const bgRef = useRef(null);
+  const joinedOnceRef = useRef(false);
 
   useEffect(() => {
-    leaveAgora();
     loadRoom(); markJoinAndLoadChat(); loadGifts(); loadSobres(); loadCofres(); checkBotActive(); loadMyEvents(); loadPendingRequests(); loadPK();
+    // Join Agora via global context (persists across navigation).
+    // Trigger welcome/entry animation once per room join.
+    (async () => {
+      const alreadyInThisRoom = activeRoom?.roomId === roomId;
+      if (!alreadyInThisRoom) {
+        await joinRoom(roomId, '', user.id);
+        try {
+          const welcomeRes = await axios.post(`${API}/rooms/${roomId}/welcome?user_id=${user.id}`);
+          if (welcomeRes.data?.entry_animation && welcomeRes.data.entry_animation !== 'none') {
+            setEntryAnim({ animation: welcomeRes.data.entry_animation, username: welcomeRes.data.username || user.username });
+          }
+          const a = await axios.get(`${API}/users/${user.id}/entry-animation`);
+          if (a.data?.special && !welcomeRes.data?.entry_animation) {
+            setEntryAnim({ animation: a.data.animation, username: user.username });
+          }
+        } catch (e) {}
+      }
+      joinedOnceRef.current = true;
+    })();
     const r = setInterval(loadRoom, 3000);
     const c = setInterval(loadChat, 2000);
     const cf = setInterval(loadCofres, 5000);
@@ -76,8 +100,9 @@ const RoomView = ({ roomId, onBack }) => {
     }, 5000);
     return () => {
       clearInterval(r); clearInterval(c); clearInterval(cf); clearInterval(ga);
-      leaveAgora();
-      // Cleanup audio element on unmount
+      // NOTE: We intentionally do NOT leave Agora here.
+      // Audio persists via AudioContext until user explicitly taps "Salir" / ✕.
+      // Cleanup local room music audio element only.
       if (audioElementRef.current) {
         audioElementRef.current.pause();
         audioElementRef.current.src = '';
@@ -93,7 +118,18 @@ const RoomView = ({ roomId, onBack }) => {
   }, [chatMessages]);
 
   const loadRoom = async () => {
-    try { const r = await axios.get(`${API}/rooms/${roomId}`); setRoom(r.data); const s = r.data.seats.findIndex(s => s?.user_id === user.id); setMySeat(s >= 0 ? s : null); } catch (e) {}
+    try {
+      const r = await axios.get(`${API}/rooms/${roomId}`);
+      setRoom(r.data);
+      const s = r.data.seats.findIndex(s => s?.user_id === user.id);
+      const seatIdx = s >= 0 ? s : null;
+      setMySeat(seatIdx);
+      setCtxSeat(seatIdx);
+      // Keep the AudioContext aware of the latest room name for MiniPlayer
+      if (r.data?.name) {
+        joinRoom(roomId, r.data.name, user.id);
+      }
+    } catch (e) {}
   };
   const loadChat = async () => {
     try {
@@ -139,79 +175,20 @@ const RoomView = ({ roomId, onBack }) => {
     } catch (e) { console.error(e); }
   };
 
-  const joinAgora = async () => {
+  const joinSeat = async (i) => {
     try {
-      setAudioStatus('connecting');
-      const t = await axios.post(`${API}/agora/token?channel_name=room_${roomId}&user_id=${user.id}`);
-      const client = AgoraRTC.createClient({ mode: 'rtc', codec: 'vp8' });
-      clientRef.current = client;
-      client.on('user-published', async (u, m) => { if (m === 'audio') { await client.subscribe(u, 'audio'); u.audioTrack?.play(); } });
-      await client.join(t.data.app_id, `room_${roomId}`, t.data.token, t.data.uid);
-      setAudioStatus('on'); setIsMuted(true);
-      // Welcome message + entry animation from backend
-      const welcomeRes = await axios.post(`${API}/rooms/${roomId}/welcome?user_id=${user.id}`);
-      if (welcomeRes.data?.entry_animation && welcomeRes.data.entry_animation !== 'none') {
-        setEntryAnim({ animation: welcomeRes.data.entry_animation, username: welcomeRes.data.username || user.username });
-      }
-      loadChat();
-      // Also check entry-animation endpoint for VIP/role-based animations
-      try {
-        const a = await axios.get(`${API}/users/${user.id}/entry-animation`);
-        if (a.data.special && !welcomeRes.data?.entry_animation) {
-          setEntryAnim({ animation: a.data.animation, username: user.username });
-        }
-      } catch (e) {}
-    } catch (e) { setAudioStatus('error'); }
+      await axios.post(`${API}/rooms/${roomId}/join`, null, { params: { user_id: user.id, seat_index: i } });
+      loadRoom();
+    } catch (e) { alert(e.response?.data?.detail || 'Error'); }
   };
-
-  const leaveAgora = async () => {
+  const leaveSeat = async () => {
     try {
-      localTrackRef.current?.close(); localTrackRef.current = null;
-      await clientRef.current?.leave(); clientRef.current = null;
-      setAudioStatus('off'); clearTimeout(autoMuteRef.current);
-      // Stop room music on leave
-      if (audioElementRef.current) {
-        audioElementRef.current.pause();
-        audioElementRef.current.src = '';
-      }
+      await axios.post(`${API}/rooms/${roomId}/leave`, null, { params: { user_id: user.id } });
+      setMySeat(null);
+      setCtxSeat(null);
+      loadRoom();
     } catch (e) {}
   };
-
-  const toggleMute = async () => {
-    if (!clientRef.current) return;
-    const newMuted = !isMuted;
-    
-    if (!newMuted) {
-      // UNMUTING - create mic track if doesn't exist
-      if (!localTrackRef.current) {
-        try {
-          const track = await AgoraRTC.createMicrophoneAudioTrack();
-          localTrackRef.current = track;
-          await clientRef.current.publish([track]);
-        } catch (e) { console.error('Mic error:', e); return; }
-      } else {
-        localTrackRef.current.setEnabled(true);
-      }
-      setIsMuted(false);
-      clearTimeout(autoMuteRef.current);
-      autoMuteRef.current = setTimeout(() => {
-        if (localTrackRef.current) {
-          localTrackRef.current.setEnabled(false);
-          setIsMuted(true);
-        }
-      }, 2 * 60 * 1000);
-    } else {
-      // MUTING - disable but don't destroy (keeps connection)
-      if (localTrackRef.current) {
-        localTrackRef.current.setEnabled(false);
-      }
-      setIsMuted(true);
-      clearTimeout(autoMuteRef.current);
-    }
-  };
-  const toggleDeafen = () => { clientRef.current?.remoteUsers?.forEach(u => { u.audioTrack && (isDeafened ? u.audioTrack.play() : u.audioTrack.stop()); }); setIsDeafened(!isDeafened); };
-  const joinSeat = async (i) => { try { await axios.post(`${API}/rooms/${roomId}/join`, null, { params: { user_id: user.id, seat_index: i } }); await joinAgora(); loadRoom(); } catch (e) { alert(e.response?.data?.detail || 'Error'); } };
-  const leaveSeat = async () => { try { await axios.post(`${API}/rooms/${roomId}/leave`, null, { params: { user_id: user.id } }); await leaveAgora(); setMySeat(null); loadRoom(); } catch (e) {} };
   const sendChat = async () => { if (!chatInput.trim()) return; try { await axios.post(`${API}/rooms/${roomId}/chat`, { user_id: user.id, text: chatInput }); setChatInput(''); loadChat(); } catch (e) {} };
   const sendPhoto = async (e) => { const f = e.target.files?.[0]; if (!f) return; try { const fd = new FormData(); fd.append('file', f); await axios.post(`${API}/rooms/${roomId}/chat-photo?user_id=${user.id}`, fd, { headers: { 'Content-Type': 'multipart/form-data' } }); loadChat(); } catch (e) { alert('Error'); } if (photoRef.current) photoRef.current.value = ''; };
 
@@ -406,27 +383,6 @@ const RoomView = ({ roomId, onBack }) => {
   };
 
   if (!room) return <div className="h-screen bg-gradient-to-b from-indigo-950 via-slate-900 to-gray-950 flex items-center justify-center"><div className="text-white">Cargando...</div></div>;
-
-  // MINIMIZED VIEW - floating mini player
-  if (minimized) {
-    return (
-      <div className="fixed bottom-20 left-3 right-3 z-40 bg-gray-900/95 backdrop-blur rounded-2xl p-3 border border-white/10 shadow-2xl">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className={`w-2 h-2 rounded-full ${audioStatus === 'on' ? 'bg-green-400' : 'bg-red-400'}`} />
-            <span className="text-white text-sm font-bold truncate max-w-[120px]">{room.name}</span>
-            <span className="text-white/40 text-xs">{room.active_users}👥</span>
-          </div>
-          <div className="flex items-center gap-2">
-            {mySeat !== null && (
-              <button onClick={toggleMute} className={`w-10 h-10 rounded-full flex items-center justify-center text-base ${isMuted ? 'bg-red-500' : 'bg-green-500'}`}>{isMuted ? '🔇' : '🎤'}</button>
-            )}
-            <button data-testid="maximize-btn" onClick={() => setMinimized(false)} className="bg-cyan-500 text-white px-4 py-2 rounded-full text-sm font-bold min-h-[40px] active:scale-95">Abrir</button>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   const opened = cofresData?.cofres_opened || 0;
   const progress = cofresData?.cofre_progress || 0;
@@ -766,13 +722,13 @@ const RoomView = ({ roomId, onBack }) => {
       {/* HEADER */}
       <div className="flex-shrink-0 px-3 pb-1" style={{paddingTop: 'calc(env(safe-area-inset-top, 20px) + 8px)'}}>
         <div className="flex items-center justify-between">
-          <button data-testid="room-back-btn" onClick={() => { leaveAgora(); onBack(); }} className="bg-white/15 text-white px-5 py-2.5 rounded-full text-sm font-bold min-h-[44px] min-w-[80px] active:scale-95 transition-transform" style={{WebkitTapHighlightColor: 'transparent'}}>← Salir</button>
+          <button data-testid="room-back-btn" onClick={() => { onBack(); }} className="bg-white/15 text-white px-5 py-2.5 rounded-full text-sm font-bold min-h-[44px] min-w-[80px] active:scale-95 transition-transform" style={{WebkitTapHighlightColor: 'transparent'}} title="Minimizar (audio sigue conectado)">← Salir</button>
           <div className="text-center flex-1 mx-2">
             <h2 className="text-white text-sm font-bold truncate">{room.name}</h2>
           </div>
           <div className="flex items-center gap-2">
-            {/* Minimize - bigger for iOS touch */}
-            <button data-testid="minimize-btn" onClick={() => setMinimized(true)} className="bg-white/15 min-w-[44px] min-h-[44px] rounded-full flex items-center justify-center text-base font-bold active:scale-95 transition-transform">⬇️</button>
+            {/* Minimize - keeps audio alive via global MiniPlayer */}
+            <button data-testid="minimize-btn" onClick={() => onBack()} className="bg-white/15 min-w-[44px] min-h-[44px] rounded-full flex items-center justify-center text-base font-bold active:scale-95 transition-transform" title="Minimizar sala (audio sigue)">⬇️</button>
             {/* Bot ON/OFF */}
             {user.role === 'dueño' && (
               <button data-testid="bot-toggle-room" onClick={toggleBot} className={`min-w-[44px] min-h-[44px] rounded-full flex items-center justify-center text-base ${botOn ? 'bg-green-500' : 'bg-gray-600'}`}>🤖</button>
@@ -1042,9 +998,9 @@ const RoomView = ({ roomId, onBack }) => {
               mySeat === null ? 'bg-gray-700 opacity-50' : isDeafened ? 'bg-orange-500' : 'bg-blue-500'
             }`}>{isDeafened ? '🔕' : '🔊'}</button>
 
-          {/* Close/Leave */}
-          <button data-testid="leave-room-btn" onClick={() => { leaveAgora(); onBack(); }}
-            className="w-14 h-14 rounded-full bg-red-600 flex items-center justify-center text-2xl active:scale-90 border-2 border-red-400">✕</button>
+          {/* Close/Leave - Desconecta audio Y sale de la sala */}
+          <button data-testid="leave-room-btn" onClick={async () => { await leaveRoom(); onBack(); }}
+            className="w-14 h-14 rounded-full bg-red-600 flex items-center justify-center text-2xl active:scale-90 border-2 border-red-400" title="Salir y desconectar">✕</button>
         </div>
         {/* Hidden audio element - NO autoPlay, NO loop */}
         {room.music_url && (

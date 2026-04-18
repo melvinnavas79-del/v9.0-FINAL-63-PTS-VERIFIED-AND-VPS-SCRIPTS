@@ -17,6 +17,7 @@ const Dashboard = ({ onNavigate }) => {
   const [starIndex, setStarIndex] = useState(0);
   const [showEventPanel, setShowEventPanel] = useState(false);
   const [flashEvent, setFlashEvent] = useState(null);
+  const [dailyRanking, setDailyRanking] = useState({ leaderboard: [], rewards: [3000000, 2000000, 1000000] });
 
   useEffect(() => {
     loadRooms();
@@ -24,11 +25,20 @@ const Dashboard = ({ onNavigate }) => {
     loadUnreadCount();
     loadClansRankings();
     loadFlashEvents();
+    loadDailyRanking();
     const n = setInterval(loadUnreadCount, 10000);
     const s = setInterval(() => setStarIndex(p => p + 1), 3000);
     const f = setInterval(loadFlashEvents, 8000);
-    return () => { clearInterval(n); clearInterval(s); clearInterval(f); };
+    const d = setInterval(loadDailyRanking, 30000);
+    return () => { clearInterval(n); clearInterval(s); clearInterval(f); clearInterval(d); };
   }, []);
+
+  const loadDailyRanking = async () => {
+    try {
+      const r = await axios.get(`${API}/rankings/daily-games`);
+      setDailyRanking(r.data);
+    } catch (e) {}
+  };
 
   const loadFlashEvents = async () => {
     try {
@@ -159,6 +169,70 @@ const Dashboard = ({ onNavigate }) => {
 
     return (
     <div className="p-4">
+      {/* DAILY GAME RANKING - TOP 3 + PRIZES */}
+      <div data-testid="daily-game-ranking" className="rounded-2xl p-4 mb-3 overflow-hidden relative border-2 border-yellow-400/30 shadow-lg" style={{background: 'linear-gradient(135deg, #2a0845 0%, #6441A5 50%, #f59e0b 100%)'}}>
+        <div className="absolute -top-10 -right-10 w-32 h-32 rounded-full bg-yellow-400/20 blur-3xl" />
+        <div className="relative">
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <h2 className="text-sm font-black text-white flex items-center gap-1" style={{textShadow: '0 2px 8px rgba(0,0,0,0.5)'}}>
+                🏆 Ranking Diario de Juegos
+              </h2>
+              <p className="text-yellow-100/80 text-[10px] mt-0.5">Reinicia a las 00:00 UTC · Premios automáticos</p>
+            </div>
+            <div className="text-right">
+              <div className="text-[10px] text-yellow-100/70 leading-none">HOY</div>
+              <div className="text-white font-bold text-[11px] leading-tight">{dailyRanking.date || ''}</div>
+            </div>
+          </div>
+          {/* Podium */}
+          <div className="grid grid-cols-3 gap-2">
+            {[1, 0, 2].map((slotIdx) => {
+              const ranks = [
+                { place: 1, emoji: '🥇', color: 'from-yellow-400 to-amber-600', reward: 3000000, label: '3M' },
+                { place: 2, emoji: '🥈', color: 'from-gray-300 to-gray-500', reward: 2000000, label: '2M' },
+                { place: 3, emoji: '🥉', color: 'from-orange-400 to-amber-700', reward: 1000000, label: '1M' },
+              ];
+              const r = ranks[slotIdx];
+              const winner = (dailyRanking.leaderboard || [])[slotIdx];
+              const heightClass = r.place === 1 ? 'h-[130px]' : 'h-[110px]';
+              return (
+                <div key={r.place} className={`bg-white/10 backdrop-blur rounded-xl ${heightClass} p-2 border border-white/20 flex flex-col items-center justify-between`}>
+                  <div className="text-2xl" style={{filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.5))'}}>{r.emoji}</div>
+                  {winner ? (
+                    <>
+                      <img src={winner.avatar} alt="" className={`w-10 h-10 rounded-full border-2 border-yellow-300 object-cover`} />
+                      <div className="text-white text-[10px] font-bold truncate w-full text-center">{winner.username}</div>
+                      <div className="text-yellow-200 text-[9px] font-bold">{(winner.total_won || 0) >= 1e6 ? `${(winner.total_won/1e6).toFixed(1)}M` : (winner.total_won || 0).toLocaleString()}</div>
+                    </>
+                  ) : (
+                    <>
+                      <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${r.color} border-2 border-yellow-300 flex items-center justify-center text-lg opacity-80`}>?</div>
+                      <div className="text-white/60 text-[10px] font-bold">Vacante</div>
+                      <div className="text-yellow-200 text-[9px]">Juega ya</div>
+                    </>
+                  )}
+                  <div className={`w-full text-center rounded-md py-0.5 mt-1 bg-gradient-to-r ${r.color} text-[10px] font-black text-black/80`}>+{r.label}</div>
+                </div>
+              );
+            })}
+          </div>
+          {/* Rest of top 10 */}
+          {(dailyRanking.leaderboard || []).length > 3 && (
+            <div className="mt-3 grid grid-cols-2 gap-1.5">
+              {dailyRanking.leaderboard.slice(3, 9).map((w) => (
+                <div key={w.user_id} className="bg-white/5 rounded-lg px-2 py-1 flex items-center gap-1.5">
+                  <span className="text-white/60 text-[10px] font-bold w-4">#{w.rank}</span>
+                  <img src={w.avatar} alt="" className="w-5 h-5 rounded-full" />
+                  <span className="text-white text-[10px] font-medium truncate flex-1">{w.username}</span>
+                  <span className="text-yellow-300 text-[9px] font-bold">{(w.total_won || 0) >= 1e6 ? `${(w.total_won/1e6).toFixed(1)}M` : `${Math.round((w.total_won || 0)/1e3)}K`}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
       {/* Monthly Star Banner - GOLD BACKGROUND */}
       <div className="rounded-2xl p-4 mb-3 overflow-hidden relative" style={{background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)'}}>
         <div className="absolute inset-0 opacity-30" style={{background: 'radial-gradient(circle at 50% 50%, #d4a017 0%, transparent 60%)'}} />

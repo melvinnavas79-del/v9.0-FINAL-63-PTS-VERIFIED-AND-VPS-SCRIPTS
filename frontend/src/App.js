@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import "./App.css";
 import { UserProvider, useUser } from './contexts/UserContext';
+import { AudioProvider, useAudio } from './contexts/AudioContext';
 import LoginPage from './pages/LoginPage';
 import Dashboard from './pages/Dashboard';
 import RoomView from './pages/RoomView';
 import ProfileView from './pages/ProfileView';
 import GamesView from './pages/GamesView';
 import SlotMachine from './pages/SlotMachine';
-import AdminPanel from './pages/AdminPanel';
 import ControlPanel from './pages/ControlPanel';
 import ReelsView from './pages/ReelsView';
 import PhotosView from './pages/PhotosView';
@@ -16,9 +16,11 @@ import ClanesView from './pages/ClanesView';
 import ParejasView from './pages/ParejasView';
 import NotificationsView from './pages/NotificationsView';
 import BotFloating from './components/BotFloating';
+import MiniPlayer from './components/MiniPlayer';
 
 function AppContent() {
   const { isAuthenticated, login, user } = useUser();
+  const { activeRoom } = useAudio();
   const [currentView, setCurrentView] = useState('dashboard');
   const [selectedRoomId, setSelectedRoomId] = useState(null);
 
@@ -83,9 +85,19 @@ function AppContent() {
     return <Dashboard onNavigate={handleNavigate} />;
   })();
 
+  // Show MiniPlayer whenever user is connected to a room but NOT currently viewing it.
+  const showMiniPlayer = !!activeRoom && currentView !== 'room';
+
   return (
     <>
       {pageContent}
+      <MiniPlayer
+        visible={showMiniPlayer}
+        onOpenRoom={(roomId) => {
+          setSelectedRoomId(roomId);
+          setCurrentView('room');
+        }}
+      />
       <BotFloating userId={user?.id} userRole={user?.role} />
     </>
   );
@@ -94,7 +106,9 @@ function AppContent() {
 function App() {
   return (
     <UserProvider>
-      <AppContent />
+      <AudioProvider>
+        <AppContent />
+      </AudioProvider>
     </UserProvider>
   );
 }
