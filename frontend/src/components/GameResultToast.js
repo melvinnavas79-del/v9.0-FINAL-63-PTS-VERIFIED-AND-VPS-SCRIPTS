@@ -26,20 +26,25 @@ const GameResultToast = ({ result, onDone }) => {
   const title = won ? '¡GANASTE!' : 'Sin suerte';
   const subtitle = result.result || result.message || (won ? `+${prize.toLocaleString()} monedas` : 'Intenta otra vez');
 
+  // Dice may come at top level OR inside game_data depending on endpoint
+  const dice1 = result.dice1 ?? result.game_data?.dice1;
+  const dice2 = result.dice2 ?? result.game_data?.dice2;
+  const reels = result.reels ?? result.game_data?.reels;
+
   // Visual content depending on game data
   const visual = (() => {
-    if (result.dice1 !== undefined && result.dice2 !== undefined) {
+    if (dice1 !== undefined && dice2 !== undefined) {
       return (
         <div className="flex gap-3 justify-center">
-          <DiceFace value={result.dice1} />
-          <DiceFace value={result.dice2} />
+          <DiceFace value={dice1} />
+          <DiceFace value={dice2} />
         </div>
       );
     }
-    if (Array.isArray(result.reels) && result.reels.length) {
+    if (Array.isArray(reels) && reels.length) {
       return (
         <div className="flex gap-2 justify-center">
-          {result.reels.map((r, i) => (
+          {reels.map((r, i) => (
             <div key={i} className="w-14 h-14 rounded-xl bg-gradient-to-br from-white/90 to-white/60 flex items-center justify-center text-3xl shadow-inner">
               {r}
             </div>

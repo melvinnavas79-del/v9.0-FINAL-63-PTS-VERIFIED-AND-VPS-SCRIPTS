@@ -138,6 +138,14 @@ async def play_generic(play: GenericPlay):
             reels = [[random.choice(symbols) for _ in range(3)] for _ in range(3)]
             if won: reels[1] = [reels[1][0]] * 3  # Force match on middle row
             game_data = {"reels": reels}
+        elif play.game == 'dados':
+            # Two-dice roll; player wins if sum >= 8
+            dice1 = random.randint(1, 6)
+            dice2 = random.randint(1, 6)
+            total = dice1 + dice2
+            won = total >= 8
+            mult = 2 if won and total < 11 else (3 if won else 0)
+            game_data = {"dice1": dice1, "dice2": dice2, "total": total}
         elif play.game == 'ludo':
             # Ludo: Roll dice, move pieces. Higher bet = more rounds
             dice = [random.randint(1, 6) for _ in range(4)]

@@ -1,0 +1,35 @@
+{
+  "summary": "Iteration 5 — Retest of the dados fix from iteration_4. VALIDATED both backend and frontend. Backend POST /api/games/play {game:'dados',bet:1000} now correctly returns won/prize/multiplier/new_balance and game_data={dice1, dice2, total}. Frontend GameResultToast renders two DiceFace components with visible dots (no multiplier fallback). Regression on tool-numero (ruleta) and tool-mora (rps) still works as expected.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration_5.py",
+    "/app/test_reports/pytest/iteration_5.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "games.py play_generic dados branch (lines 141-148) correctly rolls 2 dice 1-6, computes total, sets won=(total>=8) and mult=2 (if 8-10) or 3 (if >=11). Properly mirrors dice1/dice2/total into game_data.",
+    "GameResultToast.js lines 30-31 correctly read dice1/dice2 with fallback from top-level OR game_data — compatible with both the dedicated /api/games/dados endpoint (top-level) and the /api/games/play endpoint (game_data).",
+    "Note: /api/games/play for 'dados' does NOT top-level-expose dice1/dice2 (only in game_data). Frontend GameResultToast is compatible due to the `??` fallback. Both paths work."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iteration_5.py (new pytest file for iteration 5 — validates dados contract and ruleta/rps regression)"
+  ],
+  "success_rate": {
+    "backend": "100% (4/4 pytest passed)",
+    "frontend": "100% — dice faces render with 8 dots visible in DOM, no multiplier fallback; ruleta & mora regressions pass"
+  },
+  "test_credentials": "Melvin_Live / test123 (dueño). Owner id b45958bc-2c6b-49ea-8102-a11197001e53.",
+  "seed_data_creation": "None — reused owner balance (5.4T coins).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Dados fix is fully validated. Backend contract: game_data={dice1, dice2, total}; won when total>=8; mult=2 (total 8-10) or 3 (total 11-12). Frontend: GameResultToast DiceFace renders correctly. Console noise: Agora UID_CONFLICT on re-entering rooms (expected in test harness) and a couple of 404s on initial assets — neither is a product bug. test_iteration_5.py should stay as regression coverage going forward.",
+  "rca of the issue": "Previously fixed in iteration_4 by adding an 'elif play.game == \"dados\":' branch in /app/backend/routes/games.py play_generic() that rolls 2 dice and populates game_data with dice1/dice2/total. Frontend GameResultToast was also updated to read dice1/dice2 from top-level OR result.game_data. Retest confirms: backend response contains game_data.dice1 in [1,6], game_data.dice2 in [1,6], game_data.total == dice1+dice2, and frontend DOM shows two DiceFace elements with visible dots (no fallback multiplier text)."
+}
