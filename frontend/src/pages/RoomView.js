@@ -6,6 +6,8 @@ import { EntryAnimation, ProfileFrame } from '../components/Animations';
 import RoomGames from '../components/RoomGames';
 import LionTigerGame from '../components/LionTigerGame';
 import UserProfileModal from '../components/UserProfileModal';
+import PKBattle from '../components/PKBattle';
+import PremiumGiftAnimation from '../components/PremiumGiftAnimation';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -43,6 +45,8 @@ const RoomView = ({ roomId, onBack }) => {
   const [profileTarget, setProfileTarget] = useState(null);
   const [showRecharge, setShowRecharge] = useState(false);
   const [rechargePackages, setRechargePackages] = useState({});
+  const [premiumAnim, setPremiumAnim] = useState(null);
+  const [globalBanner, setGlobalBanner] = useState(null);
 
   const clientRef = useRef(null);
   const localTrackRef = useRef(null);
@@ -60,8 +64,18 @@ const RoomView = ({ roomId, onBack }) => {
     const r = setInterval(loadRoom, 3000);
     const c = setInterval(loadChat, 2000);
     const cf = setInterval(loadCofres, 5000);
+    const ga = setInterval(async () => {
+      try {
+        const res = await axios.get(`${API}/announcements/latest`);
+        if (res.data?.text && res.data.id !== window._lastAnnouncementId) {
+          window._lastAnnouncementId = res.data.id;
+          setGlobalBanner(res.data.text);
+          setTimeout(() => setGlobalBanner(null), 8000);
+        }
+      } catch (e) {}
+    }, 5000);
     return () => {
-      clearInterval(r); clearInterval(c); clearInterval(cf);
+      clearInterval(r); clearInterval(c); clearInterval(cf); clearInterval(ga);
       leaveAgora();
       // Cleanup audio element on unmount
       if (audioElementRef.current) {
@@ -251,22 +265,30 @@ const RoomView = ({ roomId, onBack }) => {
     }
   };
 
+  const PREMIUM_GIFTS = ['leon', 'dragon', 'castillo', 'lluvia_oro', 'mega_crown'];
+
   const sendGift = async (type, targetOverride) => {
     const target = targetOverride || giftTarget;
     if (!target) return;
     try {
       const r = await axios.post(`${API}/gifts/send`, { sender_id: user.id, receiver_id: target.user_id, gift_type: type, room_id: roomId });
       if (r.data.new_balance !== undefined) updateUser({ coins: r.data.new_balance });
-      // Trigger float animation for gift
-      setFloatingGift({ emoji: gifts[type]?.emoji || '🎁', key: Date.now() });
-      setTimeout(() => setFloatingGift(null), 2000);
+      // Premium fullscreen animation for high-value gifts
+      if (PREMIUM_GIFTS.includes(type)) {
+        setPremiumAnim({ type, sender: user.username });
+        // Send global announcement for premium gifts
+        try { await axios.post(`${API}/admin/global-announce?admin_id=${user.id}&text=${encodeURIComponent(`${user.username} envio ${gifts[type]?.emoji || '🎁'} ${gifts[type]?.name || type} en ${room.name}!`)}`); } catch (e) {}
+      } else {
+        // Regular float animation
+        setFloatingGift({ emoji: gifts[type]?.emoji || '🎁', key: Date.now() });
+        setTimeout(() => setFloatingGift(null), 2000);
+      }
       setPanel(null); setGiftTarget(null); loadChat(); loadCofres();
-      // Force sync from server to ensure accuracy
       setTimeout(() => syncUser(), 1000);
     } catch (e) {
       const msg = e.response?.data?.detail || 'Error al enviar regalo';
       if (msg === 'No tienes suficientes monedas') {
-        alert('No tienes suficientes monedas. Contacta a Soporte de Lluvia Live para recargar.');
+        setShowRecharge(true); loadRechargePackages();
       } else {
         alert(msg);
       }
@@ -426,6 +448,14 @@ const RoomView = ({ roomId, onBack }) => {
         @keyframes giftBubble { 0% { opacity: 0; transform: translateY(20px) scale(0.8); } 50% { opacity: 1; transform: translateY(-5px) scale(1.05); } 100% { opacity: 1; transform: translateY(0) scale(1); } }
       `}</style>
       {entryAnim && <EntryAnimation animation={entryAnim.animation} username={entryAnim.username} onComplete={() => setEntryAnim(null)} />}
+      {premiumAnim && <PremiumGiftAnimation giftType={premiumAnim.type} senderName={premiumAnim.sender} onComplete={() => setPremiumAnim(null)} />}
+
+      {/* GLOBAL BANNER */}
+      {globalBanner && (
+        <div className="absolute top-0 left-0 right-0 z-[60] bg-gradient-to-r from-yellow-500 via-orange-500 to-red-500 px-4 py-2 text-center" style={{top: 'calc(env(safe-area-inset-top, 20px) + 50px)'}}>
+          <div className="text-white text-xs font-bold">{globalBanner}</div>
+        </div>
+      )}
 
       {/* PHOTO ZOOM MODAL */}
       {zoomImg && (
@@ -828,6 +858,9 @@ const RoomView = ({ roomId, onBack }) => {
           onRefresh={() => { loadRoom(); }}
         />
       )}
+
+      {/* PK BATTLE BAR */}
+      <PKBattle roomId={roomId} userId={user.id} />
 
       {/* SEATS - Circular design with neon glow */}
       <div className="flex-shrink-0 px-3 mb-1 overflow-y-auto" style={{maxHeight: '40vh'}}>

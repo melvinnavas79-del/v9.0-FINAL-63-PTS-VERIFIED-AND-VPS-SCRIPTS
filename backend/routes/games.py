@@ -160,8 +160,9 @@ async def start_pk_battle(battle: PKBattleStart):
         "opponent_gifts": 0,
         "status": "active",
         "winner": None,
+        "duration": 300,
         "created_at": datetime.now(timezone.utc).isoformat(),
-        "expires_at": (datetime.now(timezone.utc) + timedelta(minutes=3)).isoformat()
+        "expires_at": (datetime.now(timezone.utc) + timedelta(minutes=5)).isoformat()
     }
     await db.pk_battles.insert_one(battle_doc)
     battle_doc.pop('_id', None)

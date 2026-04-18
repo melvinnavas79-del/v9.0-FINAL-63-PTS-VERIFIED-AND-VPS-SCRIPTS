@@ -480,6 +480,76 @@ async def update_admin_config(admin_id: str, updates: dict):
     )
     return {"success": True}
 
+# ==================== CUSTOM GIFTS (ADMIN) ====================
+
+@router.post("/admin/gifts/create")
+async def create_custom_gift(admin_id: str, request: Request):
+    """Create a custom gift with effect and sound. Owner only."""
+    admin = await db.users.find_one({"id": admin_id})
+    if not admin or admin.get('role') != 'dueño':
+        raise HTTPException(status_code=403, detail="Acceso denegado")
+    body = await request.json()
+    gift_id = body.get('id', str(uuid.uuid4())[:8])
+    gift_doc = {
+        "id": gift_id,
+        "name": body.get('name', 'Regalo'),
+        "emoji": body.get('emoji', '🎁'),
+        "cost": body.get('cost', 100),
+        "value": body.get('value', 80),
+        "effect": body.get('effect', 'float'),
+        "sound_url": body.get('sound_url', ''),
+        "animation": body.get('animation', 'none'),
+        "is_premium": body.get('is_premium', False),
+        "fullscreen": body.get('fullscreen', False),
+        "created_by": admin_id,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    await db.custom_gifts.update_one({"id": gift_id}, {"$set": gift_doc}, upsert=True)
+    return {"success": True, "gift": gift_doc}
+
+@router.get("/admin/gifts/custom")
+async def get_custom_gifts():
+    """Get all custom gifts."""
+    gifts = await db.custom_gifts.find().to_list(100)
+    for g in gifts:
+        g.pop('_id', None)
+    return gifts
+
+@router.delete("/admin/gifts/{gift_id}")
+async def delete_custom_gift(gift_id: str, admin_id: str):
+    """Delete a custom gift. Owner only."""
+    admin = await db.users.find_one({"id": admin_id})
+    if not admin or admin.get('role') != 'dueño':
+        raise HTTPException(status_code=403, detail="Acceso denegado")
+    await db.custom_gifts.delete_one({"id": gift_id})
+    return {"success": True}
+
+# ==================== GLOBAL ANNOUNCEMENTS ====================
+
+@router.post("/admin/global-announce")
+async def global_announce(admin_id: str, text: str):
+    """Send global announcement to all rooms. Owner/Admin only."""
+    admin = await db.users.find_one({"id": admin_id})
+    if not admin or admin.get('role') not in ('dueño', 'admin'):
+        raise HTTPException(status_code=403, detail="Acceso denegado")
+    announce_doc = {
+        "id": str(uuid.uuid4()),
+        "text": text,
+        "created_by": admin_id,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    await db.global_announcements.insert_one(announce_doc)
+    announce_doc.pop('_id', None)
+    return {"success": True, "announcement": announce_doc}
+
+@router.get("/announcements/latest")
+async def get_latest_announcement():
+    """Get the latest global announcement."""
+    ann = await db.global_announcements.find_one(sort=[("created_at", -1)])
+    if ann:
+        ann.pop('_id', None)
+    return ann
+
 # ==================== SETUP ====================
 
 # ==================== SVIP SYSTEM ====================
