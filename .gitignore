@@ -49,28 +49,15 @@ coverage/
 *.tar
 *.tgz
 *.pack
+
+# Carpetas de plataforma de desarrollo (NO son parte de Lluvia Live)
+.emergent/
+.gitconfig
+
+# Credenciales
+credentials.json
+.credentials
 frontend/node_modules/.cache/default-development/41.pack
-frontend/node_modules/.cache/default-development/0.pack
-frontend/node_modules/.cache/default-development/3.pack
-frontend/node_modules/.cache/default-development/6.pack
-frontend/node_modules/.cache/default-development/2.pack
-frontend/node_modules/.cache/default-development/1.pack
 frontend/node_modules/.cache/default-development/2.pack_
--e 
-# Environment and credential files
-.env
-.env.*
-*.env
-credentials.json
-*.pem
-*.key
-.credentials
--e 
-# Environment and credential files
-.env
-.env.*
-*.env
-credentials.json
-*.pem
-*.key
-.credentials
+frontend/node_modules/.cache/default-development/1.pack
+frontend/node_modules/.cache/default-development/0.pack
