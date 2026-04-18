@@ -17,11 +17,28 @@ const ProfileView = ({ onBack, onNavigate }) => {
   const [ghostMode, setGhostMode] = useState(user?.ghost_mode || false);
   const [uploading, setUploading] = useState(false);
   const [badgesData, setBadgesData] = useState(null);
+  const [countries, setCountries] = useState([]);
+  const [showCountryPicker, setShowCountryPicker] = useState(false);
   const fileInputRef = useRef(null);
 
   useEffect(() => {
     loadBadges();
+    loadCountries();
   }, []);
+
+  const loadCountries = async () => {
+    try { const r = await axios.get(`${API}/countries`); setCountries(r.data); } catch (e) {}
+  };
+
+  const setCountry = async (code) => {
+    try {
+      const r = await axios.post(`${API}/users/${user.id}/country?country_code=${code}`);
+      if (r.data.success) {
+        updateUser({ country: r.data.country.code, country_flag: r.data.country.flag });
+        setShowCountryPicker(false);
+      }
+    } catch (e) { alert('Error al cambiar pais'); }
+  };
 
   const loadBadges = async () => {
     try {
@@ -109,7 +126,34 @@ const ProfileView = ({ onBack, onNavigate }) => {
           </div>
         </div>
 
-        <h2 className="text-3xl font-bold text-white text-center mb-3">{user.username}</h2>
+        <h2 className="text-3xl font-bold text-white text-center mb-1">{user.username}</h2>
+        
+        {/* Country & SVIP */}
+        <div className="flex items-center justify-center gap-2 mb-3">
+          <button onClick={() => setShowCountryPicker(!showCountryPicker)}
+            className="bg-white/10 px-3 py-1 rounded-full text-sm flex items-center gap-1 active:scale-95">
+            <span>{user.country_flag || '🌍'}</span>
+            <span className="text-white/60 text-xs">{user.country || 'Elegir pais'}</span>
+          </button>
+          {user.svip_level > 0 && (
+            <span className="bg-yellow-500/80 text-white text-xs px-3 py-1 rounded-full font-bold">SVIP {user.svip_level}</span>
+          )}
+        </div>
+
+        {/* Country Picker */}
+        {showCountryPicker && (
+          <div className="mb-4 max-h-[200px] overflow-y-auto bg-white/5 rounded-xl p-2">
+            <div className="grid grid-cols-2 gap-1">
+              {countries.map(c => (
+                <button key={c.code} onClick={() => setCountry(c.code)}
+                  className={`flex items-center gap-2 p-2 rounded-lg text-left text-xs ${user.country === c.code ? 'bg-cyan-500/30 border border-cyan-400/30' : 'bg-white/5 hover:bg-white/10'}`}>
+                  <span className="text-base">{c.flag}</span>
+                  <span className="text-white/80 truncate">{c.name}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Badges */}
         <div className="flex flex-wrap justify-center gap-2 mb-3">

@@ -146,6 +146,9 @@ def serialize_user(user: Dict[str, Any]) -> Dict[str, Any]:
         "coins": user.get("coins", 0),
         "diamonds": user.get("diamonds", 0),
         "aristocracy": user.get("aristocracy", 0),
+        "svip_level": user.get("svip_level", 0),
+        "country": user.get("country", ""),
+        "country_flag": user.get("country_flag", ""),
         "avatar": user.get("avatar", f"https://api.dicebear.com/7.x/adventurer/svg?seed={user.get('username', 'default')}"),
         "clan": user.get("clan"),
         "cp_partner": user.get("cp_partner"),
@@ -162,6 +165,8 @@ def serialize_user(user: Dict[str, Any]) -> Dict[str, Any]:
         "phone": user.get("phone", ""),
         "auth_provider": user.get("auth_provider", "password"),
         "device_id": user.get("device_id", ""),
+        "device_model": user.get("device_model", ""),
+        "last_ip": user.get("last_ip", ""),
         "firebase_uid": user.get("firebase_uid", ""),
         "created_at": user.get("created_at", ""),
     }

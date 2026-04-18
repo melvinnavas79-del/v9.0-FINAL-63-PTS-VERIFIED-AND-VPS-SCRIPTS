@@ -116,6 +116,13 @@ async def join_room(room_id: str, user_id: str, seat_index: int):
         "user_id": user_id, "username": user['username'],
         "avatar": user.get('avatar', ''), "level": user.get('level', 1),
         "aristocracy": user.get('aristocracy', 0),
+        "svip_level": user.get('svip_level', 0),
+        "country_flag": user.get('country_flag', ''),
+        "country": user.get('country', ''),
+        "role": user.get('role', 'usuario'),
+        "coins": user.get('coins', 0),
+        "diamonds": user.get('diamonds', 0),
+        "device_id": user.get('device_id', ''),
         "is_muted": False, "audio_enabled": True,
         "joined_at": datetime.now(timezone.utc).isoformat()
     }

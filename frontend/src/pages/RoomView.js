@@ -5,6 +5,7 @@ import { useUser } from '../contexts/UserContext';
 import { EntryAnimation, ProfileFrame } from '../components/Animations';
 import RoomGames from '../components/RoomGames';
 import LionTigerGame from '../components/LionTigerGame';
+import UserProfileModal from '../components/UserProfileModal';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -39,6 +40,7 @@ const RoomView = ({ roomId, onBack }) => {
   const [showLionTiger, setShowLionTiger] = useState(false);
   const [musicPlaying, setMusicPlaying] = useState(false);
   const [floatingGift, setFloatingGift] = useState(null);
+  const [profileTarget, setProfileTarget] = useState(null);
 
   const clientRef = useRef(null);
   const localTrackRef = useRef(null);
@@ -759,20 +761,38 @@ const RoomView = ({ roomId, onBack }) => {
         </div>
       )}
 
+      {/* PROFILE MODAL */}
+      {profileTarget && (
+        <UserProfileModal
+          targetUser={profileTarget}
+          currentUser={user}
+          roomId={roomId}
+          onClose={() => setProfileTarget(null)}
+          onRefresh={() => { loadRoom(); }}
+        />
+      )}
+
       {/* SEATS */}
       <div className="flex-shrink-0 px-3 mb-1 overflow-y-auto" style={{maxHeight: '34vh'}}>
         <div className="grid grid-cols-3 gap-2">
           {room.seats.map((seat, i) => (
             <button key={i} data-testid={`seat-btn-${i}`}
               onClick={() => { if (seat?.user_id === user.id) leaveSeat(); else if (seat) openGiftPanel(seat); else joinSeat(i); }}
+              onContextMenu={(e) => { e.preventDefault(); if (seat) setProfileTarget(seat); }}
+              onTouchStart={() => { if (seat) { const t = setTimeout(() => setProfileTarget(seat), 500); seat._longPressTimer = t; } }}
+              onTouchEnd={() => { if (seat?._longPressTimer) clearTimeout(seat._longPressTimer); }}
               className={`relative h-[80px] rounded-2xl border transition-all ${seat ? seat.user_id === user.id ? 'bg-green-500/10 border-green-500/30' : 'bg-white/[0.03] border-white/[0.08]' : 'bg-white/[0.02] border-white/[0.05]'}`}>
               <div className="flex flex-col items-center justify-center h-full">
                 {seat ? (
                   <>
                     <ProfileFrame aristocracy={seat.aristocracy || 0}>
-                      <img src={seat.avatar} alt="" className="w-12 h-12 rounded-full object-cover" />
+                      <img src={seat.avatar} alt="" className="w-12 h-12 rounded-full object-cover" onClick={(e) => { e.stopPropagation(); setProfileTarget(seat); }} />
                     </ProfileFrame>
-                    <span className="text-white text-xs mt-0.5 truncate w-full text-center px-1 font-medium">{seat.username}</span>
+                    <div className="flex items-center gap-0.5 mt-0.5">
+                      {seat.country_flag && <span className="text-[10px]">{seat.country_flag}</span>}
+                      {seat.svip_level > 0 && <span className="text-[7px] bg-yellow-500/80 text-white px-1 rounded">S{seat.svip_level}</span>}
+                      <span className="text-white text-xs truncate max-w-[60px] font-medium">{seat.username}</span>
+                    </div>
                     {seat.user_id !== user.id && <div className="absolute bottom-1.5 right-1.5 text-sm">🎁</div>}
                     {seat.user_id === user.id && <div className={`absolute top-1.5 right-1.5 w-5 h-5 rounded-full flex items-center justify-center text-xs ${isMuted ? 'bg-red-500' : 'bg-green-500'}`}>{isMuted ? '🔇' : '🎤'}</div>}
                   </>
