@@ -132,16 +132,34 @@ const EffectIcon = () => (
 
 const BubbleCircle = ({ gradient, children }) => (
   <div
-    className="relative w-[62px] h-[62px] rounded-full flex items-center justify-center"
+    className="relative w-[64px] h-[64px] rounded-full flex items-center justify-center"
     style={{
       background: gradient,
-      boxShadow: '0 6px 14px rgba(0,0,0,0.35), inset 0 2px 4px rgba(255,255,255,0.35), inset 0 -3px 6px rgba(0,0,0,0.2)',
+      boxShadow:
+        '0 8px 18px rgba(0,0,0,0.45), ' +
+        '0 2px 4px rgba(0,0,0,0.25), ' +
+        'inset 0 2px 4px rgba(255,255,255,0.5), ' +
+        'inset 0 -4px 8px rgba(0,0,0,0.25), ' +
+        'inset 0 0 0 1px rgba(255,255,255,0.1)',
     }}
   >
-    {/* Inner top highlight for 3D relief */}
+    {/* Top specular glossy highlight (big) */}
     <div
-      className="absolute top-[3px] left-[8px] right-[8px] h-[20px] rounded-full pointer-events-none"
-      style={{ background: 'linear-gradient(to bottom, rgba(255,255,255,0.5), transparent)', filter: 'blur(2px)' }}
+      className="absolute top-[2px] left-[6px] right-[6px] h-[24px] rounded-[24px] pointer-events-none"
+      style={{
+        background: 'linear-gradient(to bottom, rgba(255,255,255,0.75) 0%, rgba(255,255,255,0.15) 55%, transparent 100%)',
+        filter: 'blur(0.5px)',
+      }}
+    />
+    {/* Tiny specular dot */}
+    <div
+      className="absolute top-[8px] left-[14px] w-[12px] h-[6px] rounded-full pointer-events-none"
+      style={{ background: 'rgba(255,255,255,0.85)', filter: 'blur(2px)' }}
+    />
+    {/* Bottom inner rim shadow */}
+    <div
+      className="absolute bottom-[1px] left-[10%] right-[10%] h-[8px] rounded-full pointer-events-none"
+      style={{ background: 'radial-gradient(ellipse at center, rgba(0,0,0,0.35), transparent 70%)', filter: 'blur(3px)' }}
     />
     <div className="relative z-10">{children}</div>
   </div>

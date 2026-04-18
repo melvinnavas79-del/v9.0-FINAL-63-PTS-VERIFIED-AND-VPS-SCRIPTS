@@ -1,0 +1,51 @@
+{
+  "summary": "Iteration 4 — Validated the 3 UX changes Melvin requested: (1) simplified action bar in RoomView, (2) new GameResultToast for tool-dado/tool-numero/tool-mora, (3) premium 3D BubbleCircle highlights. Backend pytest: 5/6 passing; 1 legitimate failure exposes a real bug in backend games/play for 'dados' (no dice1/dice2 returned). Frontend: login Melvin_Live → Mío → opened a room → confirmed bar-cofres/bar-sobres/bar-juegos/bar-tienda are ALL removed, 💰 coins indicator still visible, 8 ToolsPanel bubbles render with gradients gb1..e1 and glossy highlights visible in screenshots. ToolsPanel clicks on Dado/Número/Mora all triggered a visible data-testid='game-result-toast' that auto-dismissed in ~3.2–4 s. RULETA correctly displays multiplier (x3), MORA correctly displays RPS verdict text ('Tú: papel vs tijera — perdiste'), but DADO falls back to multiplier visual because the backend does NOT return dice1/dice2 for game='dados' — so the promised dice faces with dots are never drawn.",
+  "backend_issues": {
+    "critical": [
+      {
+        "endpoint": "POST /api/games/play (game='dados')",
+        "issue": "Response omits dice1/dice2 and game_data is empty ({}). GameResultToast visual pipeline expects result.dice1 and result.dice2 to render the DiceFace components; without them the toast falls back to the generic multiplier fallback and the user never sees the dice dots that were the whole point of this iteration. Fix: in /app/backend/routes/games.py play_generic(), add an explicit branch for play.game == 'dados' that rolls two dice (random.randint(1,6)) and returns them in the top-level response payload (dice1, dice2) AND mirrors them into game_data so the frontend toast renders the dots.",
+        "priority": "HIGH"
+      }
+    ],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {
+        "flow": "ToolsPanel → Dado → GameResultToast",
+        "issue": "Toast appears and auto-dismisses correctly, but because backend returns no dice1/dice2, DiceFace is never rendered. The contract between GameResultToast and quickDados() is fine — the root cause is the backend response shape for 'dados'.",
+        "affected_selectors": ["[data-testid=\"game-result-toast\"]", "[data-testid=\"tool-dado\"]"]
+      }
+    ],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration_4.py",
+    "/app/test_reports/pytest/iteration_4.xml"
+  ],
+  "action_items": [
+    "BACKEND: In /app/backend/routes/games.py play_generic(), add a branch for play.game == 'dados' that rolls 2 dice and returns dice1/dice2 (and ideally player_total = dice1+dice2, won rule e.g. sum>=8). This will make the DiceFace dots render in the toast as specified.",
+    "OPTIONAL: Once dados is fixed, consider extending the same pattern to 'slots' so the reels render in the toast too (GameResultToast already supports result.reels)."
+  ],
+  "critical_code_review_comments": [
+    "GameResultToast.js (137 lines) is well-scoped and defensive — it handles 4 visual modes (dice, reels, multiplier fallback, none). The 3.2 s auto-dismiss + 0.3 s exit animation is good UX. No changes needed.",
+    "ToolsPanel.js BubbleCircle has 3 layered highlights (top gloss, specular dot, rim shadow) — visible in screenshots. Clean CSS-only implementation.",
+    "RoomView.js action bar was correctly simplified: bar-cofres/bar-sobres/bar-juegos/bar-tienda are GONE from render, bar-fondo is correctly gated by `room.owner_id === user.id`, and the 💰 coins pill remains. The import + mount of GameResultToast at line 468 is correctly placed inside the high z-index layer.",
+    "Minor: quickDados() sets setGameResult(r.data) directly but backend response is missing dice1/dice2, so the toast receives only { won, prize, multiplier, new_balance, game_data:{} }. Frontend code is correct; backend is the gap."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iteration_4.py (new pytest for this iteration)"
+  ],
+  "success_rate": {
+    "backend": "83% (5/6 pytest) — the 1 failure is a legitimate product bug (dados response missing dice1/dice2)",
+    "frontend": "95% — all requested UX validated; the only gap is that DADO toast cannot show dice dots due to backend response shape"
+  },
+  "test_credentials": "Melvin_Live / test123 (dueño). Owner id b45958bc-2c6b-49ea-8102-a11197001e53. Owner's own rooms: 'Mi Sala Live' (f8e3f9d8-9690-43e7-8887-2e8482936ac8) and 'Test Room Created 58671' (51f74e6b-e35a-4ef3-9173-c6f2f8c844aa). 'Test Room 1775928775' (8aa56178) is NOT owned by Melvin — so bar-fondo is correctly hidden in that room.",
+  "seed_data_creation": "Created TEST_brokeUser_it4 via /api/register for the insufficient-funds assertion.",
+  "retest_needed": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "The action bar simplification and GameResultToast integration are both working. The ONLY remaining gap is backend /api/games/play for game='dados' — it returns empty game_data and no dice1/dice2. Once that is fixed, the DADO branch of GameResultToast (DiceFace with dots 1-6) will render correctly and no further frontend changes are needed. Backend tests live in /app/backend/tests/test_iteration_4.py — after the fix, test_games_play_dados should pass (it already asserts dice1/dice2 in [1,6]). Frontend flow: login → Mío tab → click a room-card-* (NOT mio-btn-0..3 which are top tiles) → entry animation finishes → ToolsPanel works. Irrelevant console noise: Agora SDK UID_CONFLICT errors when re-entering a room while still connected — expected in test harness, not a product bug.",
+  "rca of the issue": "The new GameResultToast's DiceFace branch renders only when result.dice1 !== undefined && result.dice2 !== undefined. Frontend quickDados() passes the raw /api/games/play response to setGameResult. Backend play_generic() has explicit branches for slots/ludo/yacaro/carreras/pool/domino/monster that populate game_data, but 'dados' hits the generic else block (line 197-199 of /app/backend/routes/games.py) that only sets a random won/mult pair and leaves game_data = {}. Therefore the DiceFace never renders. Reproduction: login as any user, enter any room, open ToolsPanel, tap Dado — toast appears with a large 'x5' (or similar) instead of two dice with dots. Mitigation: add an 'elif play.game == \"dados\":' branch that generates dice1 = random.randint(1,6), dice2 = random.randint(1,6), decides won from the sum, and returns them on the top-level response (and in game_data)."
+}

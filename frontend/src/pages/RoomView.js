@@ -11,6 +11,7 @@ import PremiumGiftAnimation from '../components/PremiumGiftAnimation';
 import ToolsPanel from '../components/ToolsPanel';
 import SeatsGrid from '../components/SeatsGrid';
 import ChatArea from '../components/ChatArea';
+import GameResultToast from '../components/GameResultToast';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -463,6 +464,9 @@ const RoomView = ({ roomId, onBack }) => {
       {/* TOOLS PANEL — Premium glass panel with 8 circular tools */}
       <ToolsPanel open={toolsOpen} onClose={() => setToolsOpen(false)} onAction={handleToolAction} />
 
+      {/* GAME RESULT TOAST — feedback visual premium para Número/Dado/Mora */}
+      <GameResultToast result={gameResult} onDone={() => setGameResult(null)} />
+
       {/* EFFECT BURST — triggered by Efecto tool */}
       {effectBurst && (
         <div key={effectBurst.key} className="fixed inset-0 z-[75] pointer-events-none flex items-center justify-center">
@@ -819,25 +823,19 @@ const RoomView = ({ roomId, onBack }) => {
         </div>
       )}
 
-      {/* ACTION BAR */}
+      {/* COINS INDICATOR + OWNER CONTROLS (clean, sin duplicados) */}
       <div className="flex-shrink-0 px-3 mb-2">
-        <div className="flex gap-2">
-          <button data-testid="bar-cofres" onClick={() => setPanel('cofres')} className="bg-yellow-500/15 border border-yellow-500/20 rounded-full px-3 py-2 flex items-center gap-1.5 min-h-[40px]">
-            <span className="text-base">📦</span><span className="text-yellow-300 text-xs font-bold">Cofres</span>
-          </button>
-          <button data-testid="bar-sobres" onClick={() => setPanel('sobres')} className="bg-red-500/15 border border-red-500/20 rounded-full px-3 py-2 flex items-center gap-1.5 min-h-[40px]">
-            <span className="text-base">🧧</span><span className="text-red-300 text-xs font-bold">Sobres</span>
-          </button>
-          <button data-testid="bar-juegos" onClick={() => setPanel('games')} className="bg-green-500/15 border border-green-500/20 rounded-full px-3 py-2 flex items-center gap-1.5 min-h-[40px]">
-            <span className="text-base">🎮</span><span className="text-green-300 text-xs font-bold">Juegos</span>
-          </button>
-          <button data-testid="bar-tienda" onClick={() => setPanel('tienda')} className="bg-purple-500/15 border border-purple-500/20 rounded-full px-3 py-2 flex items-center gap-1.5 min-h-[40px]">
-            <span className="text-base">🛒</span><span className="text-purple-300 text-xs font-bold">Tienda</span>
-          </button>
+        <div className="flex items-center gap-2">
           {room.owner_id === user.id && (
             <>
-              <button onClick={() => bgRef.current?.click()} className="bg-cyan-500/15 border border-cyan-500/20 rounded-full px-3 py-2 flex items-center gap-1.5 min-h-[40px]">
-                <span className="text-base">🖼</span><span className="text-cyan-300 text-xs font-bold">Fondo</span>
+              <button
+                data-testid="bar-fondo"
+                onClick={() => bgRef.current?.click()}
+                className="bg-cyan-500/15 border border-cyan-500/20 rounded-full px-3 py-2 flex items-center gap-1.5 min-h-[40px] active:scale-95"
+                title="Cambiar fondo de la sala (solo dueño)"
+              >
+                <span className="text-base">🖼</span>
+                <span className="text-cyan-300 text-xs font-bold">Fondo</span>
               </button>
               <input ref={bgRef} type="file" accept="image/*" onChange={uploadBackground} className="hidden" />
             </>
