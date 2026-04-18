@@ -41,6 +41,8 @@ const RoomView = ({ roomId, onBack }) => {
   const [musicPlaying, setMusicPlaying] = useState(false);
   const [floatingGift, setFloatingGift] = useState(null);
   const [profileTarget, setProfileTarget] = useState(null);
+  const [showRecharge, setShowRecharge] = useState(false);
+  const [rechargePackages, setRechargePackages] = useState({});
 
   const clientRef = useRef(null);
   const localTrackRef = useRef(null);
@@ -94,6 +96,13 @@ const RoomView = ({ roomId, onBack }) => {
   const loadGifts = async () => { try { const r = await axios.get(`${API}/gifts`); setGifts(r.data); } catch (e) {} };
   const loadSobres = async () => { try { const r = await axios.get(`${API}/sobres`); setSobres(r.data); } catch (e) {} };
   const loadCofres = async () => { try { const r = await axios.get(`${API}/rooms/${roomId}/cofres`); setCofresData(r.data); } catch (e) {} };
+  const loadRechargePackages = async () => { try { const r = await axios.get(`${API}/store/packages`); setRechargePackages(r.data); } catch (e) {} };
+  const buyPackageInRoom = async (pkgId) => {
+    try {
+      const r = await axios.post(`${API}/store/checkout?package_id=${pkgId}&user_id=${user.id}`, null, { headers: { 'Origin': window.location.origin } });
+      if (r.data.url) window.location.href = r.data.url;
+    } catch (e) { alert(e.response?.data?.detail || 'Error. Contacta Soporte de Lluvia Live.'); }
+  };
 
   const checkBotActive = async () => {
     try {
@@ -692,7 +701,34 @@ const RoomView = ({ roomId, onBack }) => {
               </div>
             )}
 
-            <p className="text-yellow-400/50 text-[10px] text-center mt-2">Tus monedas: {formatCoins(user.coins)}</p>
+            <div className="flex items-center justify-center gap-2 mt-2">
+              <p className="text-yellow-400/50 text-[10px]">Tus monedas: {formatCoins(user.coins)}</p>
+              <button onClick={() => { setShowRecharge(true); loadRechargePackages(); }} data-testid="recharge-in-room"
+                className="bg-green-500 text-white text-[10px] font-bold px-3 py-1 rounded-full active:scale-95">
+                + Recargar
+              </button>
+            </div>
+
+            {/* RECHARGE MODAL */}
+            {showRecharge && (
+              <div className="mt-3 bg-gradient-to-b from-green-900/40 to-emerald-900/40 border border-green-500/20 rounded-2xl p-3">
+                <div className="flex justify-between items-center mb-2">
+                  <span className="text-green-300 text-xs font-bold">Recargar Monedas</span>
+                  <button onClick={() => setShowRecharge(false)} className="text-white/30 text-sm">x</button>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  {Object.entries(rechargePackages).slice(0, 6).map(([id, pkg]) => (
+                    <button key={id} onClick={() => buyPackageInRoom(id)}
+                      className="bg-white/5 border border-white/10 rounded-xl p-2 text-center active:scale-95 hover:bg-white/10 transition-all">
+                      <div className="text-yellow-400 text-sm font-bold">{formatCoins(pkg.coins)}</div>
+                      <div className="text-white/40 text-[8px]">{pkg.diamonds > 0 ? `+${formatCoins(pkg.diamonds)} diamantes` : ''}</div>
+                      <div className="text-green-400 text-xs font-bold mt-1">${pkg.price}</div>
+                    </button>
+                  ))}
+                </div>
+                <p className="text-white/20 text-[8px] text-center mt-2">Pagos seguros con PayPal</p>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -793,11 +829,15 @@ const RoomView = ({ roomId, onBack }) => {
         />
       )}
 
-      {/* SEATS - Dynamic grid (10 or 24) */}
-      <div className="flex-shrink-0 px-2 mb-1 overflow-y-auto" style={{maxHeight: '38vh'}}>
+      {/* SEATS - Circular design with neon glow */}
+      <div className="flex-shrink-0 px-3 mb-1 overflow-y-auto" style={{maxHeight: '40vh'}}>
+        <style>{`
+          @keyframes neonPulse { 0%,100% { box-shadow: 0 0 8px #00ff88, 0 0 20px #00ff8855, 0 0 40px #00ff8822; } 50% { box-shadow: 0 0 12px #00ff88, 0 0 30px #00ff8877, 0 0 50px #00ff8833; } }
+          .seat-speaking { animation: neonPulse 1.5s ease-in-out infinite; border-color: #00ff88 !important; }
+        `}</style>
         {/* Owner controls */}
         {room.owner_id === user.id && (
-          <div className="flex gap-1 mb-1 justify-between">
+          <div className="flex gap-1 mb-2 justify-between">
             <div className="flex gap-1">
               <button onClick={async () => { await axios.post(`${API}/rooms/${roomId}/lock-all?owner_id=${user.id}`); loadRoom(); }}
                 className="text-[9px] bg-red-500/20 text-red-300 px-2 py-1 rounded-lg active:scale-95">Cerrar</button>
@@ -811,50 +851,64 @@ const RoomView = ({ roomId, onBack }) => {
                 loadRoom();
               }} data-testid="toggle-event-mode"
                 className={`text-[9px] px-3 py-1 rounded-lg font-bold active:scale-95 ${(room.max_seats || 10) === 24 ? 'bg-yellow-500/30 text-yellow-300 border border-yellow-500/30' : 'bg-blue-500/20 text-blue-300'}`}>
-                {(room.max_seats || 10) === 24 ? '24 Mics (Evento)' : '10 Mics → 24'}
+                {(room.max_seats || 10) === 24 ? '24 Mics' : '10→24'}
               </button>
             )}
           </div>
         )}
+        <div className="text-white/30 text-[10px] text-center mb-2 font-medium tracking-wider">Micro</div>
         {(() => {
           const maxSeats = room.max_seats || 10;
           const seats = (room.seats || []).slice(0, maxSeats);
-          const cols = maxSeats <= 10 ? 5 : 6;
-          const seatSize = maxSeats <= 10 ? 'h-[72px]' : 'h-[62px]';
-          const avatarSize = maxSeats <= 10 ? 'w-10 h-10' : 'w-8 h-8';
-          const fontSize = maxSeats <= 10 ? 'text-[9px]' : 'text-[7px]';
+          const cols = maxSeats <= 10 ? 3 : 6;
+          const circleSize = maxSeats <= 10 ? 'w-[72px] h-[72px]' : 'w-[52px] h-[52px]';
+          const avatarSize = maxSeats <= 10 ? 'w-[52px] h-[52px]' : 'w-[36px] h-[36px]';
+          const labelSize = maxSeats <= 10 ? 'text-[11px]' : 'text-[8px]';
           return (
-            <div className={`grid gap-1`} style={{gridTemplateColumns: `repeat(${cols}, 1fr)`}}>
+            <div className="grid justify-items-center gap-y-3" style={{gridTemplateColumns: `repeat(${cols}, 1fr)`, gap: maxSeats <= 10 ? '16px 8px' : '8px 4px'}}>
               {seats.map((seat, i) => {
                 const isLocked = room.seat_locks?.[i];
+                const isSpeaking = seat && seat.user_id === user.id && !isMuted;
+                const isOccupied = !!seat;
                 return (
-                  <button key={i} data-testid={`seat-btn-${i}`}
-                    onClick={() => {
-                      if (isLocked && room.owner_id === user.id) { axios.post(`${API}/rooms/${roomId}/lock-seat?owner_id=${user.id}&seat_index=${i}`).then(() => loadRoom()); return; }
-                      if (isLocked) return;
-                      if (seat?.user_id === user.id) leaveSeat(); else if (seat) openGiftPanel(seat); else joinSeat(i);
-                    }}
-                    onContextMenu={(e) => { e.preventDefault(); if (seat) setProfileTarget(seat); }}
-                    className={`relative ${seatSize} rounded-xl border transition-all ${isLocked && !seat ? 'bg-red-500/5 border-red-500/20' : seat ? seat.user_id === user.id ? 'bg-green-500/10 border-green-500/30' : 'bg-white/[0.03] border-white/[0.08]' : 'bg-white/[0.02] border-white/[0.05]'}`}>
-                    <div className="flex flex-col items-center justify-center h-full">
+                  <div key={i} className="flex flex-col items-center">
+                    <button data-testid={`seat-btn-${i}`}
+                      onClick={() => {
+                        if (isLocked && room.owner_id === user.id) { axios.post(`${API}/rooms/${roomId}/lock-seat?owner_id=${user.id}&seat_index=${i}`).then(() => loadRoom()); return; }
+                        if (isLocked) return;
+                        if (seat?.user_id === user.id) leaveSeat(); else if (seat) openGiftPanel(seat); else joinSeat(i);
+                      }}
+                      onContextMenu={(e) => { e.preventDefault(); if (seat) setProfileTarget(seat); }}
+                      className={`${circleSize} rounded-full border-[3px] flex items-center justify-center transition-all relative ${
+                        isLocked && !seat ? 'bg-gray-800/60 border-red-500/30' :
+                        isSpeaking ? 'bg-gray-800 seat-speaking border-green-400' :
+                        isOccupied ? 'bg-gray-800 border-gray-600/50' :
+                        'bg-gray-800/80 border-gray-700/40'
+                      }`}
+                      style={isSpeaking ? {boxShadow: '0 0 15px #00ff88, 0 0 30px #00ff8855'} : {}}>
                       {seat ? (
-                        <>
-                          <img src={seat.avatar} alt="" className={`${avatarSize} rounded-full object-cover`} onClick={(e) => { e.stopPropagation(); setProfileTarget(seat); }} />
-                          <div className="flex items-center gap-0.5 mt-0.5">
-                            {seat.country_flag && <span className={fontSize}>{seat.country_flag}</span>}
-                            {seat.svip_level > 0 && <span className="text-[5px] bg-yellow-500/80 text-white px-0.5 rounded">S{seat.svip_level}</span>}
-                            <span className={`text-white ${fontSize} truncate max-w-[45px] font-medium`}>{seat.username}</span>
-                          </div>
-                          {seat.user_id !== user.id && <div className="absolute bottom-0 right-0 text-[8px]">🎁</div>}
-                          {seat.user_id === user.id && <div className={`absolute top-0.5 right-0.5 w-3.5 h-3.5 rounded-full flex items-center justify-center text-[7px] ${isMuted ? 'bg-red-500' : 'bg-green-500'}`}>{isMuted ? '🔇' : '🎤'}</div>}
-                        </>
+                        <img src={seat.avatar} alt="" className={`${avatarSize} rounded-full object-cover`}
+                          onClick={(e) => { e.stopPropagation(); setProfileTarget(seat); }} />
                       ) : isLocked ? (
-                        <div className="text-red-400/40 text-sm">🔒</div>
+                        <span className="text-red-400/50 text-lg">🔒</span>
                       ) : (
-                        <div className="text-white/15 text-xs font-medium">{i + 1}</div>
+                        <svg className="w-8 h-8 text-blue-300/40" fill="currentColor" viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+                      )}
+                      {seat?.svip_level > 0 && (
+                        <div className="absolute -top-1 -right-1 bg-yellow-500 text-[6px] text-black font-bold px-1 rounded-full">S{seat.svip_level}</div>
+                      )}
+                    </button>
+                    <div className="mt-1 text-center">
+                      {seat ? (
+                        <div className="flex items-center gap-0.5 justify-center">
+                          {seat.country_flag && <span className="text-[10px]">{seat.country_flag}</span>}
+                          <span className={`text-white/80 ${labelSize} font-medium truncate max-w-[70px]`}>{seat.username}</span>
+                        </div>
+                      ) : (
+                        <span className={`text-white/25 ${labelSize}`}>Silla {i + 1}</span>
                       )}
                     </div>
-                  </button>
+                  </div>
                 );
               })}
             </div>
