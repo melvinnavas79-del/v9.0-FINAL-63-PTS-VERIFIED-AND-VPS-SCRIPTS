@@ -9,6 +9,8 @@ import UserProfileModal from '../components/UserProfileModal';
 import PKBattle from '../components/PKBattle';
 import PremiumGiftAnimation from '../components/PremiumGiftAnimation';
 import ToolsPanel from '../components/ToolsPanel';
+import SeatsGrid from '../components/SeatsGrid';
+import ChatArea from '../components/ChatArea';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -59,13 +61,11 @@ const RoomView = ({ roomId, onBack }) => {
   const [toolsOpen, setToolsOpen] = useState(false);
   const [effectBurst, setEffectBurst] = useState(null);
 
-  const chatRef = useRef(null);
-  const prevMsgCount = useRef(0);
   const photoRef = useRef(null);
   const musicRef = useRef(null);
   const audioElementRef = useRef(null);
   const bgRef = useRef(null);
-  const joinedOnceRef = useRef(false);
+  const joinedOnceRef = useRef(false); // eslint-disable-line no-unused-vars
 
   useEffect(() => {
     loadRoom(); markJoinAndLoadChat(); loadGifts(); loadSobres(); loadCofres(); checkBotActive(); loadMyEvents(); loadPendingRequests(); loadPK();
@@ -113,12 +113,6 @@ const RoomView = ({ roomId, onBack }) => {
       }
     };
   }, [roomId]);
-
-  useEffect(() => {
-    if (chatMessages.length > prevMsgCount.current && chatRef.current)
-      chatRef.current.scrollTop = chatRef.current.scrollHeight;
-    prevMsgCount.current = chatMessages.length;
-  }, [chatMessages]);
 
   const loadRoom = async () => {
     try {
@@ -891,10 +885,6 @@ const RoomView = ({ roomId, onBack }) => {
 
       {/* SEATS - Circular design with neon glow */}
       <div className="flex-shrink-0 px-3 mb-1 overflow-y-auto" style={{maxHeight: '40vh'}}>
-        <style>{`
-          @keyframes neonPulse { 0%,100% { box-shadow: 0 0 8px #00ff88, 0 0 20px #00ff8855, 0 0 40px #00ff8822; } 50% { box-shadow: 0 0 12px #00ff88, 0 0 30px #00ff8877, 0 0 50px #00ff8833; } }
-          .seat-speaking { animation: neonPulse 1.5s ease-in-out infinite; border-color: #00ff88 !important; }
-        `}</style>
         {/* Owner controls */}
         {room.owner_id === user.id && (
           <div className="flex gap-1 mb-2 justify-between">
@@ -917,102 +907,34 @@ const RoomView = ({ roomId, onBack }) => {
           </div>
         )}
         <div className="text-white/30 text-[10px] text-center mb-2 font-medium tracking-wider">Micro</div>
-        {(() => {
-          const maxSeats = room.max_seats || 10;
-          const seats = (room.seats || []).slice(0, maxSeats);
-          const cols = maxSeats <= 10 ? 3 : 6;
-          const circleSize = maxSeats <= 10 ? 'w-[72px] h-[72px]' : 'w-[52px] h-[52px]';
-          const avatarSize = maxSeats <= 10 ? 'w-[52px] h-[52px]' : 'w-[36px] h-[36px]';
-          const labelSize = maxSeats <= 10 ? 'text-[11px]' : 'text-[8px]';
-          return (
-            <div className="grid justify-items-center gap-y-3" style={{gridTemplateColumns: `repeat(${cols}, 1fr)`, gap: maxSeats <= 10 ? '16px 8px' : '8px 4px'}}>
-              {seats.map((seat, i) => {
-                const isLocked = room.seat_locks?.[i];
-                const isSpeaking = seat && seat.user_id === user.id && !isMuted;
-                const isOccupied = !!seat;
-                return (
-                  <div key={i} className="flex flex-col items-center">
-                    <button data-testid={`seat-btn-${i}`}
-                      onClick={() => {
-                        if (isLocked && room.owner_id === user.id) { axios.post(`${API}/rooms/${roomId}/lock-seat?owner_id=${user.id}&seat_index=${i}`).then(() => loadRoom()); return; }
-                        if (isLocked) return;
-                        if (seat?.user_id === user.id) leaveSeat(); else if (seat) openGiftPanel(seat); else joinSeat(i);
-                      }}
-                      onContextMenu={(e) => { e.preventDefault(); if (seat) setProfileTarget(seat); }}
-                      className={`${circleSize} rounded-full border-[3px] flex items-center justify-center transition-all relative ${
-                        isLocked && !seat ? 'bg-gray-800/60 border-red-500/30' :
-                        isSpeaking ? 'bg-gray-800 seat-speaking border-green-400' :
-                        isOccupied ? 'bg-gray-800 border-gray-600/50' :
-                        'bg-gray-800/80 border-gray-700/40'
-                      }`}
-                      style={isSpeaking ? {boxShadow: '0 0 15px #00ff88, 0 0 30px #00ff8855'} : {}}>
-                      {seat ? (
-                        <img src={seat.avatar} alt="" className={`${avatarSize} rounded-full object-cover`}
-                          onClick={(e) => { e.stopPropagation(); setProfileTarget(seat); }} />
-                      ) : isLocked ? (
-                        <span className="text-red-400/50 text-lg">🔒</span>
-                      ) : (
-                        <svg className="w-8 h-8 text-blue-300/40" fill="currentColor" viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
-                      )}
-                      {seat?.svip_level > 0 && (
-                        <div className="absolute -top-1 -right-1 bg-yellow-500 text-[6px] text-black font-bold px-1 rounded-full">S{seat.svip_level}</div>
-                      )}
-                    </button>
-                    <div className="mt-1 text-center">
-                      {seat ? (
-                        <div className="flex items-center gap-0.5 justify-center">
-                          {seat.country_flag && <span className="text-[10px]">{seat.country_flag}</span>}
-                          <span className={`text-white/80 ${labelSize} font-medium truncate max-w-[70px]`}>{seat.username}</span>
-                        </div>
-                      ) : (
-                        <span className={`text-white/25 ${labelSize}`}>Silla {i + 1}</span>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          );
-        })()}
+        <SeatsGrid
+          room={room}
+          currentUserId={user.id}
+          isMuted={isMuted}
+          onSeatClick={(i, seat, isLocked) => {
+            if (isLocked && room.owner_id === user.id) {
+              axios.post(`${API}/rooms/${roomId}/lock-seat?owner_id=${user.id}&seat_index=${i}`).then(() => loadRoom());
+              return;
+            }
+            if (isLocked) return;
+            if (seat?.user_id === user.id) leaveSeat();
+            else if (seat) openGiftPanel(seat);
+            else joinSeat(i);
+          }}
+          onSeatLongPress={(seat) => setProfileTarget(seat)}
+        />
       </div>
 
       {/* CHAT */}
       <div className="flex-1 min-h-0 px-3 pb-1">
-        <div className="h-full flex flex-col">
-          <div ref={chatRef} className="flex-1 min-h-0 overflow-y-auto space-y-1 pr-1">
-            {chatMessages.map(m => (
-              <div key={m.id} className={m.type === 'welcome' || m.type === 'gift' ? 'text-center' : ''}>
-                {m.type === 'welcome' ? (
-                  <span className="bg-yellow-500/10 text-yellow-300/70 text-xs px-2 py-1 rounded-full inline-block" style={{animation: 'fadeInUp 0.5s ease-out'}}>{m.text}</span>
-                ) : m.type === 'gift' ? (
-                  <span className="bg-pink-500/10 text-pink-300/80 text-xs px-2 py-1 rounded-full inline-block" style={{animation: 'giftBubble 0.6s ease-out'}}>{m.text}</span>
-                ) : m.type === 'photo' ? (
-                  <div className="flex items-start gap-1.5">
-                    <img src={m.avatar || ''} alt="" className="w-6 h-6 rounded-full mt-0.5" />
-                    <div>
-                      <span className="text-pink-400 text-xs font-bold">{m.username}</span>
-                      <img src={m.image_url?.startsWith('/api') ? `${process.env.REACT_APP_BACKEND_URL}${m.image_url}` : m.image_url} alt=""
-                        onClick={() => setZoomImg(m.image_url?.startsWith('/api') ? `${process.env.REACT_APP_BACKEND_URL}${m.image_url}` : m.image_url)}
-                        className="mt-0.5 max-w-[150px] rounded-lg object-cover cursor-pointer transition-all hover:opacity-80" />
-                    </div>
-                  </div>
-                ) : (
-                  <div className="flex items-start gap-1.5">
-                    <img src={m.avatar || ''} alt="" className="w-6 h-6 rounded-full mt-0.5" />
-                    <div><span className="text-cyan-400 text-xs font-bold">{m.username}: </span><span className="text-white/60 text-xs">{m.text}</span></div>
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-          <div className="flex gap-2 flex-shrink-0 mt-1">
-            <button onClick={() => photoRef.current?.click()} className="bg-white/5 w-10 h-10 rounded-full flex items-center justify-center text-sm">📷</button>
-            <input ref={photoRef} type="file" accept="image/*" onChange={sendPhoto} className="hidden" />
-            <input type="text" value={chatInput} onChange={e => setChatInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && sendChat()}
-              placeholder="Mensaje..." data-testid="chat-input" className="flex-1 bg-white/5 text-white placeholder-white/20 border-0 rounded-full px-4 py-2.5 text-sm outline-none min-h-[40px]" />
-            <button data-testid="chat-send-btn" onClick={sendChat} className="bg-cyan-500 text-white px-4 py-2.5 rounded-full text-sm font-bold min-h-[40px]">Enviar</button>
-          </div>
-        </div>
+        <ChatArea
+          messages={chatMessages}
+          input={chatInput}
+          onInputChange={setChatInput}
+          onSend={sendChat}
+          onPhotoUpload={sendPhoto}
+          onZoomImage={setZoomImg}
+        />
       </div>
 
       {/* FLOATING GIFT ANIMATION */}

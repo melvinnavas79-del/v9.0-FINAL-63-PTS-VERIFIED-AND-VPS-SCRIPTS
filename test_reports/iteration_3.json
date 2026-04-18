@@ -1,0 +1,33 @@
+{
+  "summary": "Regression test after SeatsGrid + ChatArea extraction from RoomView.js and ai_moderate_image placeholder_key hardening. Backend: 9/9 pytest passed (owner login, /api/rooms, /api/rankings/daily-games, ai_moderate_image with placeholder_key/empty/'your_key_here'/'tu_key_aqui' all return (True, 'ai_key_not_configured'), components exist on disk, RoomView imports extracted components and is 1029 lines). Frontend: login Melvin_Live/test123 → Mío → mio-btn-1 → entry animation → SeatsGrid renders 12 seats with sequential data-testid seat-btn-0 ... seat-btn-11, ChatArea input+send work and message autoscrolls, ToolsPanel opens with 8 tool-* buttons, MiniPlayer (global-mini-player) appears after minimize. Zero console/page errors. Refactor did NOT break any flow.",
+  "backend_issues": { "critical": [], "minor": [] },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_refactor_regression.py",
+    "/app/test_reports/pytest/iteration_3.xml"
+  ],
+  "action_items": [
+    "(Info, no action required) The owner's 'Test Room 177...' currently has max_seats=12 in DB (not the canonical 10/24). SeatsGrid correctly renders whatever max_seats is set to. If that is unintended, run POST /api/rooms/{id}/expand-seats with max_seats=10 or 24 to normalize. The refactor itself is clean.",
+    "(Low, carry-over from iteration_2) Before shipping, set a real GEMINI_API_KEY. Current 'placeholder_key' is now correctly detected and fail-opens with 'ai_key_not_configured' — so nudity/weapons are only filtered via filename keywords."
+  ],
+  "critical_code_review_comments": [
+    "SeatsGrid.js (102 lines) and ChatArea.js (103 lines) are well-scoped presentational components. Props are well-named (onSeatClick, onSeatLongPress, onInputChange, onSend, onPhotoUpload, onZoomImage). No business logic leaked — all axios/join/leave/giftPanel logic stays in RoomView.js. Clean extraction.",
+    "ChatArea uses its own internal useRef for autoscroll — this means if RoomView needs to programmatically scroll (e.g., after pinning a message), it cannot. Consider forwardRef or a scrollToBottom prop if needed later. Not required now.",
+    "ai_moderate_image now safely detects placeholder_key, placeholder, your_key_here, tu_key_aqui, and empty/whitespace keys and returns (True, 'ai_key_not_configured') BEFORE attempting to instantiate google.genai.Client. Good defensive hardening.",
+    "RoomView.js is at 1029 lines. Still large but manageable. Further candidates for extraction: GiftPanel modal, ProfileTarget modal, entry animations block (storm/dragon/eagle/etc) — but not required for this iteration."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_refactor_regression.py (new)"
+  ],
+  "success_rate": { "backend": "100% (9/9)", "frontend": "100% (seats + chat + tools + mini-player + no errors)" },
+  "test_credentials": "Melvin_Live / test123 (dueño)",
+  "seed_data_creation": "None",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "After refactor: SeatsGrid.js + ChatArea.js extracted from RoomView (now 1029 lines). All data-testid preserved: seat-btn-N, chat-input, chat-send-btn, tools-panel-btn, tool-*, global-mini-player, mio-btn-N. Owner's room in DB has max_seats=12 (non-canonical, but SeatsGrid renders correctly from room.max_seats). ai_moderate_image fail-opens on placeholder keys.",
+  "rca of the issue": "N/A — regression clean."
+}

@@ -311,10 +311,12 @@ UNSAFE_KEYWORDS = ['nude', 'nsfw', 'porn', 'sex', 'weapon', 'gun', 'knife', 'blo
 async def ai_moderate_image(image_bytes: bytes, mime_type: str = 'image/jpeg') -> tuple[bool, str]:
     """Use Gemini Vision to detect unsafe content (nudity, weapons, violence, blood, gore).
     Returns (is_safe, reason). Fails OPEN (allows upload) if AI unavailable, to not block the product.
+    Owner debe configurar GEMINI_API_KEY con su propia key de Google AI Studio.
     """
     api_key = os.environ.get('GEMINI_API_KEY') or os.environ.get('GOOGLE_API_KEY')
-    if not api_key:
-        return True, "ai_unavailable"
+    # Detect placeholder / empty / obviously invalid keys and skip (fail-open)
+    if not api_key or api_key.strip().lower() in ('placeholder_key', 'placeholder', 'your_key_here', 'tu_key_aqui', ''):
+        return True, "ai_key_not_configured"
     try:
         from google import genai
         from google.genai import types
