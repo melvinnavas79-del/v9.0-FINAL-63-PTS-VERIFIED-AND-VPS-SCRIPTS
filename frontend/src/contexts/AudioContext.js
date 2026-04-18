@@ -35,19 +35,22 @@ export const AudioProvider = ({ children }) => {
   }, []);
 
   const joinRoom = useCallback(async (roomId, roomName, userId) => {
-    // If already connected to this room, just sync the display name & keep the session
-    if (clientRef.current && activeRoom?.roomId === roomId) {
+    // If already connected / attempting this room, just sync display name and skip re-join
+    if (activeRoom?.roomId === roomId) {
       if (roomName && activeRoom.roomName !== roomName) {
         setActiveRoom({ roomId, roomName, userId });
       }
-      return;
+      // Retry the connection only if both client is missing AND status is error
+      if (clientRef.current || audioStatus === 'connecting') return;
     }
     // If in another room, leave first
-    if (clientRef.current) {
+    if (clientRef.current && activeRoom?.roomId !== roomId) {
       await leaveRoom();
     }
     try {
       setAudioStatus('connecting');
+      // Optimistic: show MiniPlayer with room name during connecting / even if join fails
+      setActiveRoom({ roomId, roomName: roomName || '', userId });
       const t = await axios.post(`${API}/agora/token?channel_name=room_${roomId}&user_id=${userId}`);
       const client = AgoraRTC.createClient({ mode: 'rtc', codec: 'vp8' });
       clientRef.current = client;
@@ -60,12 +63,13 @@ export const AudioProvider = ({ children }) => {
       await client.join(t.data.app_id, `room_${roomId}`, t.data.token, t.data.uid);
       setAudioStatus('on');
       setIsMuted(true);
-      setActiveRoom({ roomId, roomName, userId });
+      setActiveRoom({ roomId, roomName: roomName || '', userId });
     } catch (e) {
       setAudioStatus('error');
       clientRef.current = null;
+      // Keep activeRoom so MiniPlayer stays visible with a red dot; user can tap ✕ to dismiss
     }
-  }, [activeRoom, leaveRoom]);
+  }, [activeRoom, audioStatus, leaveRoom]);
 
   const toggleMute = useCallback(async () => {
     if (!clientRef.current) return;

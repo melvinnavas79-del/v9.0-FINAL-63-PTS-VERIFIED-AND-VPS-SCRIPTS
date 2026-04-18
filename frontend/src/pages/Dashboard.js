@@ -195,24 +195,24 @@ const Dashboard = ({ onNavigate }) => {
               ];
               const r = ranks[slotIdx];
               const winner = (dailyRanking.leaderboard || [])[slotIdx];
-              const heightClass = r.place === 1 ? 'h-[130px]' : 'h-[110px]';
+              const heightClass = r.place === 1 ? 'h-[150px]' : 'h-[130px]';
               return (
-                <div key={r.place} className={`bg-white/10 backdrop-blur rounded-xl ${heightClass} p-2 border border-white/20 flex flex-col items-center justify-between`}>
-                  <div className="text-2xl" style={{filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.5))'}}>{r.emoji}</div>
+                <div key={r.place} className={`bg-white/10 backdrop-blur rounded-xl ${heightClass} px-1.5 py-2 border border-white/20 flex flex-col items-center gap-1`}>
+                  <div className="text-xl leading-none" style={{filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.5))'}}>{r.emoji}</div>
                   {winner ? (
                     <>
-                      <img src={winner.avatar} alt="" className={`w-10 h-10 rounded-full border-2 border-yellow-300 object-cover`} />
-                      <div className="text-white text-[10px] font-bold truncate w-full text-center">{winner.username}</div>
-                      <div className="text-yellow-200 text-[9px] font-bold">{(winner.total_won || 0) >= 1e6 ? `${(winner.total_won/1e6).toFixed(1)}M` : (winner.total_won || 0).toLocaleString()}</div>
+                      <img src={winner.avatar} alt="" className="w-9 h-9 rounded-full border-2 border-yellow-300 object-cover flex-shrink-0" />
+                      <div className="text-white text-[10px] font-bold truncate w-full text-center leading-tight">{winner.username}</div>
+                      <div className="text-yellow-200 text-[9px] font-bold leading-none">{(winner.total_won || 0) >= 1e6 ? `${(winner.total_won/1e6).toFixed(1)}M` : (winner.total_won || 0).toLocaleString()}</div>
                     </>
                   ) : (
                     <>
-                      <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${r.color} border-2 border-yellow-300 flex items-center justify-center text-lg opacity-80`}>?</div>
+                      <div className={`w-9 h-9 rounded-full bg-gradient-to-br ${r.color} border-2 border-yellow-300 flex items-center justify-center text-base opacity-80`}>?</div>
                       <div className="text-white/60 text-[10px] font-bold">Vacante</div>
                       <div className="text-yellow-200 text-[9px]">Juega ya</div>
                     </>
                   )}
-                  <div className={`w-full text-center rounded-md py-0.5 mt-1 bg-gradient-to-r ${r.color} text-[10px] font-black text-black/80`}>+{r.label}</div>
+                  <div className={`mt-auto w-full text-center rounded-md py-0.5 bg-gradient-to-r ${r.color} text-[10px] font-black text-black/80`}>+{r.label}</div>
                 </div>
               );
             })}
