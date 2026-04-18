@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useUser } from '../contexts/UserContext';
+import EventControlPanel from '../components/EventControlPanel';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -14,16 +15,27 @@ const Dashboard = ({ onNavigate }) => {
   const [weeklyClans, setWeeklyClans] = useState([]);
   const [monthlyClans, setMonthlyClans] = useState([]);
   const [starIndex, setStarIndex] = useState(0);
+  const [showEventPanel, setShowEventPanel] = useState(false);
+  const [flashEvent, setFlashEvent] = useState(null);
 
   useEffect(() => {
     loadRooms();
     loadUsers();
     loadUnreadCount();
     loadClansRankings();
+    loadFlashEvents();
     const n = setInterval(loadUnreadCount, 10000);
     const s = setInterval(() => setStarIndex(p => p + 1), 3000);
-    return () => { clearInterval(n); clearInterval(s); };
+    const f = setInterval(loadFlashEvents, 8000);
+    return () => { clearInterval(n); clearInterval(s); clearInterval(f); };
   }, []);
+
+  const loadFlashEvents = async () => {
+    try {
+      const r = await axios.get(`${API}/flash-events/active?country=${user?.country || ''}`);
+      if (r.data?.length > 0 && r.data[0].id !== flashEvent?.id) setFlashEvent(r.data[0]);
+    } catch (e) {}
+  };
 
   const loadRooms = async () => {
     try {
@@ -383,13 +395,31 @@ const Dashboard = ({ onNavigate }) => {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white">
+      {/* Event Control Panel (Owner Only) */}
+      {showEventPanel && <EventControlPanel userId={user.id} onClose={() => setShowEventPanel(false)} />}
+
+      {/* Flash Event Banner */}
+      {flashEvent && (
+        <div className="fixed top-0 left-0 right-0 z-50 bg-gradient-to-r from-yellow-500 via-orange-500 to-red-500 px-4 py-3 text-center"
+          style={{paddingTop: 'calc(env(safe-area-inset-top, 8px) + 4px)'}}
+          onClick={() => { if (flashEvent.room_id) onNavigate('room', flashEvent.room_id); setFlashEvent(null); }}>
+          <div className="text-white text-sm font-bold">{flashEvent.text}</div>
+          {flashEvent.room_name && <div className="text-white/80 text-xs">Toca para entrar</div>}
+          <button onClick={(e) => { e.stopPropagation(); setFlashEvent(null); }} className="absolute top-2 right-3 text-white/60 text-sm">x</button>
+        </div>
+      )}
+
       {/* Status Bar */}
       <div className="bg-blue-50 px-4 flex items-center justify-between" style={{paddingTop: 'max(8px, env(safe-area-inset-top, 8px))', paddingBottom: '4px'}}>
-        <span className="text-gray-600 text-sm font-medium">08:03</span>
+        <span className="text-gray-600 text-sm font-medium">Lluvia Live</span>
         <div className="flex items-center gap-3">
-          <span className="text-gray-600 text-sm">📶</span>
-          <span className="text-gray-600 text-sm">📡</span>
-          <span className="text-green-500 font-bold text-sm">🔋 1K</span>
+          {user.role === 'dueño' && (
+            <button onClick={() => setShowEventPanel(true)} data-testid="event-control-btn"
+              className="bg-gradient-to-r from-yellow-400 to-orange-500 text-white text-[10px] font-bold px-3 py-1 rounded-full active:scale-95">
+              Centro Control
+            </button>
+          )}
+          <span className="text-green-500 font-bold text-sm">{user.coins >= 1e6 ? `${(user.coins/1e6).toFixed(1)}M` : user.coins >= 1e3 ? `${(user.coins/1e3).toFixed(0)}K` : user.coins}</span>
         </div>
       </div>
 

@@ -3,6 +3,7 @@ Admin routes: Console commands, role management, user admin, config.
 """
 from fastapi import APIRouter, HTTPException, UploadFile, File, Request
 from database import db, serialize_user, serialize_room, has_permission, ROLE_HIERARCHY, uuid, datetime, timezone, create_notification, IDChange
+from datetime import timedelta
 from typing import Dict, Any
 
 router = APIRouter()
@@ -481,6 +482,134 @@ async def update_admin_config(admin_id: str, updates: dict):
     return {"success": True}
 
 # ==================== CUSTOM GIFTS (ADMIN) ====================
+
+# ==================== EVENT CONTROL PANEL (OWNER ONLY) ====================
+
+@router.get("/admin/traffic-monitor")
+async def traffic_monitor(admin_id: str):
+    """Get active users by country. Owner only."""
+    admin = await db.users.find_one({"id": admin_id})
+    if not admin or admin.get('role') != 'dueño':
+        raise HTTPException(status_code=403, detail="Acceso denegado")
+    pipeline = [
+        {"$match": {"country": {"$exists": True, "$ne": ""}}},
+        {"$group": {"_id": "$country", "count": {"$sum": 1}, "flag": {"$first": "$country_flag"}, "name": {"$first": "$country_name"}}},
+        {"$sort": {"count": -1}},
+        {"$limit": 30}
+    ]
+    countries = await db.users.aggregate(pipeline).to_list(30)
+    total_users = await db.users.count_documents({})
+    total_rooms = await db.rooms.count_documents({})
+    active_rooms = await db.rooms.count_documents({"active_users": {"$gt": 0}})
+    for c in countries:
+        c['country'] = c.pop('_id')
+    return {
+        "total_users": total_users,
+        "total_rooms": total_rooms,
+        "active_rooms": active_rooms,
+        "by_country": countries
+    }
+
+@router.get("/admin/event-config")
+async def get_event_config(admin_id: str):
+    """Get current event broadcast configuration."""
+    admin = await db.users.find_one({"id": admin_id})
+    if not admin or admin.get('role') != 'dueño':
+        raise HTTPException(status_code=403, detail="Acceso denegado")
+    config = await db.event_config.find_one({"id": "global"})
+    if not config:
+        config = {"id": "global", "broadcast_mode": "global", "active_event": None}
+    config.pop('_id', None)
+    return config
+
+@router.post("/admin/event-config")
+async def set_event_config(admin_id: str, request: Request):
+    """Set event broadcast mode (regional/global). Owner only."""
+    admin = await db.users.find_one({"id": admin_id})
+    if not admin or admin.get('role') != 'dueño':
+        raise HTTPException(status_code=403, detail="Acceso denegado")
+    body = await request.json()
+    broadcast_mode = body.get('broadcast_mode', 'global')
+    if broadcast_mode not in ('regional', 'global'):
+        raise HTTPException(status_code=400, detail="Modo invalido. Usa 'regional' o 'global'")
+    await db.event_config.update_one(
+        {"id": "global"},
+        {"$set": {"id": "global", "broadcast_mode": broadcast_mode, "updated_at": datetime.now(timezone.utc).isoformat()}},
+        upsert=True
+    )
+    return {"success": True, "broadcast_mode": broadcast_mode}
+
+@router.post("/admin/flash-event")
+async def flash_event(admin_id: str, request: Request):
+    """Send a flash event to move traffic to a specific room. Owner only."""
+    admin = await db.users.find_one({"id": admin_id})
+    if not admin or admin.get('role') != 'dueño':
+        raise HTTPException(status_code=403, detail="Acceso denegado")
+    body = await request.json()
+    target_room_id = body.get('room_id', '')
+    message = body.get('message', '')
+    scope = body.get('scope', 'global')
+    target_country = body.get('country', '')
+    room = await db.rooms.find_one({"id": target_room_id}) if target_room_id else None
+    room_name = room.get('name', 'Sala') if room else 'Lluvia Live'
+    flash_text = message or f"Evento en {room_name}! Entra ahora!"
+    event_doc = {
+        "id": str(uuid.uuid4()),
+        "type": "flash",
+        "text": flash_text,
+        "room_id": target_room_id,
+        "room_name": room_name,
+        "scope": scope,
+        "target_country": target_country,
+        "created_by": admin_id,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "expires_at": (datetime.now(timezone.utc) + timedelta(minutes=5)).isoformat()
+    }
+    await db.flash_events.insert_one(event_doc)
+    event_doc.pop('_id', None)
+    # Also post as global announcement
+    await db.global_announcements.insert_one({
+        "id": event_doc['id'], "text": flash_text,
+        "room_id": target_room_id, "scope": scope, "target_country": target_country,
+        "created_by": admin_id, "created_at": event_doc['created_at']
+    })
+    return {"success": True, "event": event_doc}
+
+@router.post("/admin/activate-cofre")
+async def activate_cofre(admin_id: str, room_id: str, level: int = 1):
+    """Manually activate a treasure chest in any room. Owner only."""
+    admin = await db.users.find_one({"id": admin_id})
+    if not admin or admin.get('role') != 'dueño':
+        raise HTTPException(status_code=403, detail="Acceso denegado")
+    room = await db.rooms.find_one({"id": room_id})
+    if not room:
+        raise HTTPException(status_code=404, detail="Sala no encontrada")
+    if level < 1 or level > 10:
+        raise HTTPException(status_code=400, detail="Nivel 1-10")
+    await db.rooms.update_one({"id": room_id}, {"$set": {"cofre_active": True, "cofre_level": level, "cofre_activated_at": datetime.now(timezone.utc).isoformat()}})
+    # Announce
+    await db.global_announcements.insert_one({
+        "id": str(uuid.uuid4()), "text": f"Cofre Nivel {level} activado en {room.get('name', 'Sala')}! Entra y reclama tu premio!",
+        "room_id": room_id, "scope": "global",
+        "created_by": admin_id, "created_at": datetime.now(timezone.utc).isoformat()
+    })
+    return {"success": True, "cofre_level": level}
+
+@router.get("/flash-events/active")
+async def get_active_flash_events(country: str = ""):
+    """Get active flash events, optionally filtered by country."""
+    now = datetime.now(timezone.utc).isoformat()
+    query = {"expires_at": {"$gt": now}}
+    events = await db.flash_events.find(query).sort("created_at", -1).to_list(10)
+    result = []
+    for e in events:
+        e.pop('_id', None)
+        if e.get('scope') == 'regional' and country and e.get('target_country') != country:
+            continue
+        result.append(e)
+    return result
+
+# ==================== CUSTOM GIFTS CONTINUED ====================
 
 @router.post("/admin/gifts/create")
 async def create_custom_gift(admin_id: str, request: Request):
