@@ -180,10 +180,13 @@ def serialize_room(room: Dict[str, Any]) -> Dict[str, Any]:
         "name": room.get("name", ""),
         "owner_id": room.get("owner_id", ""),
         "owner_name": room.get("owner_name", ""),
+        "owner_svip": room.get("owner_svip", 0),
         "active_users": room.get("active_users", 0),
-        "seats": room.get("seats", [None]*9),
+        "seats": room.get("seats", [None]*10),
+        "seat_locks": room.get("seat_locks", [False]*10),
         "background": room.get("background"),
         "music_url": room.get("music_url"),
+        "pk_battle": room.get("pk_battle"),
         "created_at": room.get("created_at", ""),
     }
 

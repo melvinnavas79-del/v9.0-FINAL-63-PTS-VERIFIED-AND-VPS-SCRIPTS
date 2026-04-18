@@ -34,9 +34,11 @@ async def create_room(room_data: RoomCreate, owner_id: str):
 
 @router.get("/rooms")
 async def get_rooms():
-    """Get Rooms."""
-    rooms = await db.rooms.find().to_list(100)
-    return [serialize_room(r) for r in rooms]
+    """Get Rooms sorted by owner SVIP level (highest first), then active users."""
+    rooms = await db.rooms.find().to_list(200)
+    serialized = [serialize_room(r) for r in rooms]
+    serialized.sort(key=lambda r: (r.get('owner_svip', 0), r.get('active_users', 0)), reverse=True)
+    return serialized
 
 @router.get("/rooms/{room_id}")
 async def get_room(room_id: str):
@@ -69,7 +71,9 @@ async def get_or_create_my_room(user_id: str):
     room_doc = {
         "id": str(uuid.uuid4()), "name": f"Sala de {user['username']}",
         "owner_id": user_id, "owner_name": user['username'],
-        "active_users": 0, "max_seats": 9, "seats": [None] * 9,
+        "owner_svip": user.get('svip_level', 0),
+        "active_users": 0, "max_seats": 10, "seats": [None] * 10,
+        "seat_locks": [False] * 10,
         "created_at": datetime.now(timezone.utc).isoformat()
     }
     await db.rooms.insert_one(room_doc)
@@ -90,9 +94,18 @@ async def join_room(room_id: str, user_id: str, seat_index: int):
     user = await db.users.find_one({"id": user_id})
     if not user:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
-    seats = room.get('seats', [None] * 9)
+    seats = room.get('seats', [None] * 10)
+    seat_locks = room.get('seat_locks', [False] * 10)
+    # Extend if needed
+    while len(seats) < 10:
+        seats.append(None)
+    while len(seat_locks) < 10:
+        seat_locks.append(False)
     if seat_index >= len(seats):
         raise HTTPException(status_code=400, detail="Indice de asiento invalido")
+    # Check seat lock
+    if seat_locks[seat_index] and room.get('owner_id') != user_id:
+        raise HTTPException(status_code=403, detail="Este asiento esta bloqueado")
     if seats[seat_index] is not None and seats[seat_index].get('user_id') != user_id:
         raise HTTPException(status_code=400, detail="Asiento ocupado")
     # Remove from current seat in this room
@@ -289,6 +302,100 @@ async def send_chat_photo(room_id: str, user_id: str, file: UploadFile = File(..
     await db.room_chat.insert_one(chat_doc)
     chat_doc.pop('_id', None)
     return chat_doc
+
+
+# ==================== BACKGROUND UPLOAD WITH SAFETY FILTER ====================
+
+UNSAFE_KEYWORDS = ['nude', 'nsfw', 'porn', 'sex', 'weapon', 'gun', 'knife', 'blood', 'gore', 'violence']
+
+@router.post("/rooms/{room_id}/background")
+async def set_room_background(room_id: str, owner_id: str, file: UploadFile = File(...)):
+    """Upload room background image with basic content safety check."""
+    room = await db.rooms.find_one({"id": room_id})
+    if not room:
+        raise HTTPException(status_code=404, detail="Sala no encontrada")
+    if room['owner_id'] != owner_id:
+        raise HTTPException(status_code=403, detail="Solo el dueno de la sala puede cambiar el fondo")
+    # Check file type
+    ext = os.path.splitext(file.filename)[1].lower()
+    if ext not in ('.jpg', '.jpeg', '.png', '.webp', '.gif'):
+        raise HTTPException(status_code=400, detail="Solo imagenes JPG, PNG, WEBP o GIF")
+    # Check file size (max 5MB)
+    content = await file.read()
+    if len(content) > 5 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="Imagen muy grande (max 5MB)")
+    # Basic filename safety check
+    fname_lower = file.filename.lower()
+    for kw in UNSAFE_KEYWORDS:
+        if kw in fname_lower:
+            raise HTTPException(status_code=400, detail="Imagen rechazada por politica de seguridad")
+    # Save
+    filename = f"bg_{room_id}_{uuid.uuid4().hex[:8]}{ext}"
+    filepath = UPLOAD_DIR / filename
+    with open(filepath, "wb") as f:
+        f.write(content)
+    bg_url = f"/api/uploads/{filename}"
+    await db.rooms.update_one({"id": room_id}, {"$set": {"background": bg_url}})
+    return {"success": True, "background": bg_url}
+
+@router.delete("/rooms/{room_id}/background")
+async def remove_room_background(room_id: str, owner_id: str):
+    """Remove room background."""
+    room = await db.rooms.find_one({"id": room_id})
+    if not room:
+        raise HTTPException(status_code=404, detail="Sala no encontrada")
+    if room['owner_id'] != owner_id:
+        raise HTTPException(status_code=403, detail="Solo el dueno de la sala")
+    await db.rooms.update_one({"id": room_id}, {"$unset": {"background": 1}})
+    return {"success": True}
+
+# ==================== SEAT LOCKS ====================
+
+@router.post("/rooms/{room_id}/lock-seat")
+async def lock_seat(room_id: str, owner_id: str, seat_index: int):
+    """Lock/unlock a seat. Only room owner can manage locks."""
+    room = await db.rooms.find_one({"id": room_id})
+    if not room:
+        raise HTTPException(status_code=404, detail="Sala no encontrada")
+    if room['owner_id'] != owner_id:
+        raise HTTPException(status_code=403, detail="Solo el dueno de la sala")
+    locks = room.get('seat_locks', [False] * 10)
+    while len(locks) < 10:
+        locks.append(False)
+    if seat_index < 0 or seat_index >= len(locks):
+        raise HTTPException(status_code=400, detail="Asiento invalido")
+    locks[seat_index] = not locks[seat_index]
+    # If locking an occupied seat, kick the user
+    seats = room.get('seats', [])
+    if locks[seat_index] and seat_index < len(seats) and seats[seat_index]:
+        seats[seat_index] = None
+    await db.rooms.update_one({"id": room_id}, {"$set": {"seat_locks": locks, "seats": seats}})
+    return {"success": True, "seat_locks": locks}
+
+@router.post("/rooms/{room_id}/lock-all")
+async def lock_all_seats(room_id: str, owner_id: str):
+    """Lock all empty seats."""
+    room = await db.rooms.find_one({"id": room_id})
+    if not room:
+        raise HTTPException(status_code=404, detail="Sala no encontrada")
+    if room['owner_id'] != owner_id:
+        raise HTTPException(status_code=403, detail="Solo el dueno de la sala")
+    seats = room.get('seats', [])
+    locks = [seats[i] is None for i in range(10)] if len(seats) >= 10 else [True] * 10
+    await db.rooms.update_one({"id": room_id}, {"$set": {"seat_locks": locks}})
+    return {"success": True, "seat_locks": locks}
+
+@router.post("/rooms/{room_id}/unlock-all")
+async def unlock_all_seats(room_id: str, owner_id: str):
+    """Unlock all seats."""
+    room = await db.rooms.find_one({"id": room_id})
+    if not room:
+        raise HTTPException(status_code=404, detail="Sala no encontrada")
+    if room['owner_id'] != owner_id:
+        raise HTTPException(status_code=403, detail="Solo el dueno de la sala")
+    locks = [False] * 10
+    await db.rooms.update_one({"id": room_id}, {"$set": {"seat_locks": locks}})
+    return {"success": True, "seat_locks": locks}
 
 # ==================== AGORA TOKEN ====================
 

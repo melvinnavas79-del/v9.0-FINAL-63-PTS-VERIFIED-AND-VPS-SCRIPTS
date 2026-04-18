@@ -50,6 +50,7 @@ const RoomView = ({ roomId, onBack }) => {
   const photoRef = useRef(null);
   const musicRef = useRef(null);
   const audioElementRef = useRef(null);
+  const bgRef = useRef(null);
 
   useEffect(() => {
     leaveAgora();
@@ -202,6 +203,18 @@ const RoomView = ({ roomId, onBack }) => {
       setMusicPlaying(true);
     } catch (err) { alert(err.response?.data?.detail || 'Error al subir musica'); }
     if (musicRef.current) musicRef.current.value = '';
+  };
+
+  const uploadBackground = async (e) => {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    try {
+      const fd = new FormData();
+      fd.append('file', f);
+      await axios.post(`${API}/rooms/${roomId}/background?owner_id=${user.id}`, fd, { headers: { 'Content-Type': 'multipart/form-data' } });
+      loadRoom();
+    } catch (err) { alert(err.response?.data?.detail || 'Imagen rechazada'); }
+    if (bgRef.current) bgRef.current.value = '';
   };
 
   const toggleMusic = () => {
@@ -734,6 +747,14 @@ const RoomView = ({ roomId, onBack }) => {
           <button data-testid="bar-tienda" onClick={() => setPanel('tienda')} className="bg-purple-500/15 border border-purple-500/20 rounded-full px-3 py-2 flex items-center gap-1.5 min-h-[40px]">
             <span className="text-base">🛒</span><span className="text-purple-300 text-xs font-bold">Tienda</span>
           </button>
+          {room.owner_id === user.id && (
+            <>
+              <button onClick={() => bgRef.current?.click()} className="bg-cyan-500/15 border border-cyan-500/20 rounded-full px-3 py-2 flex items-center gap-1.5 min-h-[40px]">
+                <span className="text-base">🖼</span><span className="text-cyan-300 text-xs font-bold">Fondo</span>
+              </button>
+              <input ref={bgRef} type="file" accept="image/*" onChange={uploadBackground} className="hidden" />
+            </>
+          )}
           <div className="ml-auto bg-white/5 rounded-full px-3 py-2 flex items-center min-h-[40px]">
             <span className="text-yellow-400 text-xs font-bold">💰 {formatCoins(user.coins)}</span>
           </div>
@@ -772,36 +793,50 @@ const RoomView = ({ roomId, onBack }) => {
         />
       )}
 
-      {/* SEATS */}
+      {/* SEATS - 10 seats grid */}
       <div className="flex-shrink-0 px-3 mb-1 overflow-y-auto" style={{maxHeight: '34vh'}}>
-        <div className="grid grid-cols-3 gap-2">
-          {room.seats.map((seat, i) => (
+        {/* Owner controls */}
+        {room.owner_id === user.id && (
+          <div className="flex gap-1 mb-1 justify-end">
+            <button onClick={async () => { await axios.post(`${API}/rooms/${roomId}/lock-all?owner_id=${user.id}`); loadRoom(); }}
+              className="text-[9px] bg-red-500/20 text-red-300 px-2 py-1 rounded-lg">Cerrar Todo</button>
+            <button onClick={async () => { await axios.post(`${API}/rooms/${roomId}/unlock-all?owner_id=${user.id}`); loadRoom(); }}
+              className="text-[9px] bg-green-500/20 text-green-300 px-2 py-1 rounded-lg">Abrir Todo</button>
+          </div>
+        )}
+        <div className="grid grid-cols-5 gap-1.5">
+          {(room.seats || []).slice(0, 10).map((seat, i) => {
+            const isLocked = room.seat_locks?.[i];
+            return (
             <button key={i} data-testid={`seat-btn-${i}`}
-              onClick={() => { if (seat?.user_id === user.id) leaveSeat(); else if (seat) openGiftPanel(seat); else joinSeat(i); }}
+              onClick={() => {
+                if (isLocked && room.owner_id === user.id) { axios.post(`${API}/rooms/${roomId}/lock-seat?owner_id=${user.id}&seat_index=${i}`).then(() => loadRoom()); return; }
+                if (isLocked) return;
+                if (seat?.user_id === user.id) leaveSeat(); else if (seat) openGiftPanel(seat); else joinSeat(i);
+              }}
               onContextMenu={(e) => { e.preventDefault(); if (seat) setProfileTarget(seat); }}
-              onTouchStart={() => { if (seat) { const t = setTimeout(() => setProfileTarget(seat), 500); seat._longPressTimer = t; } }}
-              onTouchEnd={() => { if (seat?._longPressTimer) clearTimeout(seat._longPressTimer); }}
-              className={`relative h-[80px] rounded-2xl border transition-all ${seat ? seat.user_id === user.id ? 'bg-green-500/10 border-green-500/30' : 'bg-white/[0.03] border-white/[0.08]' : 'bg-white/[0.02] border-white/[0.05]'}`}>
+              className={`relative h-[72px] rounded-xl border transition-all ${isLocked && !seat ? 'bg-red-500/5 border-red-500/20' : seat ? seat.user_id === user.id ? 'bg-green-500/10 border-green-500/30' : 'bg-white/[0.03] border-white/[0.08]' : 'bg-white/[0.02] border-white/[0.05]'}`}>
               <div className="flex flex-col items-center justify-center h-full">
                 {seat ? (
                   <>
-                    <ProfileFrame aristocracy={seat.aristocracy || 0}>
-                      <img src={seat.avatar} alt="" className="w-12 h-12 rounded-full object-cover" onClick={(e) => { e.stopPropagation(); setProfileTarget(seat); }} />
-                    </ProfileFrame>
+                    <img src={seat.avatar} alt="" className="w-10 h-10 rounded-full object-cover" onClick={(e) => { e.stopPropagation(); setProfileTarget(seat); }} />
                     <div className="flex items-center gap-0.5 mt-0.5">
-                      {seat.country_flag && <span className="text-[10px]">{seat.country_flag}</span>}
-                      {seat.svip_level > 0 && <span className="text-[7px] bg-yellow-500/80 text-white px-1 rounded">S{seat.svip_level}</span>}
-                      <span className="text-white text-xs truncate max-w-[60px] font-medium">{seat.username}</span>
+                      {seat.country_flag && <span className="text-[8px]">{seat.country_flag}</span>}
+                      {seat.svip_level > 0 && <span className="text-[6px] bg-yellow-500/80 text-white px-0.5 rounded">S{seat.svip_level}</span>}
+                      <span className="text-white text-[9px] truncate max-w-[50px] font-medium">{seat.username}</span>
                     </div>
-                    {seat.user_id !== user.id && <div className="absolute bottom-1.5 right-1.5 text-sm">🎁</div>}
-                    {seat.user_id === user.id && <div className={`absolute top-1.5 right-1.5 w-5 h-5 rounded-full flex items-center justify-center text-xs ${isMuted ? 'bg-red-500' : 'bg-green-500'}`}>{isMuted ? '🔇' : '🎤'}</div>}
+                    {seat.user_id !== user.id && <div className="absolute bottom-0.5 right-0.5 text-[10px]">🎁</div>}
+                    {seat.user_id === user.id && <div className={`absolute top-0.5 right-0.5 w-4 h-4 rounded-full flex items-center justify-center text-[8px] ${isMuted ? 'bg-red-500' : 'bg-green-500'}`}>{isMuted ? '🔇' : '🎤'}</div>}
                   </>
+                ) : isLocked ? (
+                  <div className="text-red-400/40 text-lg">🔒</div>
                 ) : (
                   <div className="text-white/15 text-sm font-medium">{i + 1}</div>
                 )}
               </div>
             </button>
-          ))}
+            );
+          })}
         </div>
       </div>
 
