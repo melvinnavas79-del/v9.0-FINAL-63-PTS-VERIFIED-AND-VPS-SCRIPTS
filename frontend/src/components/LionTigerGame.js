@@ -176,14 +176,16 @@ const LionTigerGame = ({ userId, userCoins, onBalanceUpdate, onClose }) => {
         .lose-fade { opacity: 0.2; transform: scale(0.7) !important; }
       `}</style>
 
-      {/* Header */}
-      <div className="flex-shrink-0 flex items-center justify-between px-3 py-2" style={{ background: '#000', borderBottom: '2px solid #ffcc00' }}>
-        <div className="flex items-center gap-2">
-          <span>💰</span>
-          <span className="text-white font-bold text-sm">{coins.toLocaleString()}</span>
+      {/* Header — safe-area aware for iPhone notch/Dynamic Island */}
+      <div className="flex-shrink-0 flex items-center justify-between px-4 py-2" style={{ background: '#000', borderBottom: '2px solid #ffcc00', paddingTop: 'calc(env(safe-area-inset-top, 44px) + 10px)', paddingBottom: '10px' }}>
+        <div className="flex items-center gap-2 min-w-0 flex-1">
+          <span className="text-base">💰</span>
+          <span className="text-white font-bold text-xs truncate">{coins.toLocaleString()}</span>
         </div>
-        <span className="font-bold text-sm" style={{ color: '#ffcc00' }}>TIGER VS LION</span>
-        <button onClick={onClose} data-testid="close-lion-tiger" className="text-white/60 text-lg w-8 h-8 flex items-center justify-center">✕</button>
+        <span className="font-bold text-xs mx-2 flex-shrink-0" style={{ color: '#ffcc00' }}>TIGER VS LION</span>
+        <button onClick={onClose} data-testid="close-lion-tiger"
+          className="flex-shrink-0 w-11 h-11 rounded-full bg-red-600 flex items-center justify-center text-white text-xl font-bold active:scale-90 border-2 border-red-400 shadow-lg shadow-red-500/40"
+          title="Salir del juego">✕</button>
       </div>
 
       {/* Timer */}
