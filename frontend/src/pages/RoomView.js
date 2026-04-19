@@ -897,24 +897,23 @@ const RoomView = ({ roomId, onBack }) => {
             <span className="text-base">👑</span>
             <span className="text-yellow-200 text-[10px] font-bold">Top</span>
           </button>
+        </div>
+      </div>
+
+      {/* Second row: user-status indicators (level, fondo, coins) */}
+      <div className="flex-shrink-0 px-3 mb-2">
+        <div className="flex items-center gap-2">
+          <LevelBadge userId={user.id} />
           {(room.owner_id === user.id || user.role === 'dueño' || user.role === 'admin') && (
             <>
               <button data-testid="bar-fondo" onClick={() => bgRef.current?.click()}
-                className="flex-shrink-0 bg-cyan-500/20 border border-cyan-400/40 rounded-full px-3 py-2 flex items-center gap-1 min-h-[40px] active:scale-95 transition-transform"
-                title="Cambiar fondo de la sala (solo dueño)">
+                className="bg-cyan-500/20 border border-cyan-400/40 rounded-full w-10 h-10 flex items-center justify-center active:scale-95 transition-transform"
+                title="Cambiar fondo de la sala">
                 <span className="text-base">🖼</span>
-                <span className="text-cyan-200 text-[10px] font-bold">Fondo</span>
               </button>
               <input ref={bgRef} type="file" accept="image/*" onChange={uploadBackground} className="hidden" />
             </>
           )}
-        </div>
-      </div>
-
-      {/* Second row: user-status indicators (level, coins) */}
-      <div className="flex-shrink-0 px-3 mb-2">
-        <div className="flex items-center gap-2">
-          <LevelBadge userId={user.id} />
           <div className="ml-auto bg-white/5 rounded-full px-3 py-2 flex items-center min-h-[40px]">
             <span className="text-yellow-400 text-xs font-bold">💰 {formatCoins(user.coins)}</span>
           </div>
