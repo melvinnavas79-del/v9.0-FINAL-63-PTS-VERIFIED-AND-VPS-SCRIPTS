@@ -891,29 +891,13 @@ const RoomView = ({ roomId, onBack }) => {
             <span className="text-base">🎁</span>
             <span className="text-fuchsia-200 text-[10px] font-bold">Regalos</span>
           </button>
-          <button data-testid="open-gift-ranking-btn" onClick={() => setGiftRankOpen(true)}
-            className="flex-shrink-0 bg-gradient-to-br from-yellow-500/30 to-orange-500/30 border border-yellow-400/40 rounded-full px-3 py-2 flex items-center gap-1 min-h-[40px] active:scale-95 transition-transform"
-            title="Ranking de regalos (diario/semanal/mensual)">
-            <span className="text-base">👑</span>
-            <span className="text-yellow-200 text-[10px] font-bold">Top</span>
-          </button>
         </div>
       </div>
 
-      {/* Second row: user-status indicators (level, fondo, coins) */}
+      {/* Second row: user-status indicators (level, coins) */}
       <div className="flex-shrink-0 px-3 mb-2">
         <div className="flex items-center gap-2">
           <LevelBadge userId={user.id} />
-          {(room.owner_id === user.id || user.role === 'dueño' || user.role === 'admin') && (
-            <>
-              <button data-testid="bar-fondo" onClick={() => bgRef.current?.click()}
-                className="bg-cyan-500/20 border border-cyan-400/40 rounded-full w-10 h-10 flex items-center justify-center active:scale-95 transition-transform"
-                title="Cambiar fondo de la sala">
-                <span className="text-base">🖼</span>
-              </button>
-              <input ref={bgRef} type="file" accept="image/*" onChange={uploadBackground} className="hidden" />
-            </>
-          )}
           <div className="ml-auto bg-white/5 rounded-full px-3 py-2 flex items-center min-h-[40px]">
             <span className="text-yellow-400 text-xs font-bold">💰 {formatCoins(user.coins)}</span>
           </div>
@@ -1024,6 +1008,34 @@ const RoomView = ({ roomId, onBack }) => {
           `}</style>
         </div>
       )}
+
+      {/* FLOATING RIGHT SIDE BUTTONS - Top (👑) + Fondo (🖼) always visible */}
+      <div
+        className="fixed right-3 z-[55] flex flex-col gap-2 pointer-events-auto"
+        style={{ bottom: 'calc(env(safe-area-inset-bottom, 14px) + 96px)' }}
+      >
+        <button
+          data-testid="floating-top-btn"
+          onClick={() => setGiftRankOpen(true)}
+          className="w-12 h-12 rounded-full bg-gradient-to-br from-yellow-400 to-orange-500 flex items-center justify-center text-lg active:scale-90 shadow-lg shadow-yellow-500/40 border border-yellow-300/40"
+          title="Ranking de regalos (diario/semanal/mensual)"
+        >
+          👑
+        </button>
+        {(room.owner_id === user.id || user.role === 'dueño' || user.role === 'admin') && (
+          <>
+            <button
+              data-testid="floating-fondo-btn"
+              onClick={() => bgRef.current?.click()}
+              className="w-12 h-12 rounded-full bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center text-lg active:scale-90 shadow-lg shadow-cyan-500/40 border border-cyan-300/40"
+              title="Cambiar fondo de la sala"
+            >
+              🖼
+            </button>
+            <input ref={bgRef} type="file" accept="image/*" onChange={uploadBackground} className="hidden" />
+          </>
+        )}
+      </div>
 
       {/* BOTTOM BAR - ALWAYS VISIBLE */}
       <div className="flex-shrink-0 bg-black/90 border-t border-white/5 px-3" style={{paddingTop: '10px', paddingBottom: 'max(14px, env(safe-area-inset-bottom, 14px))'}}>
