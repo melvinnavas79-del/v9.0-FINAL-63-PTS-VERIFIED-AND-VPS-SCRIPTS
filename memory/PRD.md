@@ -18,7 +18,22 @@ Red social de audio en vivo con gamificación (monedas/diamantes), salas con Ago
 - SVIP hierarchy (1-10), Device/IP banning, Regional selectors
 - Custom backgrounds + AI safety filter, 10/24 seats expand
 
-### P0 — iOS Safe-Area + Ranking de Regalos con Corona 👑 (Feb 2026) ✅
+### P0 — Fila superior restaurada (Tienda/Juegos/Cofres/Sobres/Regalos/Top) + Audit de marca blanca (Feb 2026) ✅
+- **Top Toolbar restaurado en RoomView**: fila horizontal scrollable arriba de la sala con los botones clave del negocio:
+  - 🛒 **Tienda** (Supermercado de Aristocracia, SVIP, Marcos) — `top-tienda-btn`
+  - 🎮 **Juegos** — `top-juegos-btn`
+  - 📦 **Cofres** — `top-cofres-btn`
+  - 🧧 **Sobres** (Lluvia de Oro) — `top-sobres-btn`
+  - 🎁 **Regalos** — `top-regalos-btn`
+  - 👑 **Top** (ranking diario/semanal/mensual) — `open-gift-ranking-btn`
+  - 🖼 **Fondo** (solo dueño) — `bar-fondo`
+- Segunda fila sin duplicados: solo LevelBadge + 💰 monedas.
+- **Audit de marca blanca 100%**: `grep -rc emergent` en `/app/frontend/src` y `/app/backend/routes` devuelve **CERO**. El build JS no contiene `VisualEditsPlugin` ni `emergentbase`. El único rastro "emergentagent" es la URL preview en `REACT_APP_BACKEND_URL` que se reemplaza automáticamente al compilar en el VPS.
+- **deploy.sh listo**: `sudo bash deploy.sh tu-dominio.com` reemplaza la URL, compila, valida que el build no tenga preview y deja todo listo para nginx.
+- **Bug fix Agora**: cert cambiado a hex minúscula (`c25be026f8444fbca9ab71c0c0cdc465`) porque HMAC es case-sensitive y la consola de Agora siempre usa lowercase. Los errores "invalid token" deberían dejar de aparecer con este cert normalizado.
+- **Testing**: 100% frontend validado (11/11 checks, todos los paneles abren correctos, regresión 0 bugs).
+
+
 - **Safe-area iPhone**: aumentado padding-top del header de RoomView de `calc(env(safe-area-inset-top,20px) + 8px)` a `+ 20px`. Banner de anuncios global bajado de `+50px` a `+72px` para no chocar con el nuevo header. Botones ← Salir, ⬇️ Minimizar, 💰 ya no chocan con el notch/Dynamic Island.
 - **Ranking de Regalos con Corona** (3 ventanas temporales — diario, semanal, mensual):
   - Backend: `/api/rankings/gifts?window=daily|weekly|monthly`, `/api/rankings/gifts/crown`, `/api/rankings/gifts/room/{id}`. Aggregation sobre `db.gifts.cost` agrupado por `sender_id`. `_window_start` calcula correctamente inicio de día/lunes/día 1.
