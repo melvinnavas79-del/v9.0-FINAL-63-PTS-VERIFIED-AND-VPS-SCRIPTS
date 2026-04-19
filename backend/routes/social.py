@@ -5,8 +5,113 @@ from fastapi import APIRouter, HTTPException, UploadFile, File
 from database import db, ClanCreate, GiftSend, serialize_user, uuid, datetime, timezone, create_notification, UPLOAD_DIR
 from pydantic import BaseModel
 import random
+from datetime import timedelta
 
 router = APIRouter()
+
+
+# ==================== GIFTS LEADERBOARD (Daily/Weekly/Monthly con CORONA) ====================
+
+def _window_start(window: str) -> datetime:
+    now = datetime.now(timezone.utc)
+    if window == "daily":
+        return now.replace(hour=0, minute=0, second=0, microsecond=0)
+    if window == "weekly":
+        # Start of current ISO week (Monday 00:00 UTC)
+        return (now - timedelta(days=now.weekday())).replace(hour=0, minute=0, second=0, microsecond=0)
+    if window == "monthly":
+        return now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    return now - timedelta(days=30)
+
+
+@router.get("/rankings/gifts")
+async def gifts_leaderboard(window: str = "daily", limit: int = 20):
+    """Top gifters by coins spent in time window.
+    window: 'daily' | 'weekly' | 'monthly'
+    """
+    if window not in ("daily", "weekly", "monthly"):
+        raise HTTPException(status_code=400, detail="window debe ser daily/weekly/monthly")
+    start_iso = _window_start(window).isoformat()
+    pipeline = [
+        {"$match": {"created_at": {"$gte": start_iso}}},
+        {"$group": {
+            "_id": "$sender_id",
+            "total_spent": {"$sum": "$cost"},
+            "gift_count": {"$sum": 1},
+        }},
+        {"$sort": {"total_spent": -1}},
+        {"$limit": max(1, min(limit, 100))},
+    ]
+    rows = await db.gifts.aggregate(pipeline).to_list(100)
+    out = []
+    for i, r in enumerate(rows):
+        u = await db.users.find_one({"id": r["_id"]})
+        if not u or u.get("ghost_mode"):
+            continue
+        out.append({
+            "rank": i + 1,
+            "user_id": r["_id"],
+            "username": u.get("username"),
+            "avatar": u.get("avatar"),
+            "country_flag": u.get("country_flag"),
+            "level": u.get("level", 1),
+            "svip_level": u.get("svip_level", 0),
+            "total_spent": r.get("total_spent", 0),
+            "gift_count": r.get("gift_count", 0),
+            "is_crown": i == 0,   # 👑 king of gifts
+        })
+    return {"window": window, "starts_at": start_iso, "leaderboard": out}
+
+
+@router.get("/rankings/gifts/crown")
+async def current_gift_crown():
+    """Quick endpoint: returns only the current top gifter for badge display in rooms."""
+    daily = await gifts_leaderboard(window="daily", limit=1)
+    weekly = await gifts_leaderboard(window="weekly", limit=1)
+    monthly = await gifts_leaderboard(window="monthly", limit=1)
+    def _first(d):
+        lb = d.get("leaderboard") or []
+        return lb[0] if lb else None
+    return {
+        "daily_king": _first(daily),
+        "weekly_king": _first(weekly),
+        "monthly_king": _first(monthly),
+    }
+
+
+@router.get("/rankings/gifts/room/{room_id}")
+async def room_gifts_leaderboard(room_id: str, window: str = "daily", limit: int = 10):
+    """Top gifters in a specific room (for in-room crown)."""
+    if window not in ("daily", "weekly", "monthly"):
+        raise HTTPException(status_code=400, detail="window debe ser daily/weekly/monthly")
+    start_iso = _window_start(window).isoformat()
+    pipeline = [
+        {"$match": {"room_id": room_id, "created_at": {"$gte": start_iso}}},
+        {"$group": {
+            "_id": "$sender_id",
+            "total_spent": {"$sum": "$cost"},
+            "gift_count": {"$sum": 1},
+        }},
+        {"$sort": {"total_spent": -1}},
+        {"$limit": max(1, min(limit, 50))},
+    ]
+    rows = await db.gifts.aggregate(pipeline).to_list(50)
+    out = []
+    for i, r in enumerate(rows):
+        u = await db.users.find_one({"id": r["_id"]})
+        if not u:
+            continue
+        out.append({
+            "rank": i + 1,
+            "user_id": r["_id"],
+            "username": u.get("username"),
+            "avatar": u.get("avatar"),
+            "total_spent": r.get("total_spent", 0),
+            "gift_count": r.get("gift_count", 0),
+            "is_crown": i == 0,
+        })
+    return {"window": window, "room_id": room_id, "leaderboard": out}
+
 
 # ClanCreate imported from database
 

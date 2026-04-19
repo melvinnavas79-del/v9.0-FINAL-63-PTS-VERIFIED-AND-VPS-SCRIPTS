@@ -1,4 +1,5 @@
 import React from 'react';
+import CrownBadge from './CrownBadge';
 
 /**
  * SeatsGrid — Renderiza la cuadrícula de asientos (10 o 24) de la sala.
@@ -83,6 +84,7 @@ const SeatsGrid = ({
                 {seat ? (
                   <div className="flex items-center gap-0.5 justify-center">
                     {seat.country_flag && <span className="text-[10px]">{seat.country_flag}</span>}
+                    <CrownBadge userId={seat.user_id} size={11} />
                     <span className={`text-white/80 ${labelSize} font-medium truncate max-w-[70px]`}>
                       {seat.username}
                     </span>

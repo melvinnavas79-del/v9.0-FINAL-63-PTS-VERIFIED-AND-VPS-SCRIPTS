@@ -1,0 +1,34 @@
+{
+  "summary": "Iteration 8 — Tested (1) iOS safe-area top padding on RoomView header and (2) new Gift Ranking feature (daily/weekly/monthly crown endpoints + GiftRanking modal + CrownBadge on seats). Backend: 12/12 pytest passed in 1.01s (/api/rankings/gifts for daily/weekly/monthly returns correct shape with is_crown on rank 1; starts_at aligned to Monday 00:00 UTC for weekly and day 1 for monthly; invalid window returns 400; limit clamped to 100; /api/rankings/gifts/crown returns Melvin_Live (b45958bc-2c6b-49ea-8102-a11197001e53) as daily_king, weekly_king and monthly_king; /api/rankings/gifts/room/{id} filters by room_id). Frontend: login Melvin_Live/test123 → enter Mi Sala Live via ‘por la sala’ → header paddingTop inline-style is EXACTLY 'padding-top: calc(env(safe-area-inset-top, 20px) + 20px);' (computed=20px). Header exposes room-back-btn, minimize-btn, and open-gift-ranking-btn. Clicking the button opens gift-ranking-modal with the 3 tabs (daily/weekly/monthly); Daily shows Melvin_Live rank 🥇 510,000 with 👑, switching to weekly fires GET /api/rankings/gifts/room/{id}?window=weekly and refreshes to 'Melvin_Live 2.7M / TestReceiver99 1.0M', monthly also refetches. CrownBadge with data-testid='crown-badge-monthly' renders on Melvin’s seat with 👑 emoji (only the highest tier is displayed by the component — this is the intended priority behavior). The /api/rankings/gifts/crown endpoint is polled from RoomView (seen 4 times on room entry).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "RoomView header", "issues": ["Safe-area padding verified working on mobile viewport (390x844). iOS notch/Dynamic Island collision now avoided."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration_8.py",
+    "/app/test_reports/pytest/iteration_8.xml"
+  ],
+  "action_items": [
+    "(Informational) When the modal is opened from inside a room, the frontend calls /api/rankings/gifts/room/{id}?window=... (labelled ‘Esta sala’) instead of the global /api/rankings/gifts. This is by design for in-room context, but worth documenting — the global leaderboard endpoint is therefore only exercised when GiftRanking is opened outside a room. Consider exposing a toggle ‘Global / Esta sala’ inside the modal for clarity.",
+    "(Optional) CrownBadge only shows the highest-priority crown (monthly) for a user who is king in all 3 periods. If the product intent was to show up to 3 badges simultaneously, the stacking logic in CrownBadge.js should be revisited. Currently only data-testid='crown-badge-monthly' is visible on Melvin’s seat."
+  ],
+  "critical_code_review_comments": [
+    "routes/social.py _window_start uses datetime.now(timezone.utc) and compares against stored 'created_at' ISO strings — this works only because all gift inserts also use datetime.now(timezone.utc).isoformat() (verified in send_gift line 309). Keep this invariant if ever a new gift creation path is added.",
+    "/api/rankings/gifts/crown internally calls gifts_leaderboard 3x sequentially — 3 separate aggregation passes per request. For Melvin’s polling (every 60s in CrownBadge), this is acceptable, but if crown polling is increased or added to many rooms, consider a single $facet aggregation.",
+    "routes/social.py gifts_leaderboard filters out users with ghost_mode inside the Python loop AFTER sorting+limiting; if the top-1 user has ghost_mode enabled, the leaderboard will silently have fewer rows than requested and rank numbers could be non-contiguous (rank 2 may appear as rank #2 even though rank #1 was dropped). The 'is_crown: i == 0' is assigned based on index BEFORE ghost filtering — so if the real rank-1 is ghost, rank-2 (index 1) will NOT get is_crown. This is acceptable but slightly inconsistent; document or fix.",
+    "/api/rankings/gifts/room/{room_id} does NOT filter out ghost_mode users (only /rankings/gifts does). Minor inconsistency.",
+    "GiftRanking.js modal uses room-scoped endpoint by default when a roomId prop is provided — correct. No broken state observed.",
+    "CrownBadge.js polls /api/rankings/gifts/crown every 60s — reasonable. Make sure the component unmounts its interval on navigation (verify cleanup in useEffect return) to prevent leaks when users bounce between rooms."
+  ],
+  "updated_files": ["/app/backend/tests/test_iteration_8.py"],
+  "success_rate": {"backend": "100% (12/12 pytest passed)", "frontend": "100% — all 10 requested UI/integration checks verified (header safe-area padding, 3 header data-testids, modal open, 3 tabs, tab refetch, crown-badge visible on seat, ranking endpoint calls observed)"},
+  "test_credentials": "Melvin_Live / test123 (id b45958bc-2c6b-49ea-8102-a11197001e53)",
+  "seed_data_creation": "No new seed data created. Tests rely on pre-existing gifts seeded for Melvin_Live in daily/weekly/monthly windows.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Iteration 8 backend regression file is /app/backend/tests/test_iteration_8.py (12 tests covering the 3 new /api/rankings/gifts* endpoints). No regressions observed in previous iteration features. Melvin_Live still intact (role=dueño, coins=500T, id=b45958bc). The GiftRanking modal inside RoomView currently prefers the room-scoped endpoint — this is correct behavior for the ‘Esta sala’ context shown in the header of the modal. If a future change is made to use the global endpoint, update /api/rankings/gifts/room/{id} filter expectations."
+}

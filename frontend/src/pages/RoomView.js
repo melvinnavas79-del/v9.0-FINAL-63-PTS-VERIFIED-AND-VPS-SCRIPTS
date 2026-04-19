@@ -15,6 +15,8 @@ import GameResultToast from '../components/GameResultToast';
 import LevelBadge from '../components/LevelBadge';
 import useLevelHeartbeat from '../hooks/useLevelHeartbeat';
 import useTTS from '../hooks/useTTS';
+import GiftRanking from '../components/GiftRanking';
+import CrownBadge from '../components/CrownBadge';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -64,6 +66,7 @@ const RoomView = ({ roomId, onBack }) => {
   const [globalBanner, setGlobalBanner] = useState(null);
   const [toolsOpen, setToolsOpen] = useState(false);
   const [effectBurst, setEffectBurst] = useState(null);
+  const [giftRankOpen, setGiftRankOpen] = useState(false);
 
   // Level-up: heartbeat cuando hay mic activo
   useLevelHeartbeat({ userId: user?.id, isInRoomMicActive: mySeat !== null && !isMuted });
@@ -494,6 +497,11 @@ const RoomView = ({ roomId, onBack }) => {
       {/* GAME RESULT TOAST — feedback visual premium para Número/Dado/Mora */}
       <GameResultToast result={gameResult} onDone={() => setGameResult(null)} />
 
+      {/* GIFT RANKING — Top regalos (diario/semanal/mensual) con corona 👑 */}
+      {giftRankOpen && (
+        <GiftRanking roomId={roomId} onClose={() => setGiftRankOpen(false)} />
+      )}
+
       {/* EFFECT BURST — triggered by Efecto tool */}
       {effectBurst && (
         <div key={effectBurst.key} className="fixed inset-0 z-[75] pointer-events-none flex items-center justify-center">
@@ -504,7 +512,7 @@ const RoomView = ({ roomId, onBack }) => {
 
       {/* GLOBAL BANNER */}
       {globalBanner && (
-        <div className="absolute top-0 left-0 right-0 z-[60] bg-gradient-to-r from-yellow-500 via-orange-500 to-red-500 px-4 py-2 text-center" style={{top: 'calc(env(safe-area-inset-top, 20px) + 50px)'}}>
+        <div className="absolute top-0 left-0 right-0 z-[60] bg-gradient-to-r from-yellow-500 via-orange-500 to-red-500 px-4 py-2 text-center" style={{top: 'calc(env(safe-area-inset-top, 20px) + 72px)'}}>
           <div className="text-white text-xs font-bold">{globalBanner}</div>
         </div>
       )}
@@ -816,7 +824,7 @@ const RoomView = ({ roomId, onBack }) => {
       )}
 
       {/* HEADER */}
-      <div className="flex-shrink-0 px-3 pb-1" style={{paddingTop: 'calc(env(safe-area-inset-top, 20px) + 8px)'}}>
+      <div className="flex-shrink-0 px-3 pb-1" style={{paddingTop: 'calc(env(safe-area-inset-top, 20px) + 20px)'}}>
         <div className="flex items-center justify-between">
           <button data-testid="room-back-btn" onClick={() => { onBack(); }} className="bg-white/15 text-white px-5 py-2.5 rounded-full text-sm font-bold min-h-[44px] min-w-[80px] active:scale-95 transition-transform" style={{WebkitTapHighlightColor: 'transparent'}} title="Minimizar (audio sigue conectado)">← Salir</button>
           <div className="text-center flex-1 mx-2">
@@ -868,6 +876,12 @@ const RoomView = ({ roomId, onBack }) => {
             </>
           )}
           <div className="ml-auto flex items-center gap-2">
+            <button data-testid="open-gift-ranking-btn" onClick={() => setGiftRankOpen(true)}
+              className="bg-gradient-to-r from-yellow-500/30 to-orange-500/30 border border-yellow-400/40 rounded-full px-3 py-2 flex items-center gap-1 min-h-[40px] active:scale-95 transition-transform"
+              title="Ranking de regalos (diario/semanal/mensual)">
+              <span className="text-base">👑</span>
+              <span className="text-yellow-200 text-[10px] font-bold">Top</span>
+            </button>
             <LevelBadge userId={user.id} />
             <div className="bg-white/5 rounded-full px-3 py-2 flex items-center min-h-[40px]">
               <span className="text-yellow-400 text-xs font-bold">💰 {formatCoins(user.coins)}</span>
