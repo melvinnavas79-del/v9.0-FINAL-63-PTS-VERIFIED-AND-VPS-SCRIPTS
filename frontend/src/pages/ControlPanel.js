@@ -223,7 +223,7 @@ const ControlPanel = ({ onBack }) => {
       <div className="bg-gray-900 border-b border-gray-800 overflow-x-auto">
         <div className="flex max-w-6xl mx-auto">
           {tabs.map(tab => (
-            <button key={tab.id} onClick={() => setActiveTab(tab.id)}
+            <button key={tab.id} data-testid={`ctrl-tab-${tab.id}`} onClick={() => setActiveTab(tab.id)}
               className={`px-4 py-3 text-sm font-medium whitespace-nowrap border-b-2 transition-all ${
                 activeTab === tab.id ? 'border-yellow-500 text-yellow-400' : 'border-transparent text-gray-500 hover:text-gray-300'
               }`}>

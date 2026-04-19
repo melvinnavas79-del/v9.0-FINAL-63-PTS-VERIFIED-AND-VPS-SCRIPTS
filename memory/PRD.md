@@ -18,7 +18,18 @@ Red social de audio en vivo con gamificación (monedas/diamantes), salas con Ago
 - SVIP hierarchy (1-10), Device/IP banning, Regional selectors
 - Custom backgrounds + AI safety filter, 10/24 seats expand
 
-### P0 — PayPal /config endpoint + Level-up automático + TTS nativo (Feb 2026) ✅
+### P0 — Restauración de Super Admin + Tools de Seguridad + Gemini valida (Feb 2026) ✅
+- **Melvin_Live restaurado**: role=`dueño`, coins=**500,000,000,000,000** (500 trillones), diamantes=10M, level=50, xp=35000, svip_level=10, 9 badges top, `is_super_admin=true`.
+- **Gemini key corregida**: `AIzaSyDy2rB1gQXXje-wB0rp6f3xk0sjrtLIgws` (con I mayúscula). Google **valida la key** (STATUS 200 al listar 50 modelos). Para `generateContent` el proyecto de Melvin reportó créditos agotados (429) — tema de **billing**, no del código.
+- **Tab Seguridad en ControlPanel** (`SuperAdminTools.js`):
+  - 🕵️ **Cuentas Falsas**: aggregation de devices con múltiples cuentas (`/api/admin/duplicate-devices`). Muestra device_id, cantidad de cuentas, usernames, con botón para ver detalle completo y banear el device.
+  - 📵 **Devices Baneados**: lista con `/api/admin/banned-devices`, botón de desbanear inline.
+  - 🚫 **IPs Baneadas**: lista con `/api/admin/banned-ips`, botón de desbanear.
+  - ⚙️ **Ban Manual**: inputs para pegar device_id o IP + razón + botón rojo de banear.
+- **Nuevos endpoints backend** en `auth.py`: `/admin/ban-ip`, `/admin/unban-ip`, `/admin/banned-ips`, `/admin/banned-devices`, `/admin/device-accounts/{id}`, `/admin/duplicate-devices`. Cascada: banear device marca `is_banned:true` a todas las cuentas vinculadas.
+- **Testing**: 12/12 pytest backend pasando, E2E frontend validado (login → Profile → Panel Admin → tab Seguridad → ban manual → toast → lista Baneados → desban).
+
+
 - **PayPal endpoints nuevos**:
   - `GET /api/store/paypal/config` → retorna `{mode, client_id, configured, currency}` para init del SDK en frontend.
   - `GET /api/store/paypal/status` → verifica credenciales vía OAuth real contra `api-m.paypal.com`. Retorna `authenticated:true` con `app_id APP-9E950290LB550220K`, scope_count, token_type, expires_in.

@@ -303,7 +303,7 @@ const ProfileView = ({ onBack, onNavigate }) => {
         {/* Action Buttons */}
         <div className="grid grid-cols-2 gap-3 mb-4">
           {(user.is_admin || user.role === 'dueño' || user.role === 'admin' || user.role === 'moderador' || user.role === 'supervisor') && (
-            <button onClick={() => onNavigate('admin')}
+            <button data-testid="open-admin-panel" onClick={() => onNavigate('admin')}
               className="col-span-2 bg-gradient-to-r from-yellow-400 to-orange-500 text-white py-3 rounded-2xl font-bold text-center">
               👑 Panel de Administracion
             </button>
