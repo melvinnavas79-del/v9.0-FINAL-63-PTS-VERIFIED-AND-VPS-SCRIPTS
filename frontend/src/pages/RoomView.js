@@ -897,7 +897,7 @@ const RoomView = ({ roomId, onBack }) => {
             <span className="text-base">👑</span>
             <span className="text-yellow-200 text-[10px] font-bold">Top</span>
           </button>
-          {room.owner_id === user.id && (
+          {(room.owner_id === user.id || user.role === 'dueño' || user.role === 'admin') && (
             <>
               <button data-testid="bar-fondo" onClick={() => bgRef.current?.click()}
                 className="flex-shrink-0 bg-cyan-500/20 border border-cyan-400/40 rounded-full px-3 py-2 flex items-center gap-1 min-h-[40px] active:scale-95 transition-transform"

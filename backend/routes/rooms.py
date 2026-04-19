@@ -353,7 +353,10 @@ async def set_room_background(room_id: str, owner_id: str, file: UploadFile = Fi
     room = await db.rooms.find_one({"id": room_id})
     if not room:
         raise HTTPException(status_code=404, detail="Sala no encontrada")
-    if room['owner_id'] != owner_id:
+    # Dueño de la sala O super admin global (dueño/admin del role)
+    requester = await db.users.find_one({"id": owner_id})
+    is_super = requester and requester.get('role') in ('dueño', 'admin')
+    if room['owner_id'] != owner_id and not is_super:
         raise HTTPException(status_code=403, detail="Solo el dueno de la sala puede cambiar el fondo")
     # Check file type
     ext = os.path.splitext(file.filename)[1].lower()
