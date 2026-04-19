@@ -1,0 +1,36 @@
+{
+  "summary": "Iteration 7 — Validated (1) Melvin_Live restoration (role=dueño, coins=500T, diamonds=10M, level=50, svip_level=10, id=b45958bc-2c6b-49ea-8102-a11197001e53); (2) Admin security endpoints: duplicate-devices, banned-devices, banned-ips, ban-device/unban-device, ban-ip/unban-ip, device-accounts — all 200 OK with correct payloads; (3) Non-admin users correctly receive 403 on all 6 admin endpoints; (4) Frontend E2E: login → Profile → 'Panel de Administración' → tab Seguridad (🛡️) → SuperAdminTools visible with data-testid='super-admin-tools' and the 4 sub-tabs (tab-duplicates, tab-banned-devices, tab-banned-ips, tab-manual-ban). Manual Ban tab inputs/buttons (input-ban-device, btn-ban-device, input-ban-ip, btn-ban-ip) present and functional — ban-device triggers backend call and shows toast 'Dispositivo baneado: …', device appears in Baneados list, UI unban works. ProfileView renders correct values (SVIP 10 badge, Dueño, Nivel 50, 500000.0B monedas, 10.0M diamantes).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "ProfileView", "issues": ["Button '👑 Panel de Administración' lacks a data-testid — would benefit from data-testid='open-admin-panel' for reliable E2E navigation."]},
+      {"screen": "ControlPanel tabs", "issues": ["The internal tab buttons (Salas, Config, Consola, Bot IA, Seguridad) do not expose data-testid attributes (e.g. data-testid='ctrl-tab-security'). Tests must fall back to text match."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration_7.py",
+    "/app/test_reports/pytest/iteration_7.xml"
+  ],
+  "action_items": [
+    "(Optional) Add data-testid='open-admin-panel' to the Panel de Administración button in ProfileView.js (~line 306).",
+    "(Optional) Add data-testid='ctrl-tab-<id>' to the top tabs in ControlPanel.js (salas, config, consola, bot-ia, security) for robust automation.",
+    "No functional fixes required — Melvin_Live restoration and the new Security tab (IP/Device ban + fake-account tracker) are working end-to-end."
+  ],
+  "critical_code_review_comments": [
+    "routes/auth.py admin endpoints correctly use role check admin.get('role') in ('dueño', 'admin') — returns 403 otherwise. Verified with pytest non-admin 403 suite.",
+    "routes/auth.py ban-device also cascades is_banned=true to any user with that device_id (line 246) and ban-ip cascades to users with last_ip (line 303) — good defense-in-depth. Make sure login/registration actually persist device_id and last_ip at sign-in time for this to take effect (currently only /auth/firebase sets device_id; /login and /register do not). Consider capturing request.client.host and a device header in /login & /register too.",
+    "routes/auth.py duplicate_devices aggregation filters out empty/missing device_id and groups by device_id with $push usernames — solid.",
+    "SuperAdminTools.js — component well structured; all data-testid attributes present as specified in the request. useEffect dependency array is [] but adminId is used; works because adminId is effectively constant per session, but eslint-react-hooks may warn. Low priority.",
+    "Ban/Unban POST endpoints use query parameters (device_id, admin_id, reason) — should ideally be JSON body for POST bodies; works correctly with FastAPI but is non-idiomatic. Non-blocking.",
+    "No admin action audit log: consider inserting a record into db.admin_audit_log for every ban/unban with actor, target, reason, timestamp."
+  ],
+  "updated_files": ["/app/backend/tests/test_iteration_7.py"],
+  "success_rate": {"backend": "100% (12/12 pytest passed)", "frontend": "100% — all requested data-testid elements present and manual ban flow verified end-to-end via live UI"},
+  "test_credentials": "Melvin_Live / test123 (owner id b45958bc-2c6b-49ea-8102-a11197001e53)",
+  "seed_data_creation": "Transient test user TEST_nonadmin_iter7 created once for 403-check class (reused on subsequent runs). Test device TEST_DEV_ITER7_123 and IP 203.0.113.77 are banned then unbanned within the same test; UI smoke test also created+unbanned TEST_DEV_UI_FLOW_42 and 198.51.100.42 (final cleanup POST /unban-device + /unban-ip both returned success:true).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Iteration 7 complete. Backend regression file is /app/backend/tests/test_iteration_7.py (12 tests). Known environmental 404s in browser console during login are background asset requests (not blocking). For future UI automation of ControlPanel flows, prefer navigating Profile → click the button whose text matches /Panel de Administración/, then Seguridad tab via text match until data-testid tags are added (see action_items). All iteration 6 tests still pass and security feature is additive (no regressions expected)."
+}

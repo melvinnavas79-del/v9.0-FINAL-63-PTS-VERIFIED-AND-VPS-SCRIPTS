@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useUser } from '../contexts/UserContext';
+import SuperAdminTools from '../components/SuperAdminTools';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -204,6 +205,7 @@ const ControlPanel = ({ onBack }) => {
     { id: 'config', label: 'Config', icon: '⚙️' },
     { id: 'console', label: 'Consola', icon: '💻' },
     { id: 'bot', label: 'Bot IA', icon: '🤖' },
+    { id: 'security', label: 'Seguridad', icon: '🛡️' },
   ];
 
   return (
@@ -610,6 +612,11 @@ const ControlPanel = ({ onBack }) => {
         {/* BOT IA */}
         {activeTab === 'bot' && (
           <BotTab userId={user.id} />
+        )}
+
+        {/* SEGURIDAD - Super Admin Tools (Device/IP ban + fake accounts) */}
+        {activeTab === 'security' && (
+          <SuperAdminTools adminId={user.id} />
         )}
       </div>
     </div>

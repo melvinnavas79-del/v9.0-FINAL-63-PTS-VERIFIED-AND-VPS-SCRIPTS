@@ -257,6 +257,90 @@ async def unban_device(device_id: str, admin_id: str):
     await db.banned_devices.delete_one({"device_id": device_id})
     return {"success": True}
 
+@router.get("/admin/device-accounts/{device_id}")
+async def device_accounts(device_id: str, admin_id: str):
+    """List all user accounts registered from a specific device. Detects fake/multi-accounts."""
+    admin = await db.users.find_one({"id": admin_id})
+    if not admin or admin.get('role') not in ('dueño', 'admin'):
+        raise HTTPException(status_code=403, detail="No autorizado")
+    users = await db.users.find(
+        {"device_id": device_id},
+        {"_id": 0, "id": 1, "username": 1, "role": 1, "coins": 1, "level": 1, "created_at": 1, "is_banned": 1, "avatar": 1, "last_seen": 1}
+    ).sort("created_at", -1).to_list(100)
+    banned_info = await db.banned_devices.find_one({"device_id": device_id}) or {}
+    return {
+        "device_id": device_id,
+        "account_count": len(users),
+        "is_device_banned": bool(banned_info.get("banned_at")),
+        "ban_reason": banned_info.get("reason"),
+        "accounts": users,
+    }
+
+
+@router.get("/admin/banned-devices")
+async def list_banned_devices(admin_id: str):
+    """List all banned devices with their linked accounts count."""
+    admin = await db.users.find_one({"id": admin_id})
+    if not admin or admin.get('role') not in ('dueño', 'admin'):
+        raise HTTPException(status_code=403, detail="No autorizado")
+    devices = await db.banned_devices.find({}, {"_id": 0}).sort("banned_at", -1).to_list(200)
+    for d in devices:
+        d["account_count"] = await db.users.count_documents({"device_id": d["device_id"]})
+    return devices
+
+
+@router.post("/admin/ban-ip")
+async def ban_ip(ip_address: str, admin_id: str, reason: str = "Fraude"):
+    """Ban an IP address. Any user registering or logging in from this IP is rejected."""
+    admin = await db.users.find_one({"id": admin_id})
+    if not admin or admin.get('role') not in ('dueño', 'admin'):
+        raise HTTPException(status_code=403, detail="No autorizado")
+    await db.banned_ips.update_one(
+        {"ip_address": ip_address},
+        {"$set": {"ip_address": ip_address, "banned_by": admin_id, "reason": reason, "banned_at": datetime.now(timezone.utc).isoformat()}},
+        upsert=True
+    )
+    await db.users.update_many({"last_ip": ip_address}, {"$set": {"is_banned": True}})
+    return {"success": True, "message": f"IP {ip_address} baneada"}
+
+
+@router.post("/admin/unban-ip")
+async def unban_ip(ip_address: str, admin_id: str):
+    admin = await db.users.find_one({"id": admin_id})
+    if not admin or admin.get('role') not in ('dueño', 'admin'):
+        raise HTTPException(status_code=403, detail="No autorizado")
+    await db.banned_ips.delete_one({"ip_address": ip_address})
+    return {"success": True}
+
+
+@router.get("/admin/banned-ips")
+async def list_banned_ips(admin_id: str):
+    admin = await db.users.find_one({"id": admin_id})
+    if not admin or admin.get('role') not in ('dueño', 'admin'):
+        raise HTTPException(status_code=403, detail="No autorizado")
+    ips = await db.banned_ips.find({}, {"_id": 0}).sort("banned_at", -1).to_list(200)
+    for ip in ips:
+        ip["account_count"] = await db.users.count_documents({"last_ip": ip["ip_address"]})
+    return ips
+
+
+@router.get("/admin/duplicate-devices")
+async def duplicate_devices(admin_id: str, min_accounts: int = 2):
+    """List devices that have multiple accounts registered — detects potential fake accounts."""
+    admin = await db.users.find_one({"id": admin_id})
+    if not admin or admin.get('role') not in ('dueño', 'admin'):
+        raise HTTPException(status_code=403, detail="No autorizado")
+    pipeline = [
+        {"$match": {"device_id": {"$exists": True, "$ne": ""}}},
+        {"$group": {"_id": "$device_id", "count": {"$sum": 1}, "usernames": {"$push": "$username"}, "user_ids": {"$push": "$id"}}},
+        {"$match": {"count": {"$gte": min_accounts}}},
+        {"$sort": {"count": -1}},
+        {"$limit": 100},
+    ]
+    raw = await db.users.aggregate(pipeline).to_list(100)
+    return [{"device_id": r["_id"], "account_count": r["count"], "usernames": r["usernames"], "user_ids": r["user_ids"]} for r in raw]
+
+
 @router.get("/users/{user_id}")
 async def get_user(user_id: str):
     """Get user profile by ID."""
