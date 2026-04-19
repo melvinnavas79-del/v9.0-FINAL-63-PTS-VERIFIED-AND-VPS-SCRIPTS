@@ -13,13 +13,14 @@ const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
  */
 const GiftRanking = ({ roomId = null, onClose }) => {
   const [window, setWindow] = useState('daily');
+  const [scope, setScope] = useState(roomId ? 'room' : 'global');
   const [data, setData] = useState({ leaderboard: [] });
   const [loading, setLoading] = useState(false);
 
-  const load = async (w) => {
+  const load = async (w, s) => {
     setLoading(true);
     try {
-      const url = roomId
+      const url = (s === 'room' && roomId)
         ? `${API}/rankings/gifts/room/${roomId}?window=${w}&limit=20`
         : `${API}/rankings/gifts?window=${w}&limit=20`;
       const r = await axios.get(url);
@@ -28,11 +29,11 @@ const GiftRanking = ({ roomId = null, onClose }) => {
     setLoading(false);
   };
 
-  useEffect(() => { load(window); }, [window, roomId]);
+  useEffect(() => { load(window, scope); }, [window, scope, roomId]);
   useEffect(() => {
-    const t = setInterval(() => load(window), 30000);
+    const t = setInterval(() => load(window, scope), 30000);
     return () => clearInterval(t);
-  }, [window]);
+  }, [window, scope]);
 
   const tabs = [
     { id: 'daily', label: 'Hoy' },
@@ -52,9 +53,19 @@ const GiftRanking = ({ roomId = null, onClose }) => {
             <h3 className="text-white font-black text-base flex items-center gap-2">
               👑 Top Gifters
             </h3>
-            <p className="text-yellow-200/70 text-[10px]">{roomId ? 'Esta sala' : 'Global'}</p>
+            <p className="text-yellow-200/70 text-[10px]">{scope === 'room' ? 'Esta sala' : 'Global'}</p>
           </div>
-          <button data-testid="gift-ranking-close" onClick={onClose} className="w-8 h-8 rounded-full bg-white/10 text-white text-lg">✕</button>
+          <div className="flex items-center gap-2">
+            {roomId && (
+              <div className="flex bg-black/30 rounded-full p-0.5 text-[10px] font-bold">
+                <button data-testid="gift-scope-room" onClick={() => setScope('room')}
+                  className={`px-2.5 py-1 rounded-full transition-colors ${scope === 'room' ? 'bg-yellow-500 text-black' : 'text-white/60'}`}>Sala</button>
+                <button data-testid="gift-scope-global" onClick={() => setScope('global')}
+                  className={`px-2.5 py-1 rounded-full transition-colors ${scope === 'global' ? 'bg-yellow-500 text-black' : 'text-white/60'}`}>Global</button>
+              </div>
+            )}
+            <button data-testid="gift-ranking-close" onClick={onClose} className="w-8 h-8 rounded-full bg-white/10 text-white text-lg">✕</button>
+          </div>
         </div>
 
         {/* Tabs */}

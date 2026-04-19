@@ -18,7 +18,15 @@ Red social de audio en vivo con gamificación (monedas/diamantes), salas con Ago
 - SVIP hierarchy (1-10), Device/IP banning, Regional selectors
 - Custom backgrounds + AI safety filter, 10/24 seats expand
 
-### P0 — Restauración de Super Admin + Tools de Seguridad + Gemini valida (Feb 2026) ✅
+### P0 — iOS Safe-Area + Ranking de Regalos con Corona 👑 (Feb 2026) ✅
+- **Safe-area iPhone**: aumentado padding-top del header de RoomView de `calc(env(safe-area-inset-top,20px) + 8px)` a `+ 20px`. Banner de anuncios global bajado de `+50px` a `+72px` para no chocar con el nuevo header. Botones ← Salir, ⬇️ Minimizar, 💰 ya no chocan con el notch/Dynamic Island.
+- **Ranking de Regalos con Corona** (3 ventanas temporales — diario, semanal, mensual):
+  - Backend: `/api/rankings/gifts?window=daily|weekly|monthly`, `/api/rankings/gifts/crown`, `/api/rankings/gifts/room/{id}`. Aggregation sobre `db.gifts.cost` agrupado por `sender_id`. `_window_start` calcula correctamente inicio de día/lunes/día 1.
+  - Frontend: `GiftRanking` modal con podio top 3 (medallas 🥇🥈🥉 + corona animada en #1 flotando con bob 2s) + lista 4+ con contadores, toggle **Global/Sala**, auto-refresh 30s. `CrownBadge` que aparece junto al username en cada asiento si el usuario es king actual (prioridad monthly > weekly > daily).
+  - Botón `open-gift-ranking-btn` en el header de la sala al lado del LevelBadge.
+- **Testing**: 12/12 pytest backend + 100% frontend E2E validado.
+
+
 - **Melvin_Live restaurado**: role=`dueño`, coins=**500,000,000,000,000** (500 trillones), diamantes=10M, level=50, xp=35000, svip_level=10, 9 badges top, `is_super_admin=true`.
 - **Gemini key corregida**: `AIzaSyDy2rB1gQXXje-wB0rp6f3xk0sjrtLIgws` (con I mayúscula). Google **valida la key** (STATUS 200 al listar 50 modelos). Para `generateContent` el proyecto de Melvin reportó créditos agotados (429) — tema de **billing**, no del código.
 - **Tab Seguridad en ControlPanel** (`SuperAdminTools.js`):
