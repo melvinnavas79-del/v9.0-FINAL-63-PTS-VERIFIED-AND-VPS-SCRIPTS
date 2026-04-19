@@ -1,0 +1,27 @@
+{
+  "summary": "Iteration 9 — Frontend-only regression for restored TOP TOOLBAR on RoomView.js (lines 861-912). Login Melvin_Live/test123 → 'por la sala' → entered Mi Sala Live. All 6 top toolbar buttons are visible and clickable: data-testid='top-tienda-btn' (🛒Tienda), 'top-juegos-btn' (🎮Juegos), 'top-cofres-btn' (📦Cofres), 'top-sobres-btn' (🧧Sobres), 'top-regalos-btn' (🎁Regalos), 'open-gift-ranking-btn' (👑Top). Owner-only 'bar-fondo' (🖼Fondo) also visible for Melvin (role=dueño). Click verification: Tienda opens Supermercado panel with SVIP/VIP/Marcos (Aristocracia/Supermercado text confirmed); Juegos opens games panel; Cofres opens panel with 'Abrir Cofre #1'; Sobres opens 'Lluvia de Oro / Sobres rojos'; Regalos opens panel with 'Elige a quién enviar' + gift list (Rosa/Corazón/Diamante/Corona/Dragon/Castillo/Lluvia de Oro/Mega Corona + Sobre 10K–10M); Top opens data-testid='gift-ranking-modal' with Hoy/Semana/Mes tabs (Melvin_Live #1 510,000 👑 visible, Sala/Global toggle working). Second row under top toolbar correctly has only LevelBadge (data-testid='level-badge') + 💰 7,450,000 — NO duplicate Tienda/Juegos (exact count: 1 button with 'Tienda' text and 1 with 'Juegos' text). Regression smoke: data-testid='tools-panel-btn' opens ToolsPanel with all 8 icons (tool-sorpresa, tool-numero, tool-dado, tool-mora, tool-switch, tool-clear, tool-music, tool-voz) — all 8 data-testids found and visible. chat-input, chat-send-btn, seat-btn-0..11, minimize-btn, room-back-btn, crown-badge-monthly, gift-bottom-btn, music-btn, toggle-mute-btn, toggle-deafen-btn, leave-room-btn, bot-floating-btn, bot-toggle-room, events-room-btn, toggle-event-mode all rendered. Backend smoke not re-run this iteration (scope = frontend only per main agent).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "RoomView top toolbar", "issues": ["Toolbar is horizontally scrollable on 390px viewport (6-7 buttons don’t all fit at once — this is the intended overflow-x-auto behavior, user can scroll right to reveal Top/Fondo). No visual bug."]}
+    ]
+  },
+  "test_report_links": ["/app/test_reports/iteration_9.json"],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "RoomView.js is 1102 lines — exceeds the 700-line soft limit. Consider splitting header toolbar + panels into separate components for maintainability (HeaderToolbar.js, SecondRow.js).",
+    "The TOP TOOLBAR (lines 862-912) and the bottom panel dispatch use setPanel('tienda'|'games'|'cofres'|'sobres'|'gifts-all') — string literals duplicated across 6 call sites. Extract into a PANEL_IDS constant to prevent typos.",
+    "Agora RTC voice chat is still emitting repeated 'CAN_NOT_GET_GATEWAY_SERVER: invalid token, authorized failed' errors on room entry (observed ~7 failures per entry). Not related to this iteration but pre-existing — token minting endpoint likely missing valid App Certificate or has expired. Flag for main agent review when voice chat is revisited.",
+    "3x '404 Failed to load resource' errors on every page load (non-blocking). Likely missing favicon or a static asset referenced by index.html — worth investigating and silencing."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "not tested (scope=frontend)", "frontend": "100% — all 11 requested checks passed (6 top buttons visible + clickable, owner-only Fondo shown, 5 panels open correctly, gift-ranking-modal + 3 tabs, no duplicated Tienda/Juegos in 2nd row, ToolsPanel + 8 icons, chat+seats+minimize regressions intact)"},
+  "test_credentials": "Melvin_Live / test123 (owner)",
+  "seed_data_creation": "None",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Iteration 9 only added visible buttons to the restored TOP TOOLBAR. No new backend endpoints. The setPanel() wiring for 'tienda'/'games'/'cofres'/'sobres'/'gifts-all' was pre-existing and confirmed working. Known pre-existing issues to IGNORE unless explicitly asked: (1) Agora invalid-token errors on voice channel join, (2) 3x generic 404 on initial load (likely favicon/static). The gift-ranking-modal in iteration 8 still defaults to 'Sala' (room-scoped) when opened from inside a room — Sala/Global toggle visible in the modal header works correctly.",
+  "rca of the issue": "N/A — no bug found. The 6 restored top-row buttons (top-tienda-btn, top-juegos-btn, top-cofres-btn, top-sobres-btn, top-regalos-btn, open-gift-ranking-btn) and owner-only bar-fondo all render and open the correct panels/modals. The second row below only contains LevelBadge + coin counter as required (no duplicates). Regression checks on ToolsPanel (8 icons), seats (0-11), chat, minimize all pass."
+}

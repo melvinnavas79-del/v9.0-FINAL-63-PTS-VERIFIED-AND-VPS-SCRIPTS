@@ -858,34 +858,65 @@ const RoomView = ({ roomId, onBack }) => {
         </div>
       )}
 
-      {/* COINS INDICATOR + OWNER CONTROLS (clean, sin duplicados) */}
+      {/* TOP TOOLBAR - accesos rápidos al negocio (Tienda / Juegos / Regalos / Cofres / Sobres / Ranking) */}
       <div className="flex-shrink-0 px-3 mb-2">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 overflow-x-auto scrollbar-none" style={{scrollbarWidth:'none'}}>
+          <button data-testid="top-tienda-btn" onClick={() => setPanel('tienda')}
+            className="flex-shrink-0 bg-gradient-to-br from-pink-500/30 to-purple-500/30 border border-pink-400/40 rounded-full px-3 py-2 flex items-center gap-1 min-h-[40px] active:scale-95 transition-transform"
+            title="Supermercado — Aristocracia, Marcos, SVIP">
+            <span className="text-base">🛒</span>
+            <span className="text-pink-200 text-[10px] font-bold">Tienda</span>
+          </button>
+          <button data-testid="top-juegos-btn" onClick={() => setPanel('games')}
+            className="flex-shrink-0 bg-gradient-to-br from-green-500/30 to-emerald-500/30 border border-green-400/40 rounded-full px-3 py-2 flex items-center gap-1 min-h-[40px] active:scale-95 transition-transform"
+            title="Juegos en sala">
+            <span className="text-base">🎮</span>
+            <span className="text-green-200 text-[10px] font-bold">Juegos</span>
+          </button>
+          <button data-testid="top-cofres-btn" onClick={() => setPanel('cofres')}
+            className="flex-shrink-0 bg-gradient-to-br from-yellow-500/30 to-amber-500/30 border border-yellow-400/40 rounded-full px-3 py-2 flex items-center gap-1 min-h-[40px] active:scale-95 transition-transform"
+            title="Cofres">
+            <span className="text-base">📦</span>
+            <span className="text-yellow-200 text-[10px] font-bold">Cofres</span>
+          </button>
+          <button data-testid="top-sobres-btn" onClick={() => setPanel('sobres')}
+            className="flex-shrink-0 bg-gradient-to-br from-red-500/30 to-orange-500/30 border border-red-400/40 rounded-full px-3 py-2 flex items-center gap-1 min-h-[40px] active:scale-95 transition-transform"
+            title="Lluvia de oro / Sobres rojos">
+            <span className="text-base">🧧</span>
+            <span className="text-red-200 text-[10px] font-bold">Sobres</span>
+          </button>
+          <button data-testid="top-regalos-btn" onClick={() => setPanel('gifts-all')}
+            className="flex-shrink-0 bg-gradient-to-br from-fuchsia-500/30 to-rose-500/30 border border-fuchsia-400/40 rounded-full px-3 py-2 flex items-center gap-1 min-h-[40px] active:scale-95 transition-transform"
+            title="Enviar regalos">
+            <span className="text-base">🎁</span>
+            <span className="text-fuchsia-200 text-[10px] font-bold">Regalos</span>
+          </button>
+          <button data-testid="open-gift-ranking-btn" onClick={() => setGiftRankOpen(true)}
+            className="flex-shrink-0 bg-gradient-to-br from-yellow-500/30 to-orange-500/30 border border-yellow-400/40 rounded-full px-3 py-2 flex items-center gap-1 min-h-[40px] active:scale-95 transition-transform"
+            title="Ranking de regalos (diario/semanal/mensual)">
+            <span className="text-base">👑</span>
+            <span className="text-yellow-200 text-[10px] font-bold">Top</span>
+          </button>
           {room.owner_id === user.id && (
             <>
-              <button
-                data-testid="bar-fondo"
-                onClick={() => bgRef.current?.click()}
-                className="bg-cyan-500/15 border border-cyan-500/20 rounded-full px-3 py-2 flex items-center gap-1.5 min-h-[40px] active:scale-95"
-                title="Cambiar fondo de la sala (solo dueño)"
-              >
+              <button data-testid="bar-fondo" onClick={() => bgRef.current?.click()}
+                className="flex-shrink-0 bg-cyan-500/20 border border-cyan-400/40 rounded-full px-3 py-2 flex items-center gap-1 min-h-[40px] active:scale-95 transition-transform"
+                title="Cambiar fondo de la sala (solo dueño)">
                 <span className="text-base">🖼</span>
-                <span className="text-cyan-300 text-xs font-bold">Fondo</span>
+                <span className="text-cyan-200 text-[10px] font-bold">Fondo</span>
               </button>
               <input ref={bgRef} type="file" accept="image/*" onChange={uploadBackground} className="hidden" />
             </>
           )}
-          <div className="ml-auto flex items-center gap-2">
-            <button data-testid="open-gift-ranking-btn" onClick={() => setGiftRankOpen(true)}
-              className="bg-gradient-to-r from-yellow-500/30 to-orange-500/30 border border-yellow-400/40 rounded-full px-3 py-2 flex items-center gap-1 min-h-[40px] active:scale-95 transition-transform"
-              title="Ranking de regalos (diario/semanal/mensual)">
-              <span className="text-base">👑</span>
-              <span className="text-yellow-200 text-[10px] font-bold">Top</span>
-            </button>
-            <LevelBadge userId={user.id} />
-            <div className="bg-white/5 rounded-full px-3 py-2 flex items-center min-h-[40px]">
-              <span className="text-yellow-400 text-xs font-bold">💰 {formatCoins(user.coins)}</span>
-            </div>
+        </div>
+      </div>
+
+      {/* Second row: user-status indicators (level, coins) */}
+      <div className="flex-shrink-0 px-3 mb-2">
+        <div className="flex items-center gap-2">
+          <LevelBadge userId={user.id} />
+          <div className="ml-auto bg-white/5 rounded-full px-3 py-2 flex items-center min-h-[40px]">
+            <span className="text-yellow-400 text-xs font-bold">💰 {formatCoins(user.coins)}</span>
           </div>
         </div>
       </div>
