@@ -1,117 +1,60 @@
-# Lluvia Live - .gitignore
+# ══════════════════════════════════════════════════════
+#   LLUVIA LIVE · .gitignore
+# ══════════════════════════════════════════════════════
 
-# Dependencias
+# ─── Dependencias ─────────────────────────────────────
 node_modules/
 venv/
 .venv/
+*.egg-info/
 
-# Cache de Python
+# ─── Caché Python ─────────────────────────────────────
 __pycache__/
 *.pyc
 *.pyo
 
-# Variables de entorno (cada servidor tiene las suyas)
+# ─── Variables de entorno y credenciales ──────────────
 .env
 .env.*
 !.env.example
 firebase-admin.json
+credentials.json
+.credentials
+*.pem
+*.key
 
-# Builds
+# ─── Builds y artefactos ──────────────────────────────
 /build
 dist/
 frontend/build/
+*.tar.gz
+*.zip
+*.tgz
+*.pack
 
-# IDE
+# ─── IDE y sistema operativo ──────────────────────────
 .idea/
 .vscode/
 *.swp
 *~
-
-# Sistema
 .DS_Store
 Thumbs.db
-*.pem
-*.key
 
-# Logs
+# ─── Logs ─────────────────────────────────────────────
+*.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# Testing
+# ─── Testing y reportes internos ──────────────────────
 coverage/
 .pytest_cache/
 .ruff_cache/
 test_reports/
 memory/
 
-# Archivos comprimidos
-*.zip
-*.tar.gz
-*.tar
-*.tgz
-*.pack
-
-# Carpetas de plataforma de desarrollo (NO son parte de Lluvia Live)
+# ─── Caché de plataforma de desarrollo ────────────────
 .emergent/
 .gitconfig
-
-# Credenciales
-credentials.json
-.credentials
+frontend/node_modules/.cache/
 frontend/node_modules/.cache/default-development/41.pack
-frontend/node_modules/.cache/default-development/2.pack_
-frontend/node_modules/.cache/default-development/1.pack
-frontend/node_modules/.cache/default-development/0.pack
--e 
-# Environment and credential files
-.env
-.env.*
-*.env
-credentials.json
-*.pem
-*.key
-.credentials
-frontend/node_modules/.cache/default-development/3.pack
-frontend/node_modules/.cache/default-development/4.pack
-frontend/node_modules/.cache/default-development/5.pack
-frontend/node_modules/.cache/default-development/6.pack
-frontend/node_modules/.cache/default-development/8.pack
-frontend/node_modules/.cache/default-development/10.pack
-frontend/node_modules/.cache/default-development/13.pack
-frontend/node_modules/.cache/default-development/15.pack
-frontend/node_modules/.cache/default-development/19.pack
-frontend/node_modules/.cache/default-development/17.pack
-frontend/node_modules/.cache/default-development/20.pack
-frontend/node_modules/.cache/default-development/18.pack
--e 
-# Environment and credential files
-.env
-.env.*
-*.env
-credentials.json
-*.pem
-*.key
-.credentials
-frontend/node_modules/.cache/default-development/21.pack
-frontend/node_modules/.cache/default-development/21.pack
-frontend/node_modules/.cache/default-development/21.pack
-frontend/node_modules/.cache/default-development/24.pack
--e 
-# Environment and credential files
-.env
-.env.*
-*.env
-credentials.json
-*.pem
-*.key
-.credentials
--e 
-# Environment and credential files
-.env
-.env.*
-*.env
-credentials.json
-*.pem
-*.key
-.credentials
