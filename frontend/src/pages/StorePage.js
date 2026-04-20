@@ -30,14 +30,14 @@ const StorePage = ({ onBack }) => {
     try {
       const res = await axios.get(`${API}/store/packages`);
       setPackages(res.data);
-    } catch (err) { console.error(err); }
+    } catch (err) { /* silent */ }
   };
 
   const loadPaypalId = async () => {
     try {
       const res = await axios.get(`${API}/store/paypal-client-id`);
       setPaypalClientId(res.data.client_id);
-    } catch (err) { console.error('PayPal no configurado'); }
+    } catch (err) { /* silent */ }
   };
 
   const checkPayment = async () => {
@@ -52,7 +52,7 @@ const StorePage = ({ onBack }) => {
           const u = await axios.get(`${API}/users/${user.id}`);
           updateUser(u.data);
         }
-      } catch (err) { console.error(err); }
+      } catch (err) { /* silent */ }
       window.history.replaceState({}, '', window.location.pathname);
     }
   };

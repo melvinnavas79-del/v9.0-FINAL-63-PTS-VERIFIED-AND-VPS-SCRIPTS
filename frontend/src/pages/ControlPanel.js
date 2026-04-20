@@ -56,7 +56,7 @@ const ControlPanel = ({ onBack }) => {
       setRooms(r.data);
       setClanes(c.data);
       setEvents(e.data);
-    } catch (err) { console.error(err); }
+    } catch (err) { /* silent */ }
   };
 
   const updateUserField = async (userId, field, value) => {
@@ -673,7 +673,7 @@ const BotTab = ({ userId }) => {
     try {
       const res = await axios.get(`${API}/bot/history?admin_id=${userId}`);
       setHistory(res.data);
-    } catch (err) { console.error(err); }
+    } catch (err) { /* silent */ }
   };
 
   const [pendingAction, setPendingAction] = useState(null);

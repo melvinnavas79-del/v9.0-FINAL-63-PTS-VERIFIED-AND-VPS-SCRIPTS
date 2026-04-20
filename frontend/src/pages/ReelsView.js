@@ -28,7 +28,7 @@ const ReelsView = ({ onBack }) => {
     try {
       const res = await axios.get(`${API}/reels`);
       setReels(res.data);
-    } catch (err) { console.error(err); }
+    } catch (err) { /* silent */ }
   };
 
   const handleUpload = async () => {
@@ -76,7 +76,7 @@ const ReelsView = ({ onBack }) => {
     try {
       await axios.post(`${API}/reels/${id}/like?user_id=${user.id}`);
       loadReels();
-    } catch (err) { console.error(err); }
+    } catch (err) { /* silent */ }
   };
 
   const colors = ['from-pink-500 to-rose-600','from-purple-500 to-indigo-600','from-blue-500 to-cyan-600','from-green-500 to-emerald-600','from-yellow-500 to-orange-600'];

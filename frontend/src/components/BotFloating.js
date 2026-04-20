@@ -196,7 +196,7 @@ const BotFloating = ({ userId, userRole }) => {
         recognitionRef.current._keepListening = true;
         recognitionRef.current.start();
         setListening(true);
-      } catch (e) { console.error(e); }
+      } catch (e) { /* silent */ }
     }
   };
 

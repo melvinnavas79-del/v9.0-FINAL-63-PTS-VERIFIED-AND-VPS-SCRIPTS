@@ -21,7 +21,7 @@ const PhotosView = ({ onBack }) => {
     try {
       const res = await axios.get(`${API}/photos`);
       setPhotos(res.data);
-    } catch (err) { console.error(err); }
+    } catch (err) { /* silent */ }
   };
 
   const handleUpload = async () => {
@@ -58,7 +58,7 @@ const PhotosView = ({ onBack }) => {
     try {
       await axios.post(`${API}/photos/${id}/like?user_id=${user.id}`);
       loadPhotos();
-    } catch (err) { console.error(err); }
+    } catch (err) { /* silent */ }
   };
 
   return (

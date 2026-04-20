@@ -22,7 +22,7 @@ const NotificationsView = ({ onBack, onNavigate }) => {
     try {
       const res = await axios.get(`${API}/notifications/${user.id}?limit=30`);
       setNotifications(res.data);
-    } catch (err) { console.error(err); }
+    } catch (err) { /* silent */ }
     setLoading(false);
   }, [user.id]);
 
@@ -30,7 +30,7 @@ const NotificationsView = ({ onBack, onNavigate }) => {
     try {
       const res = await axios.get(`${API}/notifications/${user.id}/preferences`);
       setPrefs(res.data);
-    } catch (err) { console.error(err); }
+    } catch (err) { /* silent */ }
   }, [user.id]);
 
   useEffect(() => {
@@ -45,7 +45,7 @@ const NotificationsView = ({ onBack, onNavigate }) => {
     try {
       await axios.put(`${API}/notifications/${user.id}/preferences`, newPrefs);
       loadNotifications();
-    } catch (err) { console.error(err); }
+    } catch (err) { /* silent */ }
   };
 
   const timeAgo = (dateStr) => {

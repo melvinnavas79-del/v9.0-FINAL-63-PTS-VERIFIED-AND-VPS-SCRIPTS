@@ -58,7 +58,6 @@ const EntryAnimation = ({ animation, username, onComplete }) => {
       if (onComplete) onComplete();
     }, 4000);
     return () => clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   if (!visible) return null;

@@ -50,12 +50,8 @@ const AdminPanel = ({ onBack }) => {
       try {
         const staffRes = await axios.get(`${API}/admin/staff?admin_id=${user.id}`);
         setStaff(staffRes.data);
-      } catch (e) {
-        console.log('Staff endpoint not available');
-      }
-    } catch (err) {
-      console.error('Error loading admin data:', err);
-    }
+      } catch (e) { /* staff endpoint opcional */ }
+    } catch (err) { /* silent */ }
   };
 
   const activateOwner = async () => {

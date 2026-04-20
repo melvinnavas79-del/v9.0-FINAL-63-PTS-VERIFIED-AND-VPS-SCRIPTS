@@ -18,14 +18,14 @@ const ParejasView = ({ onBack }) => {
     try {
       const res = await axios.get(`${API}/cp`);
       setParejas(res.data);
-    } catch (err) { console.error(err); }
+    } catch (err) { /* silent */ }
   };
 
   const loadAllUsers = async () => {
     try {
       const res = await axios.get(`${API}/rankings/coins`);
       setAllUsers(res.data.filter(u => u.id !== user.id));
-    } catch (err) { console.error(err); }
+    } catch (err) { /* silent */ }
   };
 
   const createPareja = async (partnerId) => {

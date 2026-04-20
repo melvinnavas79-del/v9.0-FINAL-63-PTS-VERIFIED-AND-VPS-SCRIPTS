@@ -17,7 +17,7 @@ const ClanesView = ({ onBack }) => {
     try {
       const res = await axios.get(`${API}/clanes`);
       setClanes(res.data);
-    } catch (err) { console.error(err); }
+    } catch (err) { /* silent */ }
   };
 
   const createClan = async () => {

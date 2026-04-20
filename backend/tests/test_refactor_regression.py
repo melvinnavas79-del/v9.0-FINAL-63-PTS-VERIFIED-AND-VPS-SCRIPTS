@@ -64,7 +64,8 @@ def test_ai_moderate_image_placeholder_returns_fail_open():
 
 def test_ai_moderate_image_empty_key():
     """Empty/whitespace key must fail OPEN."""
-    import sys, asyncio
+    import sys
+    import asyncio
     sys.path.insert(0, '/app/backend')
     from routes.rooms import ai_moderate_image
     # Save and replace env
@@ -83,7 +84,8 @@ def test_ai_moderate_image_empty_key():
 
 def test_ai_moderate_image_other_placeholders():
     """'your_key_here' / 'tu_key_aqui' must fail OPEN."""
-    import sys, asyncio
+    import sys
+    import asyncio
     sys.path.insert(0, '/app/backend')
     from routes.rooms import ai_moderate_image
     original = os.environ.get('GEMINI_API_KEY')

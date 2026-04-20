@@ -116,9 +116,7 @@ const RoomView = ({ roomId, onBack }) => {
     }, 5000);
     return () => {
       clearInterval(r); clearInterval(c); clearInterval(cf); clearInterval(ga);
-      // NOTE: We intentionally do NOT leave the WebRTC session here.
-      // Audio persists via AudioContext until user explicitly taps "Salir" / ✕.
-      // Cleanup local room music audio element only.
+      // Sesión WebRTC persiste hasta que el usuario pulse "Salir" / ✕.
       if (audioElementRef.current) {
         audioElementRef.current.pause();
         audioElementRef.current.src = '';
@@ -207,7 +205,7 @@ const RoomView = ({ roomId, onBack }) => {
         setBotOn(true);
       }
       loadChat();
-    } catch (e) { console.error(e); }
+    } catch (e) { /* silent */ }
   };
 
   const joinSeat = async (i) => {

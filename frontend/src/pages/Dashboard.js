@@ -70,25 +70,21 @@ const Dashboard = ({ onNavigate }) => {
     try {
       const res = await axios.get(`${API}/rooms`);
       setRooms(res.data);
-    } catch (err) {
-      console.error('Error loading rooms:', err);
-    }
+    } catch (err) { /* silent */ }
   };
 
   const loadUsers = async () => {
     try {
       const res = await axios.get(`${API}/rankings/coins`);
       setUsers(res.data);
-    } catch (err) {
-      console.error('Error loading users:', err);
-    }
+    } catch (err) { /* silent */ }
   };
 
   const loadUnreadCount = async () => {
     try {
       const res = await axios.get(`${API}/notifications/${user.id}/unread-count`);
       setUnreadCount(res.data.count || 0);
-    } catch (err) { console.error(err); }
+    } catch (err) { /* silent */ }
   };
 
   const loadClansRankings = async () => {
@@ -99,7 +95,7 @@ const Dashboard = ({ onNavigate }) => {
       ]);
       setWeeklyClans(w.data);
       setMonthlyClans(m.data);
-    } catch (err) { console.error(err); }
+    } catch (err) { /* silent */ }
   };
 
   const openMyRoom = async () => {

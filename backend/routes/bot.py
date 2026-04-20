@@ -729,7 +729,7 @@ Responde brevemente:"""
                 "text": response.strip(), "type": "message",
                 "created_at": datetime.now(timezone.utc).isoformat()
             })
-    except Exception as e:
-        print(f"Bot auto-reply error: {e}")
+    except Exception:
+        pass
 
 # ==================== NOTIFICATIONS ====================

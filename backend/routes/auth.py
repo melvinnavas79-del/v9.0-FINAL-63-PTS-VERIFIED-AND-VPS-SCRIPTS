@@ -443,8 +443,8 @@ async def get_level_ranking():
 
 @router.get("/wallet/exchange-rate")
 async def get_exchange_rate():
-    """Tasa pública. Mantenemos la firma antigua para compatibilidad con
-    clientes viejos. Los datos reales vienen de /api/economy/config."""
+    """Tasa pública. Mantiene la firma anterior para compatibilidad con
+    clientes previos. Los datos reales vienen de /api/economy/config."""
     cfg = await db.economy_config.find_one({"_id": "singleton"}) or {}
     return {
         "coins_per_diamond": 0,                 # deprecado

@@ -437,7 +437,7 @@ async def welcome_message(room_id: str, user_id: str):
     }
     await db.room_chat.insert_one(msg_doc)
     # Entrada épica: si es Dueño / Dragón / Fénix, marcamos la sala para que
-    # TODOS los clientes activos reciban la animación broadcast.
+    # todos los clientes activos reciban la animación broadcast.
     if entry_anim in ('storm', 'dragon', 'phoenix'):
         await db.rooms.update_one(
             {"id": room_id},
@@ -517,9 +517,7 @@ async def ai_moderate_image(image_bytes: bytes, mime_type: str = 'image/jpeg') -
             reason = text.split(":", 1)[1].strip() if ":" in text else "contenido no permitido"
             return False, reason
         return True, "ok"
-    except Exception as e:
-        # Fail open but log — don't block uploads on API outage
-        print(f"[ai_moderate_image] falla: {e}")
+    except Exception:
         return True, "ai_error"
 
 @router.post("/rooms/{room_id}/background")

@@ -46,7 +46,7 @@ const ProfileView = ({ onBack, onNavigate }) => {
       await axios.post(`${API}/badges/${user.id}/check`);
       const r = await axios.get(`${API}/badges/${user.id}`);
       setBadgesData(r.data);
-    } catch (e) { console.error(e); }
+    } catch (e) { /* silent */ }
   };
 
   const toggleGhostMode = async () => {
