@@ -189,6 +189,8 @@ def serialize_room(room: Dict[str, Any]) -> Dict[str, Any]:
         "music_url": room.get("music_url"),
         "pk_battle": room.get("pk_battle"),
         "banned_users": room.get("banned_users", []),
+        "is_private": bool(room.get("is_private", False)),
+        "has_password": bool(room.get("password")),
         "created_at": room.get("created_at", ""),
     }
 

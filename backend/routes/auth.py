@@ -371,22 +371,28 @@ async def update_user(user_id: str, updates: dict):
 
 @router.post("/users/{user_id}/ghost-mode")
 async def toggle_ghost_mode(user_id: str):
-    """Toggle ghost mode - hides user from rankings and searches."""
+    """Toggle ghost mode - privilegio EXCLUSIVO del DUEÑO.
+    Al activarse: el usuario se oculta de rankings, búsquedas, listas de salas y
+    no incrementa el contador de usuarios activos en las salas que visite."""
     user = await db.users.find_one({"id": user_id})
     if not user:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
-    if user.get('role', 'usuario') not in ('dueño', 'admin'):
-        raise HTTPException(status_code=403, detail="Solo admin o dueno puede usar Modo Fantasma")
+    if user.get('role', 'usuario') != 'dueño':
+        raise HTTPException(status_code=403, detail="Modo Fantasma es un privilegio exclusivo del Dueño")
     new_mode = not user.get('ghost_mode', False)
     await db.users.update_one({"id": user_id}, {"$set": {"ghost_mode": new_mode}})
     return {"success": True, "ghost_mode": new_mode}
 
 @router.get("/users/{user_id}/entry-animation")
 async def get_entry_animation(user_id: str):
-    """Get entry animation data based on user role and aristocracy level."""
+    """Get entry animation data based on user role and aristocracy level.
+    Modo Fantasma (solo Dueño): animación totalmente silenciosa."""
     user = await db.users.find_one({"id": user_id})
     if not user:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    # Modo Fantasma activo en el Dueño → sin animación, invisible
+    if user.get('ghost_mode') and user.get('role') == 'dueño':
+        return {"animation": "none", "emoji": "", "text": "", "color": "transparent", "special": False, "ghost": True}
     arist = user.get('aristocracy', 0)
     level = user.get('level', 1)
     role = user.get('role', 'usuario')

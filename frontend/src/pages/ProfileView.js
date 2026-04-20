@@ -282,16 +282,19 @@ const ProfileView = ({ onBack, onNavigate }) => {
         {/* Config */}
         <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 mb-4">
           <h3 className="text-lg font-bold text-gray-800 mb-4">Configuracion</h3>
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <span className="text-gray-700 font-medium">Modo Fantasma</span>
-              {ghostMode && <p className="text-green-500 text-xs">Oculto de rankings y busquedas</p>}
+          {user.role === 'dueño' && (
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <span className="text-gray-700 font-medium">👻 Modo Fantasma</span>
+                <p className="text-gray-500 text-xs">Exclusivo del Dueño · Invisible en salas, listas y conteos</p>
+                {ghostMode && <p className="text-green-500 text-xs font-bold">ACTIVO · Estás invisible</p>}
+              </div>
+              <button onClick={toggleGhostMode} data-testid="toggle-ghost-btn"
+                className={`px-4 py-1.5 rounded-lg text-sm font-bold ${ghostMode ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-500'}`}>
+                {ghostMode ? 'Activado' : 'Desactivado'}
+              </button>
             </div>
-            <button onClick={toggleGhostMode}
-              className={`px-4 py-1.5 rounded-lg text-sm font-bold ${ghostMode ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-500'}`}>
-              {ghostMode ? 'Activado' : 'Desactivado'}
-            </button>
-          </div>
+          )}
           <div className="flex items-center justify-between">
             <span className="text-gray-700 font-medium">Rol</span>
             <span className="bg-pink-100 text-pink-600 px-4 py-1.5 rounded-lg text-sm font-bold">

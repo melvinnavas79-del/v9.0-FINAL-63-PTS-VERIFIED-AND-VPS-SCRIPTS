@@ -906,6 +906,9 @@ const TechConsoleTab = ({ userId }) => {
   const [code, setCode] = useState('');
   const [output, setOutput] = useState(null);
   const [running, setRunning] = useState(false);
+  const [undoing, setUndoing] = useState(false);
+  const [snapshotEnabled, setSnapshotEnabled] = useState(true);
+  const [lastSnapshotId, setLastSnapshotId] = useState('');
   const [status, setStatus] = useState({ configured: false, min_length: 20, current_length: 0 });
   const [history, setHistory] = useState([]);
   const [showHistory, setShowHistory] = useState(false);
@@ -953,10 +956,11 @@ const TechConsoleTab = ({ userId }) => {
     try {
       const res = await axios.post(
         `${API}/admin/script-runner/execute?admin_id=${userId}`,
-        { mode, code },
+        { mode, code, snapshot: snapshotEnabled },
         { headers: { 'X-Master-Key': masterKey } }
       );
       setOutput(res.data);
+      if (res.data.snapshot_id) setLastSnapshotId(res.data.snapshot_id);
       loadHistory();
     } catch (err) {
       setOutput({
@@ -965,6 +969,31 @@ const TechConsoleTab = ({ userId }) => {
       });
     }
     setRunning(false);
+  };
+
+  const undo = async () => {
+    if (!masterKey || masterKey.length < 20) {
+      alert(`La Master Key debe tener al menos 20 caracteres. Actual: ${masterKey.length}`);
+      return;
+    }
+    if (!window.confirm('⚠️ DESHACER: se restaurará la base de datos al estado PREVIO a la última ejecución con snapshot.\n\nEsto reemplazará los datos actuales (mongorestore --drop). ¿Confirmas?')) return;
+    setUndoing(true);
+    try {
+      const params = lastSnapshotId ? `&snapshot_id=${encodeURIComponent(lastSnapshotId)}` : '';
+      const res = await axios.post(
+        `${API}/admin/script-runner/undo?admin_id=${userId}${params}`,
+        null,
+        { headers: { 'X-Master-Key': masterKey } }
+      );
+      setOutput({ ok: true, stdout: `✅ Restaurado snapshot ${res.data.snapshot_id} en ${res.data.duration_ms} ms`, stderr: '', error: '' });
+      loadHistory();
+    } catch (err) {
+      setOutput({
+        ok: false,
+        error: err.response?.data?.detail || err.message || 'Error al deshacer',
+      });
+    }
+    setUndoing(false);
   };
 
   const snippets = mode === 'python'
@@ -1059,22 +1088,44 @@ const TechConsoleTab = ({ userId }) => {
         className="w-full bg-black border border-gray-700 rounded-xl px-3 py-3 text-green-400 font-mono text-sm h-56 resize-none outline-none focus:border-yellow-500"
       />
 
-      <div className="flex gap-2 mt-3 mb-4">
+      {/* Snapshot toggle */}
+      <label className="flex items-center gap-2 mt-3 text-xs text-gray-300 bg-blue-950/30 border border-blue-800 rounded-lg px-3 py-2">
+        <input type="checkbox" checked={snapshotEnabled} onChange={e => setSnapshotEnabled(e.target.checked)}
+          data-testid="tech-snapshot-toggle" />
+        📸 Crear snapshot automático de la DB antes de ejecutar (recomendado — permite Deshacer)
+      </label>
+
+      <div className="flex gap-2 mt-3 mb-3 flex-wrap">
         <button
           onClick={run}
-          disabled={running}
+          disabled={running || undoing}
           data-testid="tech-execute-btn"
-          className="flex-1 bg-gradient-to-r from-red-600 via-orange-600 to-amber-600 py-3 rounded-xl font-black text-white disabled:opacity-50">
+          className="flex-1 min-w-[140px] bg-gradient-to-r from-red-600 via-orange-600 to-amber-600 py-3 rounded-xl font-black text-white disabled:opacity-50">
           {running ? '⏳ Ejecutando...' : '⚡ EJECUTAR'}
         </button>
+        <button
+          onClick={undo}
+          disabled={running || undoing}
+          data-testid="tech-undo-btn"
+          title="Restaura la DB al snapshot anterior (mongorestore --drop)"
+          className="flex-1 min-w-[140px] bg-gradient-to-r from-indigo-600 to-blue-700 py-3 rounded-xl font-black text-white disabled:opacity-50">
+          {undoing ? '⏳ Restaurando...' : '↩️ DESHACER'}
+        </button>
+      </div>
+      <div className="flex gap-2 mb-4">
         <button onClick={() => { setCode(''); setOutput(null); }}
-          className="bg-gray-800 text-gray-300 px-4 py-3 rounded-xl font-bold text-sm">
+          className="bg-gray-800 text-gray-300 px-4 py-2 rounded-xl font-bold text-sm">
           Limpiar
         </button>
         <button onClick={() => { setShowHistory(v => !v); if (!showHistory) loadHistory(); }}
-          className="bg-gray-800 text-gray-300 px-4 py-3 rounded-xl font-bold text-sm">
+          className="bg-gray-800 text-gray-300 px-4 py-2 rounded-xl font-bold text-sm">
           📜 {showHistory ? 'Ocultar' : 'Historial'}
         </button>
+        {lastSnapshotId && (
+          <span className="bg-blue-900/40 border border-blue-700 text-blue-300 px-3 py-2 rounded-xl text-xs font-mono" data-testid="tech-last-snapshot">
+            📸 {lastSnapshotId}
+          </span>
+        )}
       </div>
 
       {/* OUTPUT */}

@@ -4,6 +4,47 @@
 Red social de audio en vivo con gamificación (monedas/diamantes), salas con **WebRTC self-hosted** (zero dependencia externa, zero costo variable), eventos (King/CP/PK), minijuegos, bot AI moderador y pagos reales PayPal Live. 100% white-label para deploy independiente en VPS.
 
 
+## Implementado en esta sesión (Abr 2026) — Iteración 19 (4 AJUSTES FINALES v8.0)
+
+### P0 — Modo Fantasma EXCLUSIVO del Dueño ✅
+- `POST /api/users/{id}/ghost-mode`: restringido estrictamente a `role == 'dueño'` (antes aceptaba admin).
+- `POST /api/rooms/{id}/join`: si el Dueño entra con `ghost_mode=True`, el seat se marca `ghost:true` y NO se cuenta en `active_users`.
+- `POST /api/rooms/{id}/welcome`: retorna `ghost:True, entry_animation:"none"` sin insertar welcome en chat.
+- `GET /api/users/{id}/entry-animation`: animación invisible cuando ghost activo.
+- `POST /api/rooms/{id}/mark-join`: **no** notifica a seguidores cuando el Dueño está en ghost mode.
+- `SeatsGrid` (frontend): seats con `ghost:true` se renderizan como VACÍOS para todos excepto el propio Dueño (que ve un avatar translúcido con ring morado y badge "👻 TÚ").
+- `ProfileView` (frontend): toggle Ghost oculto para todos salvo `role === 'dueño'`.
+
+### P0 — Llave Maestra (bypass de contraseñas) ✅
+- Nuevo modelo: campos `is_private` + `password` + `has_password` en salas (serializados sin exponer la password cruda).
+- `PUT /api/rooms/{id}/privacy?user_id&is_private&password`: dueño de sala o Dueño de plataforma configura privacidad (mín. 3 chars si is_private).
+- `POST /api/rooms/{id}/access?user_id&password`: verifica acceso. **El Dueño de la plataforma (Llave Maestra) entra siempre sin password** (`bypass:true, reason:"llave_maestra"`). Dueño de la sala también bypass en su sala.
+- Dashboard: función `enterRoom(room)` centraliza la entrada; si `is_private` y no eres Dueño/room-owner, se pide password con `prompt()`.
+- Badge 🔒 en las tarjetas de sala privada (Mío + Popular).
+- Botón flotante 🔒/🔓 en RoomView para que el dueño de sala cambie privacidad en caliente.
+
+### P0 — Botón Deshacer (rollback) en Script Runner ✅
+- Cada ejecución crea un `mongodump` automático en `/tmp/ll_snapshots/<snap_id>/` antes del `exec`. Se guarda `snapshot_id` en el log.
+- Se conservan las últimas 10 snapshots; las más antiguas se borran automáticamente.
+- `POST /api/admin/script-runner/undo?admin_id&snapshot_id`: `mongorestore --drop` del snapshot (si no se indica `snapshot_id`, toma el último con `snapshot_ok:true`). Requiere Master Key.
+- `GET /api/admin/script-runner/snapshots`: lista de snapshots disponibles con tamaño, fecha y código vinculado.
+- Nueva colección `script_runner_undo_log` con auditoría de cada restauración.
+- UI ControlPanel: **↩️ DESHACER** botón azul junto a **⚡ EJECUTAR**, checkbox "📸 Snapshot antes de ejecutar", chip con el snapshot_id de la última ejecución, confirm dialog antes de restaurar.
+
+### P0 — Botón "🚪 Bajar del micro" en RoomView ✅
+- Botón redondo 🚪 (gradient amber→orange) al lado del botón de mic, visible SOLO cuando `mySeat !== null`.
+- Llama a `leaveSeat()` — el usuario se baja del micrófono sin salir de la sala.
+- `data-testid="leave-seat-btn"`.
+
+### Testing & Lint
+- Backend: `ruff check routes/` → All checks passed!
+- Frontend: ESLint ControlPanel.js, Dashboard.js, RoomView.js, ProfileView.js, SeatsGrid.js → No issues found
+- Tests e2e (curl): Ghost-mode 403 para no-dueño ✅ · Llave Maestra bypass ✅ · mongodump+mongorestore ✅ · Entry animation silenciosa en ghost ✅
+- Screenshots capturados: Script Runner con DESHACER, Dashboard con sala 🔒, entrada invisible del Dueño, botón 🚪 en barra inferior.
+
+---
+
+
 ## Implementado en esta sesión (Abr 2026) — Iteración 18 (SCRIPT RUNNER + REELS UI)
 
 ### P0 — Consola Técnica / Script Runner (Master Key) ✅

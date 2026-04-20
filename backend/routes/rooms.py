@@ -117,9 +117,69 @@ async def get_or_create_my_room(user_id: str):
 
 # ==================== SEAT MANAGEMENT ====================
 
+# ==================== ROOM PRIVACY (password) ====================
+
+@router.put("/rooms/{room_id}/privacy")
+async def set_room_privacy(room_id: str, user_id: str, is_private: bool = False, password: str = ""):
+    """Configura privacidad de la sala. Solo el dueño de la sala o el Dueño de la plataforma.
+    password vacío + is_private=False → sala pública."""
+    room = await db.rooms.find_one({"id": room_id})
+    if not room:
+        raise HTTPException(status_code=404, detail="Sala no encontrada")
+    requester = await db.users.find_one({"id": user_id})
+    if not requester:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    is_platform_owner = requester.get("role") == "dueño" or requester.get("is_super_admin")
+    if room.get("owner_id") != user_id and not is_platform_owner:
+        raise HTTPException(status_code=403, detail="Solo el dueño de la sala o el Dueño de la plataforma")
+    if is_private and not password:
+        raise HTTPException(status_code=400, detail="Las salas privadas requieren contraseña")
+    if password and len(password) < 3:
+        raise HTTPException(status_code=400, detail="La contraseña debe tener al menos 3 caracteres")
+    update = {"is_private": bool(is_private), "password": password or "", "has_password": bool(password)}
+    await db.rooms.update_one({"id": room_id}, {"$set": update})
+    return {"success": True, "is_private": bool(is_private), "has_password": bool(password)}
+
+
+@router.post("/rooms/{room_id}/access")
+async def request_room_access(room_id: str, user_id: str, password: str = ""):
+    """Verifica acceso a una sala privada o con contraseña.
+    El DUEÑO de la plataforma (Llave Maestra) entra siempre, sin clave.
+    El dueño de la sala entra siempre en su propia sala.
+    """
+    room = await db.rooms.find_one({"id": room_id})
+    if not room:
+        raise HTTPException(status_code=404, detail="Sala no encontrada")
+    user = await db.users.find_one({"id": user_id})
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    # Dueño de la plataforma: Llave Maestra, siempre entra (invisible al dueño de la sala).
+    if user.get("role") == "dueño" or user.get("is_super_admin"):
+        return {"success": True, "bypass": True, "reason": "llave_maestra"}
+    # Dueño de la sala: entra en su sala
+    if room.get("owner_id") == user_id:
+        return {"success": True, "bypass": True, "reason": "owner"}
+    # Sala pública o sin contraseña: pasa directo
+    stored = room.get("password", "")
+    if not room.get("is_private") and not stored:
+        return {"success": True, "bypass": False}
+    if not stored:
+        return {"success": True, "bypass": False}
+    if password != stored:
+        raise HTTPException(status_code=403, detail="Contraseña incorrecta")
+    return {"success": True, "bypass": False}
+
+
+# ==================== JOIN/LEAVE SEAT ====================
+
 @router.post("/rooms/{room_id}/join")
 async def join_room(room_id: str, user_id: str, seat_index: int):
-    """Join a seat in a room. Removes user from other rooms first."""
+    """Join a seat in a room. Removes user from other rooms first.
+
+    El DUEÑO en Modo Fantasma ocupa el asiento pero con flag ghost=True;
+    el asiento NO se cuenta en active_users y el frontend debe ocultarlo a
+    los demás usuarios.
+    """
     room = await db.rooms.find_one({"id": room_id})
     if not room:
         raise HTTPException(status_code=404, detail="Sala no encontrada")
@@ -141,8 +201,8 @@ async def join_room(room_id: str, user_id: str, seat_index: int):
         seat_locks.append(False)
     if seat_index >= len(seats):
         raise HTTPException(status_code=400, detail="Indice de asiento invalido")
-    # Check seat lock
-    if seat_locks[seat_index] and room.get('owner_id') != user_id:
+    # Check seat lock — el Dueño bypassea los asientos bloqueados
+    if seat_locks[seat_index] and room.get('owner_id') != user_id and not is_super:
         raise HTTPException(status_code=403, detail="Este asiento esta bloqueado")
     if seats[seat_index] is not None and seats[seat_index].get('user_id') != user_id:
         raise HTTPException(status_code=400, detail="Asiento ocupado")
@@ -161,8 +221,10 @@ async def join_room(room_id: str, user_id: str, seat_index: int):
                     other_seats[i] = None
                     changed = True
             if changed:
-                ac = sum(1 for s in other_seats if s is not None)
+                ac = sum(1 for s in other_seats if s is not None and not s.get('ghost'))
                 await db.rooms.update_one({"id": other['id']}, {"$set": {"seats": other_seats, "active_users": ac}})
+    # Modo Fantasma activo: sólo el DUEÑO puede ser invisible.
+    is_ghost = bool(user.get('ghost_mode')) and user.get('role') == 'dueño'
     seats[seat_index] = {
         "user_id": user_id, "username": user['username'],
         "avatar": user.get('avatar', ''), "level": user.get('level', 1),
@@ -175,11 +237,12 @@ async def join_room(room_id: str, user_id: str, seat_index: int):
         "diamonds": user.get('diamonds', 0),
         "device_id": user.get('device_id', ''),
         "is_muted": False, "audio_enabled": True,
+        "ghost": is_ghost,
         "joined_at": datetime.now(timezone.utc).isoformat()
     }
-    active_count = sum(1 for s in seats if s is not None)
+    active_count = sum(1 for s in seats if s is not None and not s.get('ghost'))
     await db.rooms.update_one({"id": room_id}, {"$set": {"seats": seats, "active_users": active_count}})
-    return {"success": True, "seat_index": seat_index}
+    return {"success": True, "seat_index": seat_index, "ghost": is_ghost}
 
 @router.post("/rooms/{room_id}/toggle-mute")
 async def toggle_mute(room_id: str, user_id: str):
@@ -208,7 +271,7 @@ async def leave_room(room_id: str, user_id: str):
             seats[i] = None
             changed = True
     if changed:
-        ac = sum(1 for s in seats if s is not None)
+        ac = sum(1 for s in seats if s is not None and not s.get('ghost'))
         update_fields = {"seats": seats, "active_users": ac}
         # Clear music when owner leaves
         if room.get('owner_id') == user_id:
@@ -281,10 +344,11 @@ async def mark_join(room_id: str, user_id: str):
         upsert=True
     )
     # Notify followers (dedupe inside 60s implemented in friends.notify_followers_of_room_entry)
+    # Pero si el usuario está en Modo Fantasma (Dueño), NO se avisa a nadie.
     try:
         user = await db.users.find_one({"id": user_id})
         room = await db.rooms.find_one({"id": room_id})
-        if user and room:
+        if user and room and not (user.get('ghost_mode') and user.get('role') == 'dueño'):
             minute_bucket = datetime.now(timezone.utc).strftime("%Y%m%d%H%M")
             dedupe_key = f"roomentry:{user_id}:{room_id}:{minute_bucket}"
             existing = await db.notification_dedupe.find_one({"key": dedupe_key})
@@ -315,10 +379,17 @@ async def mark_join(room_id: str, user_id: str):
 
 @router.post("/rooms/{room_id}/welcome")
 async def welcome_message(room_id: str, user_id: str):
-    """Generate welcome message and entry animation for user joining room."""
+    """Generate welcome message and entry animation for user joining room.
+
+    Si el usuario tiene Modo Fantasma activo (solo Dueño), suprimimos TODO:
+    ni mensaje en el chat, ni animación de entrada.
+    """
     user = await db.users.find_one({"id": user_id})
     if not user:
         return {"success": False}
+    # Modo Fantasma del Dueño → entrada totalmente silenciosa
+    if user.get('ghost_mode') and user.get('role') == 'dueño':
+        return {"success": True, "ghost": True, "entry_animation": "none", "username": user.get('username', '')}
     role = user.get('role', 'usuario')
     aristocracy = user.get('aristocracy', 0)
     username = user['username']

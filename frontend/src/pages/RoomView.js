@@ -1033,6 +1033,37 @@ const RoomView = ({ roomId, onBack }) => {
             🖼
           </button>
           <input ref={bgRef} type="file" accept="image/*" onChange={uploadBackground} className="hidden" />
+          <button
+            data-testid="floating-privacy-btn"
+            onClick={async () => {
+              const currentlyPrivate = room.is_private || room.has_password;
+              if (currentlyPrivate) {
+                if (!window.confirm('¿Hacer PÚBLICA esta sala? Se eliminará la contraseña.')) return;
+                try {
+                  await axios.put(`${API}/rooms/${room.id}/privacy?user_id=${user.id}&is_private=false&password=`);
+                  alert('✅ Sala pública');
+                  loadRoom();
+                } catch (e) { alert(e.response?.data?.detail || 'Error'); }
+              } else {
+                const pwd = window.prompt('🔒 Define una contraseña (mín. 3 caracteres) para hacer esta sala PRIVADA:');
+                if (!pwd) return;
+                if (pwd.length < 3) { alert('Mínimo 3 caracteres'); return; }
+                try {
+                  await axios.put(`${API}/rooms/${room.id}/privacy?user_id=${user.id}&is_private=true&password=${encodeURIComponent(pwd)}`);
+                  alert('🔒 Sala privada activada. Guarda tu contraseña.');
+                  loadRoom();
+                } catch (e) { alert(e.response?.data?.detail || 'Error'); }
+              }
+            }}
+            className={`w-12 h-12 rounded-full flex items-center justify-center text-lg active:scale-90 shadow-lg border ${
+              (room.is_private || room.has_password)
+                ? 'bg-gradient-to-br from-purple-500 to-fuchsia-700 shadow-purple-500/40 border-purple-300/40'
+                : 'bg-gradient-to-br from-gray-600 to-gray-800 shadow-gray-500/20 border-gray-500/30'
+            }`}
+            title={(room.is_private || room.has_password) ? 'Sala privada — click para volver pública' : 'Hacer sala privada'}
+          >
+            {(room.is_private || room.has_password) ? '🔒' : '🔓'}
+          </button>
         </div>
       )}
 
@@ -1071,6 +1102,16 @@ const RoomView = ({ roomId, onBack }) => {
             className={`w-16 h-16 rounded-full flex items-center justify-center text-2xl active:scale-90 shadow-lg ${
               mySeat === null ? 'bg-gray-700 opacity-50' : isMuted ? 'bg-red-500 shadow-red-500/30' : 'bg-green-500 shadow-green-500/30'
             }`}>{mySeat === null ? '🎤' : isMuted ? '🔇' : '🎤'}</button>
+
+          {/* Bajar del micro (la puerta) - visible SOLO si estás sentado */}
+          {mySeat !== null && (
+            <button data-testid="leave-seat-btn" onClick={leaveSeat}
+              title="Bajar del micrófono"
+              aria-label="Bajar del micrófono"
+              className="w-12 h-12 rounded-full bg-gradient-to-br from-amber-600 to-orange-700 flex items-center justify-center text-xl active:scale-90 shadow-lg shadow-amber-500/40 border border-amber-300/40">
+              🚪
+            </button>
+          )}
 
           {/* Speaker */}
           <button data-testid="toggle-deafen-btn" onClick={mySeat !== null ? toggleDeafen : () => {}}

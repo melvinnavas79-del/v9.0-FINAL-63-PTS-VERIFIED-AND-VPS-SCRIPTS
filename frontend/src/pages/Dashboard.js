@@ -113,6 +113,28 @@ const Dashboard = ({ onNavigate }) => {
     }
   };
 
+  // Entrada unificada a una sala: valida password si es privada.
+  // DUEÑO de la plataforma (Llave Maestra) entra directo sin prompt.
+  const enterRoom = async (room) => {
+    if (!room || !room.id) return;
+    const isPlatformOwner = user?.role === 'dueño';
+    const isRoomOwner = room.owner_id === user?.id;
+    const needsPassword = (room.is_private || room.has_password) && !isPlatformOwner && !isRoomOwner;
+
+    if (!needsPassword) {
+      onNavigate('room', room.id);
+      return;
+    }
+    const pwd = window.prompt(`🔒 La sala "${room.name}" requiere contraseña:`);
+    if (pwd === null) return;
+    try {
+      await axios.post(`${API}/rooms/${room.id}/access?user_id=${user.id}&password=${encodeURIComponent(pwd)}`);
+      onNavigate('room', room.id);
+    } catch (err) {
+      alert(err.response?.data?.detail || 'Contraseña incorrecta');
+    }
+  };
+
   const createRoom = async () => {
     const roomName = prompt('Nombre de la sala:');
     if (!roomName) return;
@@ -131,7 +153,7 @@ const Dashboard = ({ onNavigate }) => {
       <div className="grid grid-cols-4 gap-3 mb-6">
         {[
           { icon: '🏠', label: 'My Room', action: createRoom },
-          { icon: '💬', label: 'Quick Join', action: () => { if (rooms.length > 0) onNavigate('room', rooms[0].id); } },
+          { icon: '💬', label: 'Quick Join', action: () => { if (rooms.length > 0) enterRoom(rooms[0]); } },
           { icon: '🎬', label: 'Reels', action: () => onNavigate('reels') },
           { icon: '💰', label: 'Tienda', action: () => onNavigate('store') }
         ].map((item, i) => (
@@ -153,14 +175,14 @@ const Dashboard = ({ onNavigate }) => {
           <button
             key={room.id}
             data-testid={`room-card-${room.id}`}
-            onClick={() => onNavigate('room', room.id)}
+            onClick={() => enterRoom(room)}
             className="w-full bg-white rounded-2xl p-4 shadow-sm hover:shadow-md transition-all text-left border border-gray-100"
           >
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-12 h-12 bg-gradient-to-br from-cyan-400 to-blue-500 rounded-xl flex items-center justify-center text-white text-xl">☔</div>
                 <div>
-                  <h4 className="font-bold text-gray-800">{room.name}</h4>
+                  <h4 className="font-bold text-gray-800">{room.name} {(room.is_private || room.has_password) && <span data-testid="room-private-badge" title="Sala privada">🔒</span>}</h4>
                   <p className="text-gray-500 text-sm">Bienvenidos a Lluvia Live</p>
                 </div>
               </div>
@@ -360,13 +382,13 @@ const Dashboard = ({ onNavigate }) => {
               <button
                 key={room.id}
                 data-testid={`popular-room-card-${room.id}`}
-                onClick={() => onNavigate('room', room.id)}
+                onClick={() => enterRoom(room)}
                 className="w-full bg-white rounded-2xl p-3 shadow-sm hover:shadow-md active:scale-[0.99] transition-all text-left border border-gray-100"
               >
                 <div className="flex items-center gap-3">
                   <div className="w-11 h-11 bg-gradient-to-br from-cyan-400 to-blue-500 rounded-xl flex items-center justify-center text-white text-lg flex-shrink-0">☔</div>
                   <div className="flex-1 min-w-0">
-                    <h4 className="font-bold text-gray-800 text-sm truncate">{room.name}</h4>
+                    <h4 className="font-bold text-gray-800 text-sm truncate">{room.name} {(room.is_private || room.has_password) && <span title="Sala privada">🔒</span>}</h4>
                     <p className="text-gray-400 text-xs truncate">Tap para entrar</p>
                   </div>
                   <div className={`flex-shrink-0 flex items-center gap-1 bg-cyan-50 rounded-full px-2.5 py-1 border border-cyan-100 ${flash ? 'ring-2 ring-cyan-300' : ''}`}

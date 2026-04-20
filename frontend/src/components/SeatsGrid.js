@@ -41,16 +41,20 @@ const SeatsGrid = ({
       >
         {seats.map((seat, i) => {
           const isLocked = room.seat_locks?.[i];
-          const isSpeaking = seat && seat.user_id === currentUserId && !isMuted;
-          const isOccupied = !!seat;
+          // Modo Fantasma: si el seat está ocupado por un usuario invisible y NO
+          // soy yo mismo, lo renderizo como asiento VACÍO para el resto del mundo.
+          const hideGhost = seat && seat.ghost && seat.user_id !== currentUserId;
+          const effectiveSeat = hideGhost ? null : seat;
+          const isSpeaking = effectiveSeat && effectiveSeat.user_id === currentUserId && !isMuted;
+          const isOccupied = !!effectiveSeat;
           return (
             <div key={i} className="flex flex-col items-center">
               <button
                 data-testid={`seat-btn-${i}`}
-                onClick={() => onSeatClick(i, seat, isLocked)}
-                onContextMenu={(e) => { e.preventDefault(); if (seat) onSeatLongPress(seat); }}
+                onClick={() => onSeatClick(i, effectiveSeat, isLocked)}
+                onContextMenu={(e) => { e.preventDefault(); if (effectiveSeat) onSeatLongPress(effectiveSeat); }}
                 className={`${circleSize} rounded-full border-[3px] flex items-center justify-center transition-all relative ${
-                  isLocked && !seat
+                  isLocked && !effectiveSeat
                     ? 'bg-gray-800/60 border-red-500/30'
                     : isSpeaking
                     ? 'bg-gray-800 seat-speaking border-green-400'
@@ -60,13 +64,20 @@ const SeatsGrid = ({
                 }`}
                 style={isSpeaking ? { boxShadow: '0 0 15px #00ff88, 0 0 30px #00ff8855' } : {}}
               >
-                {seat ? (
-                  <img
-                    src={seat.avatar}
-                    alt=""
-                    className={`${avatarSize} rounded-full object-cover`}
-                    onClick={(e) => { e.stopPropagation(); onSeatLongPress(seat); }}
-                  />
+                {effectiveSeat ? (
+                  <>
+                    <img
+                      src={effectiveSeat.avatar}
+                      alt=""
+                      className={`${avatarSize} rounded-full object-cover ${effectiveSeat.ghost ? 'opacity-50 ring-2 ring-purple-400' : ''}`}
+                      onClick={(e) => { e.stopPropagation(); onSeatLongPress(effectiveSeat); }}
+                    />
+                    {effectiveSeat.ghost && effectiveSeat.user_id === currentUserId && (
+                      <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 bg-purple-600 text-white text-[7px] font-bold px-1 rounded-full" title="Invisible — solo tú te ves">
+                        👻 TÚ
+                      </div>
+                    )}
+                  </>
                 ) : isLocked ? (
                   <span className="text-red-400/50 text-lg">🔒</span>
                 ) : (
@@ -74,19 +85,19 @@ const SeatsGrid = ({
                     <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
                   </svg>
                 )}
-                {seat?.svip_level > 0 && (
+                {effectiveSeat?.svip_level > 0 && (
                   <div className="absolute -top-1 -right-1 bg-yellow-500 text-[6px] text-black font-bold px-1 rounded-full">
-                    S{seat.svip_level}
+                    S{effectiveSeat.svip_level}
                   </div>
                 )}
               </button>
               <div className="mt-1 text-center">
-                {seat ? (
+                {effectiveSeat ? (
                   <div className="flex items-center gap-0.5 justify-center">
-                    {seat.country_flag && <span className="text-[10px]">{seat.country_flag}</span>}
-                    <CrownBadge userId={seat.user_id} size={11} />
+                    {effectiveSeat.country_flag && <span className="text-[10px]">{effectiveSeat.country_flag}</span>}
+                    <CrownBadge userId={effectiveSeat.user_id} size={11} />
                     <span className={`text-white/80 ${labelSize} font-medium truncate max-w-[70px]`}>
-                      {seat.username}
+                      {effectiveSeat.username}
                     </span>
                   </div>
                 ) : (
