@@ -58,3 +58,12 @@ memory/
 .gitconfig
 frontend/node_modules/.cache/
 frontend/node_modules/.cache/default-development/41.pack
+-e 
+# Environment and credential files
+.env
+.env.*
+*.env
+credentials.json
+*.pem
+*.key
+.credentials
