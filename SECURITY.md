@@ -2,7 +2,7 @@
 
 **Titular:** Melvin H. Navas Hernández
 **Producto:** Lluvia Live (plataforma de salas de audio en vivo)
-**Versión:** v8.0
+**Versión:** v9.0
 
 ---
 
@@ -27,8 +27,8 @@ Esta política aplica a todos los componentes del producto:
 
 | Versión | Estado         | Soporte de seguridad |
 |---------|----------------|----------------------|
-| 8.x     | ✅ Activa      | Sí, hasta nuevo aviso |
-| < 8.0   | ❌ Obsoleta    | No                   |
+| 9.x     | ✅ Activa      | Sí, hasta nuevo aviso |
+| < 9.0   | ❌ Obsoleta    | No                   |
 
 ## 4. Canal de reporte
 
