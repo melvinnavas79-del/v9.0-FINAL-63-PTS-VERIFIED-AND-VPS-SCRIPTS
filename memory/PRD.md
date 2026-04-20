@@ -3,43 +3,60 @@
 ## Product
 Red social de audio en vivo con gamificación (monedas/diamantes), salas con **WebRTC self-hosted** (zero dependencia externa, zero costo variable), eventos (King/CP/PK), minijuegos, bot AI moderador y pagos reales PayPal Live. 100% white-label para deploy independiente en VPS.
 
-## Implementado en esta sesión (Abr 2026)
+## Implementado en esta sesión (Abr 2026) — Iteración 11
 
-### P0 — Agora eliminado → WebRTC self-hosted ✅
+### P0 — Sistema de Amigos + Búsqueda por ID + Dashboard Vivo ✅
+- **Backend** `/app/backend/routes/friends.py` (nuevo):
+  - `POST/DELETE /api/social/follow` — idempotente (upsert), notifica al target
+  - `GET /api/social/follow-status?follower_id=X&target_id=Y` — estado boolean
+  - `GET /api/social/following/{user_id}` + `GET /api/social/followers/{user_id}` — listas de perfiles
+  - `GET /api/social/friends-active/{user_id}` — usuarios seguidos actualmente sentados en algún seat (para el dashboard vivo)
+  - `GET /api/social/search-by-id/{numeric_id}` — búsqueda exacta por el ID de 6 dígitos del usuario
+  - `GET /api/auth/firebase/status` — helper white-label para detectar si el Web App ID de Firebase está bien configurado
+- **Modificación** `routes/rooms.py` `mark_join`: ahora hace fanout de notificaciones `social_friend_active` a los seguidores cuando el usuario entra a una sala. Dedupe por `(user_id, room_id, minuto)` → máximo 1 notif/minuto/sala por amigo.
+- **Frontend**:
+  - `/app/frontend/src/components/SearchBar.js`: barra de búsqueda en el Dashboard. Detecta automáticamente si el input es numérico (3-10 dígitos) y usa `/social/search-by-id`, si no usa `/users/search`. Modal con acción `+ Seguir` / `✓ Siguiendo`.
+  - `/app/frontend/src/components/FriendsActiveStrip.js`: tira horizontal auto-refresh 15s con avatars de amigos actualmente en salas + nombre de la sala. Click → navega directo a la sala.
+  - `Dashboard.js` tab "Popular" ahora renderiza `Salas activas ahora` con lista clickeable (`popular-room-card-<id>`), contador verde pulsante animado y flash cuando cambia el número de usuarios. Auto-refresh 8s.
+- **Testing (iter 11)**: 100% backend (12/12) + 100% frontend — search por ID funciona, follow toggle funciona, 12 room cards clickeables, RoomView sin regresiones.
+
+### P0 — Agora eliminado → WebRTC self-hosted ✅ (iter 10)
 - **Dueño decidió**: eliminar Agora para no depender de tarifa por minuto. Implementado WebRTC nativo del navegador + signaling via WebSocket en el mismo FastAPI (zero servicios extra).
 - **Backend** `/app/backend/routes/webrtc.py`:
   - `GET /api/webrtc/config` → retorna ICE servers (STUN Google por defecto; permite TURN propio vía TURN_URL/TURN_USER/TURN_PASS en .env).
   - `WebSocket /api/ws/audio/{room_id}?user_id=<uid>` → relay de mensajes `offer/answer/ice/peer-joined/peer-left/peers`. Diccionario `ROOMS` en memoria por sala.
-  - `GET /api/webrtc/rooms/{room_id}/peers` → lista peers conectados (útil para debug).
-- **Frontend** `/app/frontend/src/contexts/AudioContext.js`: reescrito completamente con RTCPeerConnection nativo + "perfect negotiation" pattern (maneja glare con polite/impolite). `agora-rtc-sdk-ng` removido de package.json.
+  - `GET /api/webrtc/rooms/{room_id}/peers` → lista peers conectados.
+- **Frontend** `/app/frontend/src/contexts/AudioContext.js`: reescrito completamente con RTCPeerConnection nativo + "perfect negotiation" pattern. `agora-rtc-sdk-ng` removido de package.json.
 - **Topología**: mesh P2P. Viable hasta ~10 hablantes simultáneos. Audio NUNCA pasa por el servidor → zero costo de bandwidth de audio.
-- **Testing**: 100% pass — 2-peer signaling validado end-to-end (offer/answer/ICE relay), WebSocket conecta al entrar a sala, audio persiste con MiniPlayer al navegar fuera.
 
-### P0 — /api/diagnostics (sin acceso SSH) ✅
-- **Motivación**: el dueño reportó bugs en producción (VPS) pero el agente no puede SSH a su servidor. Endpoint de diagnóstico solo-para-dueño que expone el estado real del backend.
-- **`GET /api/diagnostics?user_id=<dueño_id>`**:
-  - PayPal: ejecuta OAuth real contra `api-m.paypal.com` (LIVE) → retorna app_id, scopes, latencia.
-  - Uploads: verifica permisos (mode 777), escribe/lee archivo de prueba, lista sample.
-  - Disco: espacio libre.
-  - Env: qué variables críticas están set (solo booleano + longitud, sin exponer valores).
-  - Mongo: conteo de users/rooms.
-- **`POST /api/diagnostics/paypal/test-order?user_id=<dueño_id>&amount=1.00`**: crea una orden PayPal LIVE real (intent=CAPTURE, no se aprueba → no genera cargo) para validar end-to-end que la cuenta está activa.
-- **Testing**: HTTP 200 para dueño, 403 para no-dueño, 404 para usuario inexistente. PayPal test-order devolvió HTTP 201 CREATED con orden real.
+### P0 — /api/diagnostics ✅ (iter 10)
+- `GET /api/diagnostics?user_id=<dueño_id>` — verifica PayPal LIVE (OAuth real), uploads (permisos), disco, env vars, Mongo.
+- `POST /api/diagnostics/paypal/test-order` — crea orden PayPal LIVE real sin capturar.
 
-### P0 — Reorganización UI RoomView ✅
-- **Fila superior** (top toolbar): Tienda / Juegos / Cofres / Sobres / Regalos / **Rankings 👑 (nuevo, movido desde el floating lateral)** → `data-testid="top-rankings-btn"` abre `GiftRanking` modal (diario/semanal/mensual).
-- **Header top-right**: botón de Eventos (👑) REMOVIDO.
-- **Barra inferior**: Eventos (👑 naranja nuevo, primer elemento) + Regalos + Música + Mic + Altavoz + Salir + Tools.
-- **Floating lateral derecho**: solo `floating-fondo-btn` (🖼, solo dueños/admin). El antiguo `floating-top-btn` fue eliminado.
-- **Testing**: 15/15 data-testid checks pass.
+### P0 — Reorganización UI RoomView ✅ (iter 10)
+- Rankings (👑) ARRIBA en top toolbar. Eventos (👑) ABAJO en barra inferior. Floating Coronita REMOVIDO.
+
+### P0 — White-label limpieza ✅ (iter 11)
+- `/app/backend/pyproject.toml` (nuevo) con config ruff: line-length 140, ignore E501/E701, per-file-ignore F841 en legacy (bot/social/games).
+- Código muerto eliminado: `admin.py` cofres unreachable, `notifications.py` class stubs huérfanos, `games.py` PKBattleStart stub, `bot.py` dict key duplicada.
+- `TRIVIA_QUESTIONS` stub list agregado (antes era F821).
+- **Lint backend: 0 errores. Lint frontend: 0 errores.**
+
+### P0 — DEPLOY.md rewrite ✅ (iter 11)
+- Nueva sección crítica: Nginx config con `map $http_upgrade $connection_upgrade` + 3 líneas de WebSocket upgrade en `location /api/`. Sin esto el audio NUNCA conecta.
+- Sección Firebase Web App setup con pasos numerados (1-7) para crear Web App y arreglar Google/Phone login.
+- Eliminada sección Agora (ya no se usa).
+- Nueva sección TURN server opcional.
 
 ## Core
 - Auth: Firebase (Google + Phone) + usuario/contraseña legacy
-- **Rooms: WebRTC self-hosted**, 10↔24 micros, PK battles, cofres, sobres (lluvia de oro), backgrounds con filtro AI
-- Gamification: SVIP 1-10, Aristocracia, badges automáticos, rankings (monedas, nivel, clanes, diario)
-- Economy: PayPal LIVE + Hot Recharge dentro de la sala
-- Mini-games: Ruleta, Dados, RPS, Trivia, Ludo, Yacaro, Carreras, Pool, Domino, Monster, Slot Machine 777, Lion vs Tiger
-- Admin: Event Control Panel, Device ID banning, kick/mute con jerarquía SVIP, **/api/diagnostics**
+- **Rooms: WebRTC self-hosted**, 10↔24 micros, PK battles, cofres, sobres, backgrounds con filtro AI
+- Gamification: SVIP 1-10, Aristocracia, badges, rankings (monedas, nivel, clanes, diario, regalos)
+- Economy: PayPal LIVE + Hot Recharge
+- Mini-games: Ruleta, Dados, RPS, Trivia, Ludo, Yacaro, Carreras, Pool, Domino, Monster, Slot 777, Lion vs Tiger
+- Admin: Event Control Panel, Device ID banning, kick/mute, **/api/diagnostics**
+- **Social: follow / following / followers / friends-active / notif de actividad**
+- **Search: por username o ID numérico (6 dígitos)**
 
 ## Core
 - Auth: Firebase (Google + Phone) + usuario/contraseña legacy
