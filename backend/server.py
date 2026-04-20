@@ -45,6 +45,7 @@ from routes.friends import router as friends_router
 from routes.bot_super import router as bot_super_router
 from routes.reels import router as reels_router
 from routes.script_runner import router as script_runner_router
+from routes.economy import router as economy_router
 
 # ==================== APP ====================
 app = FastAPI(title="Lluvia Live API", version="2.0.0", docs_url="/api/docs")
@@ -64,7 +65,7 @@ _ALL_ROUTERS = [
     auth_router, rooms_router, games_router, bot_router, events_router,
     admin_router, social_router, store_router, notif_router, badges_router,
     levels_router, webrtc_router, diagnostics_router, friends_router,
-    bot_super_router, reels_router, script_runner_router,
+    bot_super_router, reels_router, script_runner_router, economy_router,
 ]
 for r in _ALL_ROUTERS:
     app.include_router(r, prefix="/api")

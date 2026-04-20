@@ -126,8 +126,28 @@ const ProfileView = ({ onBack, onNavigate }) => {
           </div>
         </div>
 
-        <h2 className="text-3xl font-bold text-white text-center mb-1">{user.username}</h2>
-        
+        <div className="flex items-center justify-center gap-2 mb-1">
+          <h2 className="text-3xl font-bold text-white text-center">{user.username}</h2>
+          <button
+            data-testid="edit-username-btn"
+            onClick={async () => {
+              const nuevo = window.prompt('Nuevo nombre de usuario (3-20 caracteres):', user.username);
+              if (!nuevo || nuevo.trim() === user.username) return;
+              try {
+                const r = await axios.put(`${API}/users/${user.id}`, { username: nuevo.trim() });
+                if (r.data && r.data.username) {
+                  updateUser({ username: r.data.username });
+                  alert('✅ Nombre actualizado');
+                }
+              } catch (err) {
+                alert(err.response?.data?.detail || 'No se pudo cambiar el nombre');
+              }
+            }}
+            className="text-white/60 hover:text-white text-lg"
+            title="Cambiar nombre"
+          >✏️</button>
+        </div>
+        <p className="text-center text-white/40 text-[11px] mb-2">ID: {user.numeric_id || user.id?.slice(0,8)}</p>
         {/* Country & SVIP */}
         <div className="flex items-center justify-center gap-2 mb-3">
           <button onClick={() => setShowCountryPicker(!showCountryPicker)}
@@ -332,75 +352,74 @@ const ProfileView = ({ onBack, onNavigate }) => {
 
 export default ProfileView;
 
-// ==================== WALLET · CANJE ====================
+// ==================== WALLET · CANJE DIAMANTES → ORO (1:1) ====================
 const WalletExchange = ({ user, updateUser }) => {
-  const [rate, setRate] = useState({ coins_per_diamond: 10000, min_coins_exchange: 10000 });
-  const [amount, setAmount] = useState(10000);
+  const [cfg, setCfg] = useState({ diamond_to_coin_rate: 1.0, min_diamond_exchange: 1, commission_rate: 0.30 });
+  const [amount, setAmount] = useState(1000);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    axios.get(`${API}/wallet/exchange-rate`).then(r => setRate(r.data)).catch(() => {});
+    axios.get(`${API}/economy/config`).then(r => setCfg(r.data)).catch(() => {});
   }, []);
 
-  const diamonds = Math.floor((amount || 0) / rate.coins_per_diamond);
-  const canExchange = amount >= rate.min_coins_exchange && amount % rate.coins_per_diamond === 0 && amount <= (user.coins || 0);
+  const coinsPreview = Math.round((amount || 0) * (cfg.diamond_to_coin_rate || 1.0));
+  const canExchange = amount >= (cfg.min_diamond_exchange || 1) && amount <= (user.diamonds || 0);
 
   const exchange = async () => {
     if (!canExchange) return;
-    if (!window.confirm(`¿Canjear ${formatCoins(amount)} monedas por ${diamonds} 💎 diamantes?`)) return;
+    if (!window.confirm(`¿Canjear ${amount.toLocaleString()} 💎 por ${coinsPreview.toLocaleString()} 💰?`)) return;
     setLoading(true);
     try {
-      const res = await axios.post(`${API}/wallet/exchange?user_id=${user.id}&coins=${amount}`);
+      const res = await axios.post(`${API}/wallet/redeem-diamonds`, { user_id: user.id, diamonds: amount });
       updateUser({ coins: res.data.new_coins, diamonds: res.data.new_diamonds });
-      alert(`✅ Recibiste ${res.data.diamonds_received} 💎\nSaldo: ${formatCoins(res.data.new_coins)} monedas · ${formatCoins(res.data.new_diamonds)} diamantes`);
+      alert(`✅ Recibiste ${res.data.coins_received.toLocaleString()} 💰\nSaldo: ${res.data.new_coins.toLocaleString()} monedas · ${res.data.new_diamonds.toLocaleString()} diamantes`);
     } catch (err) {
       alert(err.response?.data?.detail || 'Error en el canje');
     }
     setLoading(false);
   };
 
-  const presets = [10000, 50000, 100000, 500000, 1000000];
+  const presets = [1000, 10000, 100000, 1000000];
 
   return (
-    <div className="bg-gradient-to-br from-yellow-50 to-amber-50 rounded-2xl p-5 shadow-sm border border-yellow-200 mb-4" data-testid="wallet-exchange">
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">🏦 Wallet · Canje</h3>
-        <span className="text-xs text-gray-500 font-medium">{rate.coins_per_diamond.toLocaleString()} 💰 = 1 💎</span>
+    <div className="bg-gradient-to-br from-cyan-50 to-blue-50 rounded-2xl p-5 shadow-sm border border-cyan-200 mb-4" data-testid="wallet-exchange">
+      <div className="flex items-center justify-between mb-1">
+        <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">🏦 Wallet · Canje Diamantes → Oros</h3>
       </div>
+      <p className="text-[11px] text-gray-500 mb-3">
+        Tasa exacta <strong>{cfg.diamond_to_coin_rate.toFixed(2)} 💰 por 1 💎</strong> · Sin pérdida ·
+        Comisión de la casa ({Math.round((cfg.commission_rate || 0) * 100)}%) ya fue descontada al recibir los regalos.
+      </p>
 
-      <div className="bg-white rounded-xl p-3 mb-3 border border-yellow-100">
-        <label className="text-gray-500 text-xs font-medium">Monedas a canjear</label>
+      <div className="bg-white rounded-xl p-3 mb-3 border border-cyan-100">
+        <label className="text-gray-500 text-xs font-medium">Diamantes a canjear</label>
         <input
           type="number"
           value={amount}
           onChange={e => setAmount(parseInt(e.target.value) || 0)}
-          step={rate.coins_per_diamond}
-          min={rate.min_coins_exchange}
+          min={cfg.min_diamond_exchange}
           data-testid="wallet-exchange-input"
-          className="w-full bg-transparent text-2xl font-black text-yellow-700 outline-none"
+          className="w-full bg-transparent text-2xl font-black text-cyan-700 outline-none"
         />
         <div className="flex gap-1 mt-2 flex-wrap">
           {presets.map(p => (
             <button key={p} onClick={() => setAmount(p)} data-testid={`wallet-preset-${p}`}
-              className={`text-[11px] px-2 py-1 rounded-full font-bold ${amount === p ? 'bg-yellow-500 text-white' : 'bg-yellow-100 text-yellow-700'}`}>
+              className={`text-[11px] px-2 py-1 rounded-full font-bold ${amount === p ? 'bg-cyan-500 text-white' : 'bg-cyan-100 text-cyan-700'}`}>
               {formatCoins(p)}
             </button>
           ))}
-          <button onClick={() => {
-            const max = Math.floor((user.coins || 0) / rate.coins_per_diamond) * rate.coins_per_diamond;
-            setAmount(max);
-          }} data-testid="wallet-preset-max"
-            className="text-[11px] px-2 py-1 rounded-full font-bold bg-amber-500 text-white">
+          <button onClick={() => setAmount(user.diamonds || 0)} data-testid="wallet-preset-max"
+            className="text-[11px] px-2 py-1 rounded-full font-bold bg-blue-500 text-white">
             MAX
           </button>
         </div>
       </div>
 
-      <div className="flex items-center justify-between bg-white rounded-xl p-3 mb-3 border border-yellow-100">
+      <div className="flex items-center justify-between bg-white rounded-xl p-3 mb-3 border border-cyan-100">
         <div className="text-gray-600 text-sm">Recibirás</div>
         <div className="flex items-center gap-2">
-          <span className="text-3xl">💎</span>
-          <span className="text-3xl font-black text-cyan-600" data-testid="wallet-diamonds-preview">{diamonds}</span>
+          <span className="text-3xl">💰</span>
+          <span className="text-3xl font-black text-yellow-600" data-testid="wallet-coins-preview">{coinsPreview.toLocaleString()}</span>
         </div>
       </div>
 
@@ -408,17 +427,15 @@ const WalletExchange = ({ user, updateUser }) => {
         onClick={exchange}
         disabled={!canExchange || loading}
         data-testid="wallet-exchange-btn"
-        className={`w-full py-3 rounded-xl font-black text-white text-sm ${canExchange && !loading ? 'bg-gradient-to-r from-yellow-500 via-amber-500 to-orange-500 active:scale-[0.98]' : 'bg-gray-300 cursor-not-allowed'}`}
+        className={`w-full py-3 rounded-xl font-black text-white text-sm ${canExchange && !loading ? 'bg-gradient-to-r from-cyan-500 via-blue-500 to-indigo-500 active:scale-[0.98]' : 'bg-gray-300 cursor-not-allowed'}`}
       >
-        {loading ? '⏳ Procesando...' : `🔄 CANJEAR ${formatCoins(amount)} 💰 → ${diamonds} 💎`}
+        {loading ? '⏳ Procesando...' : `🔄 CANJEAR ${amount.toLocaleString()} 💎 → ${coinsPreview.toLocaleString()} 💰`}
       </button>
       {!canExchange && amount > 0 && (
         <p className="text-red-500 text-[11px] mt-2 text-center">
-          {amount > (user.coins || 0)
-            ? `Saldo insuficiente (tienes ${formatCoins(user.coins)} 💰)`
-            : amount % rate.coins_per_diamond !== 0
-              ? `Debe ser múltiplo de ${rate.coins_per_diamond.toLocaleString()}`
-              : `Mínimo ${rate.min_coins_exchange.toLocaleString()} monedas`}
+          {amount > (user.diamonds || 0)
+            ? `Saldo insuficiente (tienes ${(user.diamonds || 0).toLocaleString()} 💎)`
+            : `Mínimo ${cfg.min_diamond_exchange} diamantes`}
         </p>
       )}
     </div>

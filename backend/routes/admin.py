@@ -300,16 +300,25 @@ async def console_broadcast(admin_id: str, message: str):
 
 @router.post("/admin/console/expand-room")
 async def expand_room_seats(admin_id: str, room_id: str, max_seats: int):
-    """Expand Room Seats."""
+    """Cambia la capacidad de micros.
+      - 9, 12, 16 → permitido al dueño de la SALA o al Dueño de la plataforma.
+      - 24        → exclusivo del Dueño de la plataforma (reservado para eventos grandes).
+    """
+    allowed = {9, 12, 16, 24}
+    if max_seats not in allowed:
+        raise HTTPException(status_code=400, detail="Capacidades permitidas: 9, 12, 16 o 24")
     admin = await db.users.find_one({"id": admin_id})
-    if not admin or admin.get('role') != 'dueño':
-        raise HTTPException(status_code=403, detail="Solo el dueño")
-    if max_seats < 9 or max_seats > 24:
-        raise HTTPException(status_code=400, detail="Mínimo 9, máximo 24 micros")
-
+    if not admin:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
     room = await db.rooms.find_one({"id": room_id})
     if not room:
         raise HTTPException(status_code=404, detail="Sala no encontrada")
+    is_platform_owner = admin.get('role') == 'dueño' or admin.get('is_super_admin')
+    is_room_owner = room.get('owner_id') == admin_id
+    if max_seats == 24 and not is_platform_owner:
+        raise HTTPException(status_code=403, detail="La configuración de 24 micros está reservada al Dueño de la plataforma")
+    if not (is_platform_owner or is_room_owner):
+        raise HTTPException(status_code=403, detail="Solo el dueño de la sala o el Dueño de la plataforma")
 
     current_seats = room.get('seats', [])
     if max_seats > len(current_seats):

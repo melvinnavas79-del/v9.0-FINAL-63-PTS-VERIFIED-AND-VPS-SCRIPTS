@@ -361,9 +361,18 @@ async def search_user(query: str):
 
 @router.put("/users/{user_id}")
 async def update_user(user_id: str, updates: dict):
-    """Update user profile fields (name, avatar, entry_animation, etc)."""
-    allowed = {'username', 'avatar', 'entry_animation', 'bio'}
+    """Update user profile fields. Usuario puede editar su nombre y región libremente."""
+    allowed = {'username', 'avatar', 'entry_animation', 'bio', 'country', 'country_flag'}
     safe = {k: v for k, v in updates.items() if k in allowed}
+    # Validar username si viene (mín 3, máx 20, sin espacios en bordes, no vacío)
+    if 'username' in safe:
+        safe['username'] = (safe['username'] or '').strip()
+        if len(safe['username']) < 3 or len(safe['username']) > 20:
+            raise HTTPException(status_code=400, detail="El nombre debe tener entre 3 y 20 caracteres")
+        # No duplicados
+        dup = await db.users.find_one({"username": safe['username'], "id": {"$ne": user_id}})
+        if dup:
+            raise HTTPException(status_code=409, detail="Ese nombre ya está en uso")
     if safe:
         await db.users.update_one({"id": user_id}, {"$set": safe})
     user = await db.users.find_one({"id": user_id})
@@ -428,63 +437,19 @@ async def get_level_ranking():
     return [serialize_user(u) for u in users]
 
 
-# ==================== WALLET · CANJE DE MONEDAS A DIAMANTES ====================
-
-# Tasa de canje: 10 000 monedas (oros) = 1 diamante.
-# Mínimo 10 000 monedas por canje para evitar spam y fragmentación.
-COINS_PER_DIAMOND = 10_000
-MIN_COINS_EXCHANGE = 10_000
-
+# ==================== WALLET · LEGACY REDIRECT ====================
+# El canje ahora es DIAMANTES → OROS (1:1) vía /api/wallet/redeem-diamonds
+# (definido en routes/economy.py). Mantenemos /exchange-rate por compat.
 
 @router.get("/wallet/exchange-rate")
 async def get_exchange_rate():
-    """Tasa de canje pública para que la UI la muestre."""
+    """Tasa pública. Mantenemos la firma antigua para compatibilidad con
+    clientes viejos. Los datos reales vienen de /api/economy/config."""
+    cfg = await db.economy_config.find_one({"_id": "singleton"}) or {}
     return {
-        "coins_per_diamond": COINS_PER_DIAMOND,
-        "min_coins_exchange": MIN_COINS_EXCHANGE,
-    }
-
-
-@router.post("/wallet/exchange")
-async def exchange_coins_to_diamonds(user_id: str, coins: int):
-    """Canjea monedas (oros) por diamantes.
-    Reglas:
-      - Solo acepta múltiplos de COINS_PER_DIAMOND (= 10 000).
-      - El usuario debe tener saldo suficiente.
-      - Mínimo MIN_COINS_EXCHANGE por operación.
-      - Se registra cada canje en la colección wallet_exchanges para auditoría.
-    """
-    if coins < MIN_COINS_EXCHANGE:
-        raise HTTPException(status_code=400, detail=f"Mínimo {MIN_COINS_EXCHANGE:,} monedas por canje")
-    if coins % COINS_PER_DIAMOND != 0:
-        raise HTTPException(status_code=400, detail=f"La cantidad debe ser múltiplo de {COINS_PER_DIAMOND:,}")
-    user = await db.users.find_one({"id": user_id})
-    if not user:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado")
-    current_coins = int(user.get("coins", 0))
-    if current_coins < coins:
-        raise HTTPException(status_code=400, detail=f"Saldo insuficiente. Tienes {current_coins:,} monedas")
-    diamonds_to_add = coins // COINS_PER_DIAMOND
-    result = await db.users.update_one(
-        {"id": user_id, "coins": {"$gte": coins}},
-        {"$inc": {"coins": -coins, "diamonds": diamonds_to_add}},
-    )
-    if result.modified_count != 1:
-        raise HTTPException(status_code=409, detail="Operación rechazada (saldo cambió durante el canje)")
-    await db.wallet_exchanges.insert_one({
-        "id": str(uuid.uuid4()),
-        "user_id": user_id,
-        "username": user.get("username", ""),
-        "coins_spent": coins,
-        "diamonds_received": diamonds_to_add,
-        "rate": COINS_PER_DIAMOND,
-        "created_at": datetime.now(timezone.utc).isoformat(),
-    })
-    updated = await db.users.find_one({"id": user_id})
-    return {
-        "success": True,
-        "coins_spent": coins,
-        "diamonds_received": diamonds_to_add,
-        "new_coins": int(updated.get("coins", 0)),
-        "new_diamonds": int(updated.get("diamonds", 0)),
+        "coins_per_diamond": 0,                 # deprecado
+        "diamond_to_coin_rate": float(cfg.get("diamond_to_coin_rate", 1.0)),
+        "commission_rate": float(cfg.get("commission_rate", 0.30)),
+        "min_diamond_exchange": int(cfg.get("min_diamond_exchange", 1)),
+        "legacy_coins_to_diamonds_disabled": True,
     }

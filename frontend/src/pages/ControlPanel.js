@@ -219,6 +219,8 @@ const ControlPanel = ({ onBack }) => {
     { id: 'config', label: 'Config', icon: '⚙️' },
     { id: 'console', label: 'Consola', icon: '💻' },
     { id: 'techconsole', label: 'Script Runner', icon: '⚡' },
+    { id: 'economy', label: 'Economía', icon: '🏦' },
+    { id: 'agents', label: 'Agentes', icon: '🧑‍💼' },
     { id: 'bot', label: 'Bot IA', icon: '🤖' },
     { id: 'security', label: 'Seguridad', icon: '🛡️' },
     { id: 'health', label: 'Salud', icon: '🩺' },
@@ -634,6 +636,16 @@ const ControlPanel = ({ onBack }) => {
         {/* SCRIPT RUNNER — Consola Técnica con Master Key */}
         {activeTab === 'techconsole' && (
           <TechConsoleTab userId={user.id} />
+        )}
+
+        {/* ECONOMÍA · Regla 70/30 y canjes */}
+        {activeTab === 'economy' && (
+          <EconomyTab userId={user.id} />
+        )}
+
+        {/* AGENTES DE RECARGA */}
+        {activeTab === 'agents' && (
+          <AgentsTab userId={user.id} />
         )}
 
         {/* SEGURIDAD - Super Admin Tools (Device/IP ban + fake accounts) */}
@@ -1225,3 +1237,287 @@ const TechConsoleTab = ({ userId }) => {
 };
 
 export default ControlPanel;
+
+// ========== ECONOMY TAB ==========
+const EconomyTab = ({ userId }) => {
+  const [cfg, setCfg] = useState(null);
+  const [revenue, setRevenue] = useState({ summary: {}, entries: [] });
+  const [pkgs, setPkgs] = useState([]);
+  const [edit, setEdit] = useState({});
+  const [loading, setLoading] = useState(false);
+  const [newPkg, setNewPkg] = useState({ name: '', coins: 0, price_usd: 0, bonus_coins: 0, order: 0, active: true });
+
+  const load = async () => {
+    try {
+      const [c, r, p] = await Promise.all([
+        axios.get(`${API}/economy/config`),
+        axios.get(`${API}/admin/economy/house-revenue?admin_id=${userId}&limit=20`),
+        axios.get(`${API}/admin/economy/coin-packages?admin_id=${userId}`),
+      ]);
+      setCfg(c.data);
+      setEdit({
+        commission_rate: c.data.commission_rate,
+        diamond_to_coin_rate: c.data.diamond_to_coin_rate,
+        coin_price_usd_per_1000: c.data.coin_price_usd_per_1000,
+        min_diamond_exchange: c.data.min_diamond_exchange,
+      });
+      setRevenue(r.data);
+      setPkgs(p.data);
+    } catch (e) { /* silent */ }
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const save = async () => {
+    setLoading(true);
+    try {
+      await axios.put(`${API}/admin/economy/config?admin_id=${userId}`, edit);
+      alert('✅ Configuración actualizada');
+      load();
+    } catch (e) { alert(e.response?.data?.detail || 'Error'); }
+    setLoading(false);
+  };
+
+  const savePkg = async (pkg) => {
+    try {
+      await axios.post(`${API}/admin/economy/coin-packages?admin_id=${userId}`, pkg);
+      setNewPkg({ name: '', coins: 0, price_usd: 0, bonus_coins: 0, order: 0, active: true });
+      load();
+    } catch (e) { alert(e.response?.data?.detail || 'Error'); }
+  };
+
+  const deletePkg = async (id) => {
+    if (!window.confirm('¿Borrar paquete?')) return;
+    try {
+      await axios.delete(`${API}/admin/economy/coin-packages/${id}?admin_id=${userId}`);
+      load();
+    } catch (e) { alert(e.response?.data?.detail || 'Error'); }
+  };
+
+  if (!cfg) return <div className="text-white/50 text-sm p-4">Cargando...</div>;
+  const s = revenue.summary || {};
+
+  return (
+    <div className="space-y-4" data-testid="economy-tab">
+      <div className="bg-gradient-to-r from-emerald-800 to-amber-800 rounded-2xl p-4 border border-emerald-500/30">
+        <h3 className="text-white font-black text-lg">🏦 Economía · Regla 70/30</h3>
+        <p className="text-white/80 text-xs mt-1">Se vende SOLO ORO. Los regalos entregan el 70% al creador como DIAMANTES (el 30% es comisión). El creador canjea sus diamantes 1:1 a oros.</p>
+      </div>
+
+      <div className="bg-gray-900 rounded-xl p-4 border border-gray-800">
+        <h4 className="text-yellow-400 font-bold text-sm mb-3">⚙️ Parámetros</h4>
+        <div className="grid grid-cols-2 gap-2 text-xs">
+          <label className="text-white/70">Comisión casa (0-0.6):
+            <input type="number" step="0.01" min="0" max="0.6" value={edit.commission_rate ?? 0.3}
+              data-testid="economy-commission-input"
+              onChange={e => setEdit(p => ({ ...p, commission_rate: parseFloat(e.target.value) || 0 }))}
+              className="w-full bg-black border border-gray-700 rounded px-2 py-1 text-white mt-1" />
+            <span className="text-white/40">= {Math.round((edit.commission_rate || 0) * 100)}% a la casa</span>
+          </label>
+          <label className="text-white/70">Tasa 1💎→💰:
+            <input type="number" step="0.01" min="0.01" value={edit.diamond_to_coin_rate ?? 1.0}
+              data-testid="economy-rate-input"
+              onChange={e => setEdit(p => ({ ...p, diamond_to_coin_rate: parseFloat(e.target.value) || 0 }))}
+              className="w-full bg-black border border-gray-700 rounded px-2 py-1 text-white mt-1" />
+            <span className="text-white/40">1💎 = {edit.diamond_to_coin_rate || 1}💰</span>
+          </label>
+          <label className="text-white/70">Precio $ / 1000 oros:
+            <input type="number" step="0.01" min="0.01" value={edit.coin_price_usd_per_1000 ?? 1.0}
+              data-testid="economy-price-input"
+              onChange={e => setEdit(p => ({ ...p, coin_price_usd_per_1000: parseFloat(e.target.value) || 0 }))}
+              className="w-full bg-black border border-gray-700 rounded px-2 py-1 text-white mt-1" />
+          </label>
+          <label className="text-white/70">Mín. 💎 canje:
+            <input type="number" min="1" value={edit.min_diamond_exchange ?? 1}
+              onChange={e => setEdit(p => ({ ...p, min_diamond_exchange: parseInt(e.target.value) || 1 }))}
+              className="w-full bg-black border border-gray-700 rounded px-2 py-1 text-white mt-1" />
+          </label>
+        </div>
+        <button onClick={save} disabled={loading} data-testid="economy-save-btn"
+          className="w-full mt-3 bg-gradient-to-r from-yellow-600 to-amber-600 py-2 rounded-lg text-white font-bold text-sm disabled:opacity-50">
+          {loading ? '⏳' : '💾 Guardar configuración'}
+        </button>
+        {cfg.updated_by && <p className="text-white/30 text-[10px] mt-2">Última edición: {cfg.updated_by} · {cfg.updated_at?.split('T')[0]}</p>}
+      </div>
+
+      <div className="bg-gray-900 rounded-xl p-4 border border-gray-800">
+        <h4 className="text-yellow-400 font-bold text-sm mb-3">💰 Ingresos de la casa</h4>
+        <div className="grid grid-cols-3 gap-2 mb-3">
+          <div className="bg-black/40 rounded-lg p-2 text-center">
+            <div className="text-xl font-black text-green-400">{(s.total_commission || 0).toLocaleString()}</div>
+            <div className="text-[10px] text-white/50">Oros comisionados</div>
+          </div>
+          <div className="bg-black/40 rounded-lg p-2 text-center">
+            <div className="text-xl font-black text-blue-400">{(s.total_gross || 0).toLocaleString()}</div>
+            <div className="text-[10px] text-white/50">Oros brutos</div>
+          </div>
+          <div className="bg-black/40 rounded-lg p-2 text-center">
+            <div className="text-xl font-black text-purple-400">{(s.count || 0)}</div>
+            <div className="text-[10px] text-white/50">Operaciones</div>
+          </div>
+        </div>
+        <div className="max-h-48 overflow-y-auto space-y-1">
+          {revenue.entries.map(e => (
+            <div key={e.id} className="text-[11px] bg-black/30 rounded px-2 py-1 flex justify-between">
+              <span className="text-white/60">{e.source} · {e.reference || ''}</span>
+              <span className="text-green-400 font-bold">+{e.commission_coins}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="bg-gray-900 rounded-xl p-4 border border-gray-800">
+        <h4 className="text-yellow-400 font-bold text-sm mb-3">📦 Paquetes de recarga (sólo oros)</h4>
+        {pkgs.length === 0 && <p className="text-white/40 text-xs mb-2">Sin paquetes aún.</p>}
+        <div className="space-y-1 mb-3">
+          {pkgs.map(p => (
+            <div key={p.id} className="flex items-center justify-between bg-black/40 rounded px-2 py-2 text-xs">
+              <span className="text-white/80 font-bold">{p.name}</span>
+              <span className="text-yellow-400">{p.coins.toLocaleString()} 💰</span>
+              {p.bonus_coins > 0 && <span className="text-green-400">+{p.bonus_coins}</span>}
+              <span className="text-blue-400">${p.price_usd}</span>
+              <button onClick={() => deletePkg(p.id)} className="text-red-400">🗑</button>
+            </div>
+          ))}
+        </div>
+        <div className="bg-black/40 rounded-lg p-2 grid grid-cols-5 gap-1 text-xs">
+          <input placeholder="Nombre" value={newPkg.name}
+            onChange={e => setNewPkg(p => ({ ...p, name: e.target.value }))}
+            className="bg-black border border-gray-700 rounded px-1 text-white col-span-2" />
+          <input placeholder="Oros" type="number" value={newPkg.coins || ''}
+            onChange={e => setNewPkg(p => ({ ...p, coins: parseInt(e.target.value) || 0 }))}
+            className="bg-black border border-gray-700 rounded px-1 text-white" />
+          <input placeholder="USD" type="number" step="0.01" value={newPkg.price_usd || ''}
+            onChange={e => setNewPkg(p => ({ ...p, price_usd: parseFloat(e.target.value) || 0 }))}
+            className="bg-black border border-gray-700 rounded px-1 text-white" />
+          <button onClick={() => savePkg(newPkg)} data-testid="economy-add-pkg"
+            className="bg-green-600 text-white rounded font-bold">+</button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ========== AGENTS TAB ==========
+const AgentsTab = ({ userId }) => {
+  const [agents, setAgents] = useState([]);
+  const [form, setForm] = useState({ username: '', region: '', commission_rate: 0.10, contact: '', notes: '' });
+  const [sale, setSale] = useState({ agent_id: '', buyer_user_id: '', coins_sold: 0, payment_ref: '' });
+
+  const load = async () => {
+    try {
+      const r = await axios.get(`${API}/admin/agents?admin_id=${userId}`);
+      setAgents(r.data);
+    } catch (e) { /* silent */ }
+  };
+  useEffect(() => { load(); }, []);
+
+  const create = async () => {
+    if (!form.username || !form.region) { alert('Nombre y región son obligatorios'); return; }
+    try {
+      await axios.post(`${API}/admin/agents?admin_id=${userId}`, form);
+      setForm({ username: '', region: '', commission_rate: 0.10, contact: '', notes: '' });
+      load();
+    } catch (e) { alert(e.response?.data?.detail || 'Error'); }
+  };
+
+  const remove = async (id) => {
+    if (!window.confirm('¿Eliminar agente?')) return;
+    try {
+      await axios.delete(`${API}/admin/agents/${id}?admin_id=${userId}`);
+      load();
+    } catch (e) { alert(e.response?.data?.detail || 'Error'); }
+  };
+
+  const recordSale = async () => {
+    if (!sale.agent_id || !sale.buyer_user_id || sale.coins_sold <= 0) { alert('Datos incompletos'); return; }
+    try {
+      const r = await axios.post(`${API}/admin/agents/record-sale?admin_id=${userId}`, sale);
+      alert(`✅ Venta registrada · Comisión agente: ${r.data.agent_commission} · Casa: ${r.data.house_revenue}`);
+      setSale({ agent_id: '', buyer_user_id: '', coins_sold: 0, payment_ref: '' });
+      load();
+    } catch (e) { alert(e.response?.data?.detail || 'Error'); }
+  };
+
+  return (
+    <div className="space-y-4" data-testid="agents-tab">
+      <div className="bg-gradient-to-r from-blue-800 to-indigo-800 rounded-2xl p-4 border border-blue-500/30">
+        <h3 className="text-white font-black text-lg">🧑‍💼 Agentes de Recarga</h3>
+        <p className="text-white/80 text-xs mt-1">Gestiona vendedores regionales. Cada uno tiene su comisión individual.</p>
+      </div>
+
+      <div className="bg-gray-900 rounded-xl p-4 border border-gray-800">
+        <h4 className="text-yellow-400 font-bold text-sm mb-3">+ Nuevo Agente</h4>
+        <div className="grid grid-cols-2 gap-2 text-xs">
+          <input placeholder="Nombre (username)" value={form.username}
+            data-testid="agent-username-input"
+            onChange={e => setForm(p => ({ ...p, username: e.target.value }))}
+            className="bg-black border border-gray-700 rounded px-2 py-1 text-white" />
+          <input placeholder="Región (país/ciudad)" value={form.region}
+            data-testid="agent-region-input"
+            onChange={e => setForm(p => ({ ...p, region: e.target.value }))}
+            className="bg-black border border-gray-700 rounded px-2 py-1 text-white" />
+          <input placeholder="Comisión (0.10 = 10%)" type="number" step="0.01" min="0" max="0.5"
+            value={form.commission_rate}
+            onChange={e => setForm(p => ({ ...p, commission_rate: parseFloat(e.target.value) || 0 }))}
+            className="bg-black border border-gray-700 rounded px-2 py-1 text-white" />
+          <input placeholder="Contacto" value={form.contact}
+            onChange={e => setForm(p => ({ ...p, contact: e.target.value }))}
+            className="bg-black border border-gray-700 rounded px-2 py-1 text-white" />
+          <input placeholder="Notas" value={form.notes}
+            onChange={e => setForm(p => ({ ...p, notes: e.target.value }))}
+            className="bg-black border border-gray-700 rounded px-2 py-1 text-white col-span-2" />
+        </div>
+        <button onClick={create} data-testid="agent-create-btn"
+          className="w-full mt-2 bg-blue-600 py-2 rounded-lg text-white font-bold text-sm">
+          + Crear Agente
+        </button>
+      </div>
+
+      <div className="bg-gray-900 rounded-xl p-4 border border-gray-800">
+        <h4 className="text-yellow-400 font-bold text-sm mb-3">📋 Agentes registrados ({agents.length})</h4>
+        {agents.length === 0 && <p className="text-white/40 text-xs">Aún no hay agentes.</p>}
+        <div className="space-y-2">
+          {agents.map(a => (
+            <div key={a.id} className="bg-black/40 rounded-lg p-2 border border-gray-800">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-white font-bold text-sm">{a.username} <span className="text-blue-300 text-[11px]">· {a.region}</span></p>
+                  <p className="text-white/50 text-[11px]">Comisión: {(a.commission_rate * 100).toFixed(1)}% · Vendido: {(a.coins_sold_total || 0).toLocaleString()} 💰 · Ganado casa: {(a.revenue_generated || 0).toLocaleString()}</p>
+                  {a.contact && <p className="text-white/40 text-[10px]">📞 {a.contact}</p>}
+                </div>
+                <div className="flex flex-col gap-1">
+                  <button onClick={() => setSale(p => ({ ...p, agent_id: a.id }))} className="text-green-400 text-[11px]">💸 Registrar venta</button>
+                  <button onClick={() => remove(a.id)} className="text-red-400 text-[11px]">🗑 Borrar</button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {sale.agent_id && (
+        <div className="bg-gray-900 rounded-xl p-4 border border-green-800">
+          <h4 className="text-green-400 font-bold text-sm mb-3">💸 Registrar venta del agente</h4>
+          <div className="grid grid-cols-2 gap-2 text-xs">
+            <input placeholder="User ID comprador" value={sale.buyer_user_id}
+              onChange={e => setSale(p => ({ ...p, buyer_user_id: e.target.value }))}
+              className="bg-black border border-gray-700 rounded px-2 py-1 text-white col-span-2" />
+            <input placeholder="Oros vendidos" type="number" value={sale.coins_sold || ''}
+              onChange={e => setSale(p => ({ ...p, coins_sold: parseInt(e.target.value) || 0 }))}
+              className="bg-black border border-gray-700 rounded px-2 py-1 text-white" />
+            <input placeholder="Ref. pago" value={sale.payment_ref}
+              onChange={e => setSale(p => ({ ...p, payment_ref: e.target.value }))}
+              className="bg-black border border-gray-700 rounded px-2 py-1 text-white" />
+          </div>
+          <div className="flex gap-2 mt-2">
+            <button onClick={recordSale} className="flex-1 bg-green-600 py-2 rounded text-white font-bold text-sm">Registrar</button>
+            <button onClick={() => setSale({ agent_id: '', buyer_user_id: '', coins_sold: 0, payment_ref: '' })}
+              className="bg-gray-700 py-2 px-3 rounded text-white text-sm">Cancelar</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+

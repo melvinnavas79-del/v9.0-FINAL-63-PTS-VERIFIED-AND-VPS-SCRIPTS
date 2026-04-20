@@ -273,7 +273,13 @@ async def get_gifts():
 
 @router.post("/gifts/send")
 async def send_gift(gift: GiftSend):
-    """Send Gift."""
+    """Send Gift. Aplica la regla 70/30:
+      - Sender paga `cost` oros.
+      - Receiver recibe `cost * (1 - commission_rate)` DIAMANTES (ganancias netas).
+      - La casa se queda con `cost * commission_rate` oros registrados en house_revenue.
+    `g['value']` (oros antiguos) se conserva pero ya no se usa para recompensar al receiver;
+    sirve como referencia del valor bruto del regalo para leaderboards históricos.
+    """
     if gift.gift_type not in GIFTS:
         raise HTTPException(status_code=400, detail="Regalo no válido")
 
@@ -288,9 +294,35 @@ async def send_gift(gift: GiftSend):
     if not receiver:
         raise HTTPException(status_code=404, detail="Receiver no encontrado")
 
-    # Deduct from sender, add to receiver
-    await db.users.update_one({"id": gift.sender_id}, {"$inc": {"coins": -g['cost'], "total_spent": g['cost'], "total_gifts_sent": 1}})
-    await db.users.update_one({"id": gift.receiver_id}, {"$inc": {"coins": g['value'], "total_received": g['value'], "total_gifts_received": 1}})
+    # Leer configuración económica (comisión editable por el Dueño)
+    cfg = await db.economy_config.find_one({"_id": "singleton"}) or {}
+    commission_rate = float(cfg.get("commission_rate", 0.30))
+    gross_coins = int(g['cost'])
+    commission_coins = int(round(gross_coins * commission_rate))
+    net_diamonds = gross_coins - commission_coins  # 70% del bruto → diamantes al creador
+
+    # Deduct from sender, give DIAMONDS (no oros) to receiver
+    await db.users.update_one(
+        {"id": gift.sender_id},
+        {"$inc": {"coins": -gross_coins, "total_spent": gross_coins, "total_gifts_sent": 1}},
+    )
+    await db.users.update_one(
+        {"id": gift.receiver_id},
+        {"$inc": {"diamonds": net_diamonds, "total_received": net_diamonds, "total_gifts_received": 1}},
+    )
+    # House revenue ledger (comisión)
+    await db.house_revenue.insert_one({
+        "id": str(uuid.uuid4()),
+        "source": "gift_commission",
+        "reference": gift.gift_type,
+        "sender_id": gift.sender_id,
+        "receiver_id": gift.receiver_id,
+        "gross_coins": gross_coins,
+        "commission_coins": commission_coins,
+        "commission_rate": commission_rate,
+        "room_id": gift.room_id,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    })
 
     # Log gift
     gift_doc = {
@@ -304,6 +336,9 @@ async def send_gift(gift: GiftSend):
         "gift_emoji": g['emoji'],
         "cost": g['cost'],
         "value": g['value'],
+        "commission_rate": commission_rate,
+        "commission_coins": commission_coins,
+        "net_diamonds": net_diamonds,
         "room_id": gift.room_id,
         "created_at": datetime.now(timezone.utc).isoformat()
     }

@@ -4,6 +4,45 @@
 Red social de audio en vivo con gamificación (monedas/diamantes), salas con **WebRTC self-hosted** (zero dependencia externa, zero costo variable), eventos (King/CP/PK), minijuegos, bot AI moderador y pagos reales PayPal Live. 100% white-label para deploy independiente en VPS.
 
 
+## Implementado en esta sesión (Abr 2026) — Iteración 21 (ECONOMÍA 70/30 + AGENTES)
+
+### 1 · Regla económica 70/30 (SOLO ORO se vende) ✅
+- **Regalos reescritos**: `send_gift` ahora aplica comisión de la casa. Sender paga `cost` oros; receiver recibe `cost * 0.7` como DIAMANTES (antes eran oros). La casa retiene `cost * 0.3` en ledger `house_revenue`.
+- **Canje Diamantes → Oros 1:1** (`POST /api/wallet/redeem-diamonds`): 1 💎 = 1 💰 exacto, sin pérdida. Mínimo 1 💎 (ajustable).
+- **Legacy eliminado**: el viejo `POST /wallet/exchange` (Oro→Diamante) fue removido. `GET /wallet/exchange-rate` se mantiene por compat pero sirve los nuevos campos.
+- Todo parametrizable desde el panel del Dueño.
+
+### 2 · Panel de Control de Economía ✅
+- Nuevo módulo backend `/app/backend/routes/economy.py`:
+  - `GET /economy/config` público + `PUT /admin/economy/config` para ajustar: `commission_rate` (0-0.6), `diamond_to_coin_rate`, `coin_price_usd_per_1000`, `min_diamond_exchange`.
+  - `GET /admin/economy/house-revenue` con summary + últimos 100 movimientos.
+  - CRUD de `coin_packages` (paquetes vendibles, sólo oros).
+- Nueva pestaña **"Economía"** en ControlPanel: 4 inputs editables, botón guardar, panel de ingresos, lista + alta/baja de paquetes.
+
+### 3 · Agentes de Recarga regionales ✅
+- Colección `recharge_agents` + endpoints `/admin/agents` (CRUD).
+- `POST /admin/agents/record-sale` acredita oros al comprador, calcula comisión del agente + house_revenue, registra en `agent_sales` y `house_revenue`.
+- Pestaña **"Agentes"** en ControlPanel: formulario alta (username, región, comisión 0-50%, contacto, notas), lista con stats (vendido total, ganado por casa), botones Registrar venta / Borrar.
+
+### 4 · Edición de perfil libre (username + región) ✅
+- `PUT /users/{id}` ahora acepta `username`, `country`, `country_flag` con validación (3-20 chars, sin duplicados).
+- En ProfileView: lápiz ✏️ junto al username abre prompt para renombrar. El `CountryPicker` ya existente cubre el cambio de región.
+- ID numérico mostrado debajo del nombre para referencia pública.
+
+### 5 · Selector de micros diferenciado ✅
+- Endpoint `/admin/console/expand-room` ahora permite **9, 12, 16** al dueño de la SALA (no solo plataforma) y **bloquea 24** a cualquiera que no sea Dueño de plataforma.
+- Botón flotante 🎤 en RoomView muestra las opciones correctas según `user.role`.
+
+### Tests e2e (curl)
+- Economy config GET/PUT ✅ · canje 1000💎→1000💰 ✅ · regalo rosa (100 oros) → +70 💎 al receiver, +30 al house_revenue ✅ · agente creado/listado/eliminado ✅ · record-sale ✅ · username duplicado bloqueado (409) ✅ · nombre <3 chars rechazado (400) ✅ · 24 micros bloqueado para no-dueño (403) ✅ · 16 micros owner-sala OK ✅.
+
+### Lint
+- ruff check routes/ → All checks passed
+- ESLint ControlPanel.js, RoomView.js, ProfileView.js → No issues found
+
+---
+
+
 ## Implementado en esta sesión (Abr 2026) — Iteración 20 (5 PUNTOS FINALES v8.0)
 
 ### 1 · Salas privadas para TODOS + Llave Maestra Bot + Dueño ✅

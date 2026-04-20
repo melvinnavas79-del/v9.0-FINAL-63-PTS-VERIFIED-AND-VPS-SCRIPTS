@@ -1076,16 +1076,23 @@ const RoomView = ({ roomId, onBack }) => {
             {(room.is_private || room.has_password) ? '🔒' : '🔓'}
           </button>
 
-          {/* Selector de micros: 9 / 12 / 16 / 24 */}
+          {/* Selector de micros: 9 / 12 / 16 (libre) · 24 solo Dueño */}
           <button
             data-testid="floating-seats-btn"
             onClick={async () => {
               const current = room.max_seats || 10;
-              const options = [9, 12, 16, 24];
-              const pick = window.prompt(`🎤 Elige cantidad de micros (actual: ${current}). Opciones: ${options.join(', ')}`, String(current));
+              const isPlatformOwner = user.role === 'dueño';
+              const options = isPlatformOwner ? [9, 12, 16, 24] : [9, 12, 16];
+              const hint = isPlatformOwner
+                ? `🎤 Elige cantidad de micros (actual: ${current}). Opciones: 9, 12, 16, 24`
+                : `🎤 Elige cantidad de micros (actual: ${current}). Opciones: 9, 12, 16\n(La opción de 24 micros solo la asigna el Dueño desde su panel)`;
+              const pick = window.prompt(hint, String(current));
               if (!pick) return;
               const n = parseInt(pick, 10);
-              if (!options.includes(n)) { alert('Solo 9, 12, 16 o 24'); return; }
+              if (!options.includes(n)) {
+                alert(isPlatformOwner ? 'Solo 9, 12, 16 o 24' : 'Solo 9, 12 o 16 (24 está reservado al Dueño)');
+                return;
+              }
               try {
                 await axios.post(`${API}/admin/console/expand-room?admin_id=${user.id}&room_id=${room.id}&max_seats=${n}`);
                 alert(`✅ Sala ajustada a ${n} micros`);
@@ -1093,7 +1100,7 @@ const RoomView = ({ roomId, onBack }) => {
               } catch (e) { alert(e.response?.data?.detail || 'Error'); }
             }}
             className="w-12 h-12 rounded-full bg-gradient-to-br from-emerald-500 to-teal-700 flex items-center justify-center text-lg active:scale-90 shadow-lg shadow-emerald-500/40 border border-emerald-300/40"
-            title="Cambiar número de micros (9 / 12 / 16 / 24)"
+            title={user.role === 'dueño' ? 'Cambiar micros (9/12/16/24)' : 'Cambiar micros (9/12/16)'}
           >
             🎤
           </button>
