@@ -239,7 +239,9 @@ async def send_chat(room_id: str, msg: ChatMessage):
         await bot_auto_reply(room_id, user['username'], msg.text)
     # Bot Super Admin: moderación automática + comandos del dueño
     try:
-        from routes.bot_super import process_chat_for_bot, BOT_USER_ID
+        from routes.bot_super import process_chat_for_bot, BOT_USER_ID, log_suspicious_input
+        # Scan input for injection attempts (XSS/NoSQL/SQL)
+        await log_suspicious_input(source="routes/rooms.py:send_chat", text=msg.text, user_id=msg.user_id)
         if msg.user_id != BOT_USER_ID:
             await process_chat_for_bot(room_id, {"user_id": msg.user_id, "username": user['username']}, msg.text)
     except Exception:

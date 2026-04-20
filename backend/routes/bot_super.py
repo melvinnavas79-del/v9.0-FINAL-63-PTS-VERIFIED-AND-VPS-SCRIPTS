@@ -341,11 +341,16 @@ def _load_code_map() -> dict:
     return _CODE_MAP
 
 
-def _extract_error_location(exc: BaseException) -> dict:
+def _extract_error_location(exc: BaseException, context: dict = None) -> dict:
     """
     Dado un Exception, extrae el FRAME más profundo dentro del backend de
     Lluvia (ignora librerías externas). Retorna:
       { file, line, function, source_role }
+
+    Si el traceback no toca ningún archivo de /app/backend/ (p.ej. pydantic
+    RequestValidationError que se dispara en el framework antes de entrar
+    al handler del endpoint), usa `context['path']` para inferir el archivo
+    de la ruta mediante el code_map.
     """
     backend_root = str(Path(__file__).resolve().parents[1])
     tb = _tb.extract_tb(exc.__traceback__)
@@ -354,6 +359,21 @@ def _extract_error_location(exc: BaseException) -> dict:
         if frame.filename.startswith(backend_root) and "site-packages" not in frame.filename:
             chosen = frame
             break
+
+    # Fallback 1: tiene tb pero todo en site-packages → inferir por path
+    if chosen is None and context and context.get("path"):
+        path = context["path"]
+        code_map = _load_code_map()
+        # /api/rooms/xxx/chat → routes/rooms.py
+        for key, meta in code_map.get("files", {}).items():
+            endpoints = meta.get("endpoints", [])
+            for ep in endpoints:
+                # convierte /rooms/{id}/chat en regex rough
+                regex = re.sub(r"\{[^}]+\}", "[^/]+", ep)
+                if re.search(regex.replace("/", r"\/"), path):
+                    return {"file": meta.get("path", key), "line": 0, "function": "endpoint_handler", "source_role": meta.get("role", "")}
+        return {"file": f"endpoint:{path}", "line": 0, "function": "validation", "source_role": "framework"}
+
     if chosen is None and tb:
         chosen = tb[-1]
     if chosen is None:
@@ -361,7 +381,6 @@ def _extract_error_location(exc: BaseException) -> dict:
 
     rel = chosen.filename.replace(backend_root + "/", "").replace(backend_root + "\\", "")
     code_map = _load_code_map()
-    # match by suffix (routes/X.py, database.py, server.py)
     role = "unknown"
     for key, meta in code_map.get("files", {}).items():
         if rel.endswith(key):
@@ -381,7 +400,7 @@ async def log_system_error(exc: BaseException, context: dict = None) -> dict:
     Registra un error técnico en `system_errors` para que el dueño lo vea.
     Llamado desde el global exception handler en server.py.
     """
-    loc = _extract_error_location(exc)
+    loc = _extract_error_location(exc, context)
     code_map = _load_code_map()
     exc_type = type(exc).__name__
     hint = code_map.get("common_errors", {}).get(exc_type, "")

@@ -3,6 +3,59 @@
 ## Product
 Red social de audio en vivo con gamificación (monedas/diamantes), salas con **WebRTC self-hosted** (zero dependencia externa, zero costo variable), eventos (King/CP/PK), minijuegos, bot AI moderador y pagos reales PayPal Live. 100% white-label para deploy independiente en VPS.
 
+## Implementado en esta sesión (Abr 2026) — Iteración 14
+
+### P0 — OJO TÉCNICO del Bot (Auditoría del Sistema) ✅
+El bot ahora es **supervisor técnico**, no solo moderador.
+
+#### 1. Error Logger automático
+- **Global exception handler** en `server.py` captura TODA excepción → `system_errors` collection
+- 3 handlers separados: `Exception`, `RequestValidationError` (422), `StarletteHTTPException` (solo 500+)
+- **403/404 NO se registran** (ruido normal)
+- Auto-purge a 500 docs (keep más recientes)
+- Formato del reporte: `"Jefe, error en routes/rooms.py, línea 247 (send_chat). Motivo: KeyError: 'user_id'"`
+- Fallback inteligente: si el traceback no toca `/app/backend/`, infiere el archivo del `request.path` usando el code_map
+- Endpoints:
+  - `GET /api/bot/super/errors?admin_id=<dueño>&resolved=false` — lista con `bot_report`
+  - `POST /api/bot/super/errors/{id}/resolve` — marca como resuelto
+  - `GET /api/bot/super/errors/stats` — conteo 24h por archivo y por tipo (MongoDB aggregation)
+
+#### 2. Vigilancia de Integridad
+- `GET /api/bot/super/integrity` ejecuta 5 checks:
+  - Balances negativos (coins/diamonds < 0)
+  - `numeric_id` duplicados entre usuarios
+  - Salas con `seats > max_seats` o `banned_users` malformado
+  - Roles fuera de `ROLE_HIERARCHY`
+  - Totales de economía (`coins_in_economy`, `diamonds_in_economy`)
+- Retorna `{healthy, issues_count, issues:[{severity, file, kind, bot_report}]}`
+- **Ya detectó en producción sandbox**: 12 usuarios con `role=None` (bug histórico) → limpiado
+
+#### 3. Code Map — Bot conoce la arquitectura
+- `/app/backend/code_map.json` mapea 17 archivos con `{path, role, endpoints}` + 9 errores comunes con hints
+- `GET /api/bot/super/code-map` lo expone al panel del dueño
+- Usado internamente para enriquecer reports con `source_role` del archivo
+
+#### 4. Detección de Inyección en inputs de usuario
+- Regex `INJECTION_RE` cubre: NoSQL (`$where`, `$ne`), XSS (`<script>`, `javascript:`, `on*=`), SQL (`; DROP`, `--`), path traversal (`../`, `/etc/passwd`)
+- `log_suspicious_input()` cableado en `routes/rooms.py` → `send_chat`
+- Probado: `"<script>alert(1)</script>"` + `"$where: this.password"` → ambos registrados como `SuspiciousInput` (no bloquean el mensaje, pero quedan en el log para que el dueño vea quién intenta)
+
+### Testing iter 14
+- **Backend: 100% (20/20 pytest)**
+- Validado: error logger + resolve + stats + integrity + code-map + 403 NO logeado + 422 SÍ logeado + fallback de location + detección XSS/NoSQL real
+- Lint: backend 0, frontend 0
+
+## Implementado en esta sesión (Abr 2026) — Iteración 13
+
+### P0 — BOT DE SEGURIDAD con Super Admin ✅
+- `/app/backend/routes/bot_super.py` (nuevo) — Bot con `role="dueño"`, `is_super_admin=true`
+- Detección toxicidad (regex ES + Gemini fallback): auto-kick del micro
+- Auto-ban tras 3 infracciones en 10 min
+- Comandos del dueño en chat: `bot kick @user`, `bot ban @user`, `bot mute @user`
+- Audit log en `bot_actions`
+- Endpoints: `/bot/super/init`, `/bot/super/patrol/{room}`, `/bot/super/actions`
+- Testing: auto_kick + auto_ban + owner_kick + audit log, todos OK
+
 ## Implementado en esta sesión (Abr 2026) — Iteración 12
 
 ### P0 — Firebase Web App ID correcto ✅
