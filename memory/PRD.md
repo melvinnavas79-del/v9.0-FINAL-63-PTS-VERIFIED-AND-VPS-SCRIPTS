@@ -3,7 +3,35 @@
 ## Product
 Red social de audio en vivo con gamificación (monedas/diamantes), salas con **WebRTC self-hosted** (zero dependencia externa, zero costo variable), eventos (King/CP/PK), minijuegos, bot AI moderador y pagos reales PayPal Live. 100% white-label para deploy independiente en VPS.
 
-## Implementado en esta sesión (Abr 2026) — Iteración 15 (FINAL antes del push)
+## Implementado en esta sesión (Abr 2026) — Iteración 16 (FINAL + LIMPIEZA)
+
+### P0 — PURGA TOTAL DE AGORA ✅
+- Eliminado endpoint `POST /api/agora/token` de `routes/rooms.py`
+- Eliminadas variables `AGORA_APP_ID` y `AGORA_APP_CERTIFICATE` de `backend/.env` y `.env.example`
+- Eliminado paquete `agora-token-builder==1.0.0` del entorno Python (`pip uninstall`)
+- `requirements.txt` reescrito con solo deps directas (21 paquetes, antes tenía 138 del pip freeze que incluía `emergentintegrations` y basura global)
+- Eliminado `tests/test_iteration_6.py` (testaba el endpoint Agora viejo)
+- Actualizados docs: `/app/GUIA-INSTALACION.md` reescrito completo sin Agora, `/app/README.md` sin Agora, `/app/DEPLOY.md` ya libre desde iter 11
+- Comentario de header en `server.py` actualizado
+
+### P0 — PURGA TOTAL DE EMERGENT ✅
+- `grep -ri "emergent" /app/frontend/src/ /app/frontend/public/` → **0 matches** (solo `REACT_APP_BACKEND_URL` que es env var del usuario)
+- `grep -ri "emergent" /app/GUIA-INSTALACION.md /app/README.md /app/DEPLOY.md` → **0 matches**
+- Paquete `emergentintegrations==0.1.0` eliminado de `requirements.txt` (estaba por el pip freeze accidental)
+
+### Verificación final pre-push
+```
+✓ POST /api/agora/token          → 404 (endpoint eliminado)
+✓ GET  /api/webrtc/config        → 200 (audio self-hosted operativo)
+✓ GET  /api/rooms                → 200 (visibilidad total)
+✓ Backend arranca sin errores
+✓ Backend lint: 0 errores
+✓ Frontend lint: 0 errores
+✓ 0 referencias a Agora en código productivo
+✓ 0 referencias a Emergent en código/docs
+```
+
+## Implementado en esta sesión (Abr 2026) — Iteración 15 (Panel Salud)
 
 ### P0 — Panel de Salud Visual ✅
 - `/app/frontend/src/components/SystemHealthPanel.js` (nuevo, 194 líneas)

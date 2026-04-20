@@ -679,25 +679,6 @@ async def expand_seats(room_id: str, admin_id: str, max_seats: int = 24):
     await db.rooms.update_one({"id": room_id}, {"$set": {"max_seats": max_seats, "seats": current_seats, "seat_locks": current_locks}})
     return {"success": True, "max_seats": max_seats}
 
-# ==================== AGORA TOKEN ====================
-
-@router.post("/agora/token")
-async def get_agora_token(channel_name: str, user_id: str):
-    """Generate Agora RTC token for audio rooms."""
-    app_id = os.environ.get('AGORA_APP_ID', '')
-    app_cert = os.environ.get('AGORA_APP_CERTIFICATE', '')
-    if not app_id or not app_cert:
-        return {"token": "", "app_id": app_id}
-    try:
-        from agora_token_builder import RtcTokenBuilder
-        import time
-        uid = abs(hash(user_id)) % (10**9)
-        expiration = int(time.time()) + 3600 * 24
-        token = RtcTokenBuilder.buildTokenWithUid(app_id, app_cert, channel_name, uid, 1, expiration)
-        return {"token": token, "app_id": app_id, "uid": uid}
-    except Exception:
-        return {"token": "", "app_id": app_id}
-
 # ==================== FILE UPLOADS ====================
 
 @router.post("/upload")

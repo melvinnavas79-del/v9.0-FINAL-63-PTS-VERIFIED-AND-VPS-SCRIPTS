@@ -9,7 +9,7 @@ Architecture:
   database.py        - MongoDB connection, models, helpers
   routes/
     auth.py          - Register, Login, User profile, Ghost mode, Rankings
-    rooms.py         - Room CRUD, Seats, Chat, Music, Photos, Agora
+    rooms.py         - Room CRUD, Seats, Chat, Music, Photos, moderation
     games.py         - All games, PK battles
     bot.py           - AI Bot command, auto-reply, missions, monitoring
     events.py        - King/CP events, cashback, weekly rewards
