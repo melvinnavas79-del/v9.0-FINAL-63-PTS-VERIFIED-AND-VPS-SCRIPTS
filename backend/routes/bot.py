@@ -179,7 +179,8 @@ REGLAS:
                 target = await db.users.find_one({"username": params.get('username')})
                 if target:
                     badges = list(target.get('badges', []))
-                    if '✅ Verificado' not in badges: badges.append('✅ Verificado')
+                    if '✅ Verificado' not in badges:
+                        badges.append('✅ Verificado')
                     await db.users.update_one({"id": target['id']}, {"$set": {"verified": True, "badges": badges}})
                     action_result = f"{params['username']} verificado"
             elif action == 'broadcast':
@@ -605,8 +606,6 @@ async def bot_auto_reply(room_id: str, username: str, text: str):
             await db.bot_active_rooms.update_one({"room_id": room_id}, {"$set": {"paused": True}})
             await db.room_chat.insert_one({
                 "id": str(uuid.uuid4()), "room_id": room_id,
-                "user_id": "bot", "username": "🤖 Bot Lluvia", "avatar": "",
-
                 "user_id": "bot", "username": "🤖 Bot Lluvia", "avatar": "",
                 "text": "Entendido, me quedo callado. Diganme 'bot habla' cuando me necesiten.",
                 "type": "message", "created_at": datetime.now(timezone.utc).isoformat()

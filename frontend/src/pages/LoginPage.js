@@ -84,9 +84,12 @@ const LoginPage = ({ onLogin }) => {
           // Page will reload, result handled in useEffect above
           return;
         } catch (redirectErr) {
-          setError('Error con Google. Verifica que tu dominio este en Firebase Authorized Domains.');
+          setError('Google Login no disponible. Verifica que tu proyecto Firebase tenga una Web App registrada (no solo Android) y que tu dominio esté en Authorized Domains. Ver /api/auth/firebase/status.');
           setLoading('');
         }
+      } else if (err.code === 'auth/configuration-not-found' || err.code === 'auth/api-key-not-valid' || err.code === 'auth/invalid-api-key') {
+        setError('Firebase Web no configurado. Abre Firebase Console → Add app → Web, copia el appId (:web:) a REACT_APP_FIREBASE_APP_ID y recompila. Detalle: /api/auth/firebase/status');
+        setLoading('');
       } else if (err.response?.data?.detail) {
         setError(err.response.data.detail);
         setLoading('');

@@ -1,7 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { useUser } from '../contexts/UserContext';
 import EventControlPanel from '../components/EventControlPanel';
+import SearchBar from '../components/SearchBar';
+import FriendsActiveStrip from '../components/FriendsActiveStrip';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -18,6 +20,8 @@ const Dashboard = ({ onNavigate }) => {
   const [showEventPanel, setShowEventPanel] = useState(false);
   const [flashEvent, setFlashEvent] = useState(null);
   const [dailyRanking, setDailyRanking] = useState({ leaderboard: [], rewards: [3000000, 2000000, 1000000] });
+  // Animación de contador "vivo": el valor mostrado es el previo; al cambiar se aplica flash
+  const prevActiveUsersRef = useRef({});
 
   useEffect(() => {
     loadRooms();
@@ -30,7 +34,8 @@ const Dashboard = ({ onNavigate }) => {
     const s = setInterval(() => setStarIndex(p => p + 1), 3000);
     const f = setInterval(loadFlashEvents, 8000);
     const d = setInterval(loadDailyRanking, 30000);
-    return () => { clearInterval(n); clearInterval(s); clearInterval(f); clearInterval(d); };
+    const rms = setInterval(loadRooms, 8000);   // Dashboard "vivo": refresh rooms cada 8s
+    return () => { clearInterval(n); clearInterval(s); clearInterval(f); clearInterval(d); clearInterval(rms); };
   }, []);
 
   const loadDailyRanking = async () => {
@@ -314,6 +319,59 @@ const Dashboard = ({ onNavigate }) => {
         </button>
       </div>
 
+      {/* Amigos activos (live-refresh) */}
+      <FriendsActiveStrip userId={user.id} onEnterRoom={(rid) => onNavigate('room', rid)} />
+
+      {/* Salas activas — clickeables para entrar directo (live-refresh 8s) */}
+      <div className="mb-3">
+        <h3 className="text-sm font-bold text-gray-800 mb-2 flex items-center gap-1.5">
+          <span className="relative flex h-2 w-2">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75" />
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-cyan-500" />
+          </span>
+          Salas activas ahora
+        </h3>
+        <div className="space-y-2" data-testid="popular-rooms-list">
+          {rooms.length === 0 && (
+            <div className="text-center py-6 text-gray-400">
+              <div className="text-4xl mb-2">🪑</div>
+              <p className="text-sm">No hay salas activas</p>
+            </div>
+          )}
+          {rooms.map((room) => {
+            const prev = prevActiveUsersRef.current[room.id];
+            const flash = prev !== undefined && prev !== room.active_users;
+            prevActiveUsersRef.current[room.id] = room.active_users;
+            return (
+              <button
+                key={room.id}
+                data-testid={`popular-room-card-${room.id}`}
+                onClick={() => onNavigate('room', room.id)}
+                className="w-full bg-white rounded-2xl p-3 shadow-sm hover:shadow-md active:scale-[0.99] transition-all text-left border border-gray-100"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-11 h-11 bg-gradient-to-br from-cyan-400 to-blue-500 rounded-xl flex items-center justify-center text-white text-lg flex-shrink-0">☔</div>
+                  <div className="flex-1 min-w-0">
+                    <h4 className="font-bold text-gray-800 text-sm truncate">{room.name}</h4>
+                    <p className="text-gray-400 text-xs truncate">Tap para entrar</p>
+                  </div>
+                  <div className={`flex-shrink-0 flex items-center gap-1 bg-cyan-50 rounded-full px-2.5 py-1 border border-cyan-100 ${flash ? 'ring-2 ring-cyan-300' : ''}`}
+                    style={flash ? { animation: 'countFlash 0.8s ease' } : undefined}>
+                    <span className="relative flex h-1.5 w-1.5">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
+                      <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-green-500" />
+                    </span>
+                    <span className="text-cyan-700 font-bold text-xs">{room.active_users || 0}</span>
+                    <span className="text-[10px] text-cyan-500">👥</span>
+                  </div>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+      <style>{`@keyframes countFlash { 0% { background-color: rgba(34,211,238,0.35); transform: scale(1.12); } 100% { background-color: rgba(236,254,255,1); transform: scale(1); } }`}</style>
+
       {/* User Feed */}
       <div className="space-y-3 px-1">
         {users.map((u, i) => (
@@ -499,6 +557,10 @@ const Dashboard = ({ onNavigate }) => {
 
       {/* Top Tabs: Mío, Popular, Descubrir, Event */}
       <div className="bg-white/80 backdrop-blur px-4 pt-2">
+        {/* Search bar — usuario o ID numérico */}
+        <div className="mb-2">
+          <SearchBar />
+        </div>
         <div className="flex items-center gap-1">
           {[
             { id: 'mio', label: 'Mío' },

@@ -7,6 +7,18 @@ import random
 
 router = APIRouter()
 
+# Trivia question bank (simple stub — puede ser expandido a CMS en el futuro).
+TRIVIA_QUESTIONS = [
+    {"question": "¿Capital de El Salvador?", "options": ["San Salvador", "Tegucigalpa", "Managua", "Guatemala"], "correct": 0},
+    {"question": "¿Color del cielo en un día soleado?", "options": ["Verde", "Azul", "Rojo", "Rosa"], "correct": 1},
+    {"question": "¿Cuánto es 2+2?", "options": ["3", "4", "5", "6"], "correct": 1},
+    {"question": "¿Animal rey de la selva?", "options": ["Tigre", "Elefante", "León", "Lobo"], "correct": 2},
+    {"question": "¿Planeta más cercano al Sol?", "options": ["Venus", "Tierra", "Marte", "Mercurio"], "correct": 3},
+    {"question": "¿Océano más grande?", "options": ["Pacífico", "Atlántico", "Índico", "Ártico"], "correct": 0},
+    {"question": "¿Continente con más países?", "options": ["Asia", "África", "Europa", "América"], "correct": 1},
+    {"question": "¿Cuántos lados tiene un triángulo?", "options": ["2", "3", "4", "5"], "correct": 1},
+]
+
 
 # ==================== DAILY GAME RANKING ====================
 DAILY_REWARDS = [3_000_000, 2_000_000, 1_000_000]  # 1st, 2nd, 3rd
@@ -143,7 +155,8 @@ async def play_generic(play: GenericPlay):
             mult = random.choice([3, 5, 10]) if won else 0
             symbols = ['🍒','🍋','🔔','💎','7️⃣','🍀']
             reels = [[random.choice(symbols) for _ in range(3)] for _ in range(3)]
-            if won: reels[1] = [reels[1][0]] * 3  # Force match on middle row
+            if won:
+                reels[1] = [reels[1][0]] * 3  # Force match on middle row
             game_data = {"reels": reels}
         elif play.game == 'dados':
             # Two-dice roll; player wins if sum >= 8
@@ -173,7 +186,8 @@ async def play_generic(play: GenericPlay):
             score = ones + fives + triples
             won = score >= 350
             mult = 2 if score >= 350 else (3 if score >= 600 else (5 if score >= 1000 else 0))
-            if not won: mult = 0
+            if not won:
+                mult = 0
             game_data = {"dice": dice, "score": score, "ones": ones, "fives": fives, "triples": triples}
         elif play.game == 'carreras':
             # Car racing: 5 cars race, user bets on car 1
@@ -238,10 +252,6 @@ async def play_generic(play: GenericPlay):
     raise HTTPException(status_code=400, detail="Juego no válido")
 
 # PKBattleStart imported from database
-    room_id: str
-    challenger_id: str
-    opponent_id: str
-    bet_amount: int
 
 @router.post("/games/pk-battle")
 async def start_pk_battle(battle: PKBattleStart):

@@ -1,0 +1,34 @@
+{
+  "summary": "Iteration 11 — Full-stack validation of (a) numeric-id search (/api/social/search-by-id/{id}), (b) follow/unfollow + follow-status + following/followers lists with idempotent upsert, (c) friends-active presence endpoint, (d) mark-join fanout regression, (e) /api/auth/firebase/status white-label helper, (f) Dashboard SearchBar + modal + toggle-follow-btn, (g) FriendsActiveStrip (empty placeholder path), (h) Popular tab 12 clickable room cards navigating to RoomView, (i) RoomView regression (top-rankings-btn + events-room-btn still rendered), (j) WebSocket /api/ws/audio regression. Backend: 12/12 pytest pass in 2.25s. Frontend: all required data-testids visible and interactive flows work end-to-end with Melvin_Live/test123.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "RoomView banner (preexisting)", "issues": ["Room banner still contains user-set text '500 Internal Server Error' (owner-authored content, not an API error). Same cosmetic issue already flagged in iteration 10 — not introduced here."]},
+      {"screen": "Dashboard search results avatar", "issues": ["Mixed 404s for /api/uploads/avatar_*.jpeg are logged in console (preexisting missing avatar files on disk). Cosmetic only — fallback image renders."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration_11.py",
+    "/app/test_reports/pytest/iter11_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "routes/friends.py search_by_numeric_id: does exact match on `numeric_id`. No index on db.users.numeric_id is enforced in code — for scale, add a unique index (Mongo) to guarantee lookup speed and prevent collisions on registration.",
+    "routes/friends.py notify_followers_of_room_entry: iterates follower rows sequentially and awaits create_notification one-by-one. For users with many followers this serializes. Consider asyncio.gather for fanout (still with 60s dedupe guard).",
+    "routes/friends.py /social/following and /social/followers: pass limit as a query param but default of 100 is also the to_list bound for both the follows collection AND the users lookup. If a user follows >100 accounts, follower/following lists silently truncate. Either raise the default or paginate.",
+    "routes/friends.py friends-active: no index hint on seats.user_id + target_ids filter. Fine for current scale but flag for future.",
+    "Frontend Dashboard.js now 600+ lines with SearchBar, FriendsActiveStrip, Popular tab, auto-refresh timer, modals — consider splitting Popular tab rendering into its own component for readability (non-blocking).",
+    "SearchBar.js modal closes only on explicit close/ESC handler — verify no body scroll lock leak on rapid open/close (not observed in this test run but worth a quick check).",
+    "Firebase REACT_APP_FIREBASE_APP_ID in /app/frontend/.env is still `:android:` — Google/Phone login will fail in the Web SDK at runtime. This is known and documented (setup_instructions returned by /api/auth/firebase/status). Main agent / owner must create a Web App in Firebase Console and replace the appId before Google/Phone login works. Not a regression from this iteration; white-label path is correctly exposing the fix instructions."
+  ],
+  "updated_files": ["/app/backend/tests/test_iteration_11.py", "/app/test_reports/iteration_11.json"],
+  "success_rate": {"backend": "100% (12/12)", "frontend": "100% (search + modal + follow toggle + friends-strip + 12 popular cards clickable + navigation to RoomView + RoomView testids intact)"},
+  "test_credentials": "Melvin_Live / test123 (owner). Follow target used: numeric_id 930788 / username 'Melvin navas' / id 4bea36c7-5c7f-48b0-ae68-97af4ac8890b.",
+  "seed_data_creation": "None. Tests cleaned up their own follow relationships (DELETE /api/social/follow at start and end of test_follow_unfollow_flow) so no residual state.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Iteration 11 validated the new Friends/Search/Firebase-status system end-to-end. Known non-issue: REACT_APP_FIREBASE_APP_ID is still Android (:android:) so Google/Phone login will not work until the owner creates a Firebase Web app and updates the env — this is the white-label path and is correctly documented via /api/auth/firebase/status. Follow target numeric_id 930788 maps to a DIFFERENT user ('Melvin navas', id 4bea36c7-…) than the owner Melvin_Live (id b45958bc-…); do not confuse them. Pre-existing cosmetic issues (room banner text '500 Internal Server Error' and missing avatar files 404) are the same ones from iteration 10 — do not re-flag.",
+  "rca of the issue": "N/A — no bugs found. All review-requested features work as specified."
+}

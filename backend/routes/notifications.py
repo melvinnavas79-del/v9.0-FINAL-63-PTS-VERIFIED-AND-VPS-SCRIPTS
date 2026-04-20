@@ -22,9 +22,6 @@ async def create_notification(category: str, title: str, message: str, target_us
     return notif_doc
 
 # NotifPreferences imported from database
-    regalos_globales: bool = True
-    eventos_cp: bool = True
-    alertas_conexion: bool = True
 
 @router.get("/notifications/{user_id}")
 async def get_notifications(user_id: str, limit: int = 30):

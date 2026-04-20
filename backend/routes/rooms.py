@@ -215,13 +215,45 @@ async def get_chat(room_id: str, limit: int = 50, user_id: str = None):
 
 @router.post("/rooms/{room_id}/mark-join")
 async def mark_join(room_id: str, user_id: str):
-    """Mark user join time. Updates every time user enters the room so old messages don't reappear."""
+    """Mark user join time. Updates every time user enters the room so old messages don't reappear.
+    Also fan-out notifications to the user's followers ('amigo activo en sala')."""
     now = datetime.now(timezone.utc).isoformat()
     await db.room_joins.update_one(
         {"user_id": user_id, "room_id": room_id},
         {"$set": {"joined_at": now}},
         upsert=True
     )
+    # Notify followers (dedupe inside 60s implemented in friends.notify_followers_of_room_entry)
+    try:
+        user = await db.users.find_one({"id": user_id})
+        room = await db.rooms.find_one({"id": room_id})
+        if user and room:
+            minute_bucket = datetime.now(timezone.utc).strftime("%Y%m%d%H%M")
+            dedupe_key = f"roomentry:{user_id}:{room_id}:{minute_bucket}"
+            existing = await db.notification_dedupe.find_one({"key": dedupe_key})
+            if not existing:
+                await db.notification_dedupe.insert_one({
+                    "key": dedupe_key,
+                    "created_at": datetime.now(timezone.utc).isoformat(),
+                })
+                follower_rows = await db.follows.find({"target_id": user_id}, {"_id": 0}).to_list(2000)
+                for row in follower_rows:
+                    await create_notification(
+                        category="social_friend_active",
+                        title=f"{user['username']} está en una sala",
+                        message=f"{user['username']} entró a {room.get('name', 'una sala')} — entra a acompañarlo",
+                        target_user_id=row["follower_id"],
+                        data={
+                            "user_id": user_id,
+                            "username": user["username"],
+                            "avatar": user.get("avatar"),
+                            "room_id": room_id,
+                            "room_name": room.get("name"),
+                        },
+                    )
+    except Exception:
+        # Never block mark-join on notification errors
+        pass
     return {"success": True}
 
 @router.post("/rooms/{room_id}/welcome")

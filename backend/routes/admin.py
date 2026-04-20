@@ -2,7 +2,7 @@
 Admin routes: Console commands, role management, user admin, config.
 """
 from fastapi import APIRouter, HTTPException, UploadFile, File, Request
-from database import db, serialize_user, serialize_room, has_permission, ROLE_HIERARCHY, uuid, datetime, timezone, create_notification, IDChange
+from database import db, serialize_user, serialize_room, has_permission, ROLE_HIERARCHY, uuid, datetime, timezone, create_notification, IDChange, UPLOAD_DIR
 from datetime import timedelta
 from typing import Dict, Any
 
@@ -339,20 +339,9 @@ async def admin_delete_room(room_id: str, admin_id: str):
     await db.rooms.delete_one({"id": room_id})
     return {"success": True}
 
-    await db.room_chat.insert_one({
-        "id": str(uuid.uuid4()), "room_id": room_id,
-        "user_id": "system", "username": "COFRE", "avatar": "",
-        "text": f"📦✨ COFRE #{opened + 1} ({cofre['label']}) ABIERTO! {' | '.join(results)}",
-        "type": "gift", "created_at": datetime.now(timezone.utc).isoformat()
-    })
-    return {"opened": True, "level": opened + 1, "label": cofre['label'], "results": results}
-
 # ==================== ID SYSTEM ====================
 
 # IDChange imported from database
-    user_id: str
-    new_id: str
-    tier: str
 
 @router.post("/users/change-id")
 async def change_user_id(data: IDChange):

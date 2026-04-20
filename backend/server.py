@@ -52,8 +52,9 @@ from routes.badges import router as badges_router
 from routes.levels import router as levels_router
 from routes.webrtc import router as webrtc_router
 from routes.diagnostics import router as diagnostics_router
+from routes.friends import router as friends_router
 
-for r in [auth_router, rooms_router, games_router, bot_router, events_router, admin_router, social_router, store_router, notif_router, badges_router, levels_router, webrtc_router, diagnostics_router]:
+for r in [auth_router, rooms_router, games_router, bot_router, events_router, admin_router, social_router, store_router, notif_router, badges_router, levels_router, webrtc_router, diagnostics_router, friends_router]:
     app.include_router(r, prefix="/api")
 
 # ==================== STATIC FILES ====================
