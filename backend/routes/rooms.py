@@ -436,6 +436,21 @@ async def welcome_message(room_id: str, user_id: str):
         "type": "welcome", "created_at": datetime.now(timezone.utc).isoformat()
     }
     await db.room_chat.insert_one(msg_doc)
+    # Entrada épica: si es Dueño / Dragón / Fénix, marcamos la sala para que
+    # TODOS los clientes activos reciban la animación broadcast.
+    if entry_anim in ('storm', 'dragon', 'phoenix'):
+        await db.rooms.update_one(
+            {"id": room_id},
+            {"$set": {
+                "last_entry_broadcast": {
+                    "id": str(uuid.uuid4()),
+                    "animation": entry_anim,
+                    "username": username,
+                    "role": role,
+                    "created_at": datetime.now(timezone.utc).isoformat(),
+                }
+            }}
+        )
     msg_doc.pop('_id', None)
     return {"success": True, "entry_animation": entry_anim, "username": username}
 

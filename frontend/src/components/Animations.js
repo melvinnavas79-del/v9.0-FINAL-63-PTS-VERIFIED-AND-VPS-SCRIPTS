@@ -5,11 +5,60 @@ const EntryAnimation = ({ animation, username, onComplete }) => {
   const [visible, setVisible] = useState(true);
 
   useEffect(() => {
+    // Vibración: pattern TORMENTA más intenso y prolongado para el Dueño
+    try {
+      if (navigator.vibrate) {
+        if (animation === 'storm') {
+          navigator.vibrate([300, 120, 200, 80, 500, 100, 300, 120, 700]);
+        } else if (['dragon', 'phoenix'].includes(animation)) {
+          navigator.vibrate([200, 100, 400]);
+        } else {
+          navigator.vibrate(120);
+        }
+      }
+    } catch (_) {}
+
+    // Sonido de trueno (Web Audio API) sintético para que no dependa de archivos
+    if (animation === 'storm') {
+      try {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (AudioCtx) {
+          const ctx = new AudioCtx();
+          const playBoom = (offset = 0, duration = 1.4, peak = 0.9) => {
+            const bufferSize = ctx.sampleRate * duration;
+            const noise = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+            const data = noise.getChannelData(0);
+            for (let i = 0; i < bufferSize; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / bufferSize);
+            const src = ctx.createBufferSource();
+            src.buffer = noise;
+            const lp = ctx.createBiquadFilter();
+            lp.type = 'lowpass';
+            lp.frequency.value = 160;
+            const gain = ctx.createGain();
+            gain.gain.value = 0;
+            const start = ctx.currentTime + offset;
+            gain.gain.setValueAtTime(0, start);
+            gain.gain.linearRampToValueAtTime(peak, start + 0.05);
+            gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
+            src.connect(lp).connect(gain).connect(ctx.destination);
+            src.start(start);
+            src.stop(start + duration);
+          };
+          // Doble trueno: relámpago corto + retumbe largo
+          playBoom(0, 0.25, 1.0);
+          playBoom(0.35, 1.8, 0.8);
+          playBoom(2.2, 1.2, 0.5);
+          setTimeout(() => { try { ctx.close(); } catch (_) {} }, 4500);
+        }
+      } catch (_) {}
+    }
+
     const timer = setTimeout(() => {
       setVisible(false);
       if (onComplete) onComplete();
     }, 4000);
     return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   if (!visible) return null;

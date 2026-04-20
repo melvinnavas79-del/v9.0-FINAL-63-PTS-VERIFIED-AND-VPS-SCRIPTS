@@ -426,3 +426,65 @@ async def get_level_ranking():
     """Top 50 users by level (excludes ghost mode users)."""
     users = await db.users.find({"ghost_mode": {"$ne": True}}).sort("level", -1).limit(50).to_list(50)
     return [serialize_user(u) for u in users]
+
+
+# ==================== WALLET · CANJE DE MONEDAS A DIAMANTES ====================
+
+# Tasa de canje: 10 000 monedas (oros) = 1 diamante.
+# Mínimo 10 000 monedas por canje para evitar spam y fragmentación.
+COINS_PER_DIAMOND = 10_000
+MIN_COINS_EXCHANGE = 10_000
+
+
+@router.get("/wallet/exchange-rate")
+async def get_exchange_rate():
+    """Tasa de canje pública para que la UI la muestre."""
+    return {
+        "coins_per_diamond": COINS_PER_DIAMOND,
+        "min_coins_exchange": MIN_COINS_EXCHANGE,
+    }
+
+
+@router.post("/wallet/exchange")
+async def exchange_coins_to_diamonds(user_id: str, coins: int):
+    """Canjea monedas (oros) por diamantes.
+    Reglas:
+      - Solo acepta múltiplos de COINS_PER_DIAMOND (= 10 000).
+      - El usuario debe tener saldo suficiente.
+      - Mínimo MIN_COINS_EXCHANGE por operación.
+      - Se registra cada canje en la colección wallet_exchanges para auditoría.
+    """
+    if coins < MIN_COINS_EXCHANGE:
+        raise HTTPException(status_code=400, detail=f"Mínimo {MIN_COINS_EXCHANGE:,} monedas por canje")
+    if coins % COINS_PER_DIAMOND != 0:
+        raise HTTPException(status_code=400, detail=f"La cantidad debe ser múltiplo de {COINS_PER_DIAMOND:,}")
+    user = await db.users.find_one({"id": user_id})
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    current_coins = int(user.get("coins", 0))
+    if current_coins < coins:
+        raise HTTPException(status_code=400, detail=f"Saldo insuficiente. Tienes {current_coins:,} monedas")
+    diamonds_to_add = coins // COINS_PER_DIAMOND
+    result = await db.users.update_one(
+        {"id": user_id, "coins": {"$gte": coins}},
+        {"$inc": {"coins": -coins, "diamonds": diamonds_to_add}},
+    )
+    if result.modified_count != 1:
+        raise HTTPException(status_code=409, detail="Operación rechazada (saldo cambió durante el canje)")
+    await db.wallet_exchanges.insert_one({
+        "id": str(uuid.uuid4()),
+        "user_id": user_id,
+        "username": user.get("username", ""),
+        "coins_spent": coins,
+        "diamonds_received": diamonds_to_add,
+        "rate": COINS_PER_DIAMOND,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    })
+    updated = await db.users.find_one({"id": user_id})
+    return {
+        "success": True,
+        "coins_spent": coins,
+        "diamonds_received": diamonds_to_add,
+        "new_coins": int(updated.get("coins", 0)),
+        "new_diamonds": int(updated.get("diamonds", 0)),
+    }

@@ -4,6 +4,54 @@
 Red social de audio en vivo con gamificación (monedas/diamantes), salas con **WebRTC self-hosted** (zero dependencia externa, zero costo variable), eventos (King/CP/PK), minijuegos, bot AI moderador y pagos reales PayPal Live. 100% white-label para deploy independiente en VPS.
 
 
+## Implementado en esta sesión (Abr 2026) — Iteración 20 (5 PUNTOS FINALES v8.0)
+
+### 1 · Salas privadas para TODOS + Llave Maestra Bot + Dueño ✅
+- Contraseñas disponibles para cualquier dueño de sala (botón flotante 🔒/🔓 en RoomView para el owner).
+- El **Bot Admin** (`system_bot_lluvia`, role=`dueño` + `is_super_admin`) tiene `bypass:true` automático en `/access`, entra a cualquier sala privada sin password.
+- Nuevo control en Control Panel → Bot IA: **"👻 Modo Fantasma del Bot"** para activar/desactivar `ghost_mode` del bot vía `POST /users/system_bot_lluvia/ghost-mode`.
+- Verificado: `bypass:true, reason:"llave_maestra"` tanto para Dueño como para el Bot en salas privadas.
+
+### 2 · Entrada Épica "LA TORMENTA" (animación + trueno + vibración) ✅
+- `Animations.js` ahora dispara en la entrada del Dueño (`animation==='storm'`):
+  - Trueno sintético con Web Audio API (relámpago + doble retumbe de 4s)
+  - Vibración patrón `[300,120,200,80,500,100,300,120,700]` — sellada a la duración del trueno
+  - Animación visual ya existente potenciada con el sonido
+- Backend `welcome` actualiza `room.last_entry_broadcast = {id, animation, username, role, created_at}` cuando la animación es `storm/dragon/phoenix`.
+- Frontend `RoomView.loadRoom` detecta nuevos broadcasts (id diferente, <15s de antigüedad) y dispara `EntryAnimation` para **todos los usuarios presentes** — no solo quien entra.
+- Suprimido en `ghost_mode` (Dueño invisible = sin trueno, sin animación, sin mensaje).
+
+### 3 · Selector de micros 9 / 12 / 16 / 24 ✅
+- Nuevo botón flotante 🎤 (emerald-teal) en RoomView debajo de 🔒/🖼. Al clickearlo abre un prompt con las opciones 9/12/16/24 y llama `POST /admin/console/expand-room?admin_id&room_id&max_seats=N` (endpoint ya existía).
+- Visible solo para `room.owner_id === user.id || role === 'dueño' || role === 'admin'`.
+- `data-testid="floating-seats-btn"`.
+
+### 4 · Wallet · Canje Oro → Diamantes (100% funcional) ✅
+- Backend nuevo: `GET /api/wallet/exchange-rate` (tasa pública) y `POST /api/wallet/exchange?user_id&coins` con validaciones atómicas (operador `$inc` con filtro `$gte`):
+  - Mínimo 10 000 monedas por operación.
+  - Solo múltiplos de 10 000 (tasa: `10 000 💰 = 1 💎`).
+  - Saldo validado a nivel Mongo (race-safe).
+  - Auditoría en colección `wallet_exchanges`.
+- Frontend: componente `WalletExchange` en ProfileView:
+  - Input con presets (10K, 50K, 100K, 500K, 1M, MAX)
+  - Preview en vivo de diamantes a recibir
+  - Botón "🔄 CANJEAR X 💰 → Y 💎" deshabilitado si no cumple reglas
+  - Mensaje de error inline (saldo insuficiente / múltiplo inválido / bajo mínimo)
+  - Actualiza `user.coins`/`user.diamonds` vía `updateUser()` del contexto
+- Test e2e: canje 50 000 → 5 💎 ✅ · bajo mínimo → 400 ✅ · no múltiplo → 400 ✅
+
+### 5 · Seguros de sistema ✅
+- **Botón DESHACER**: confirmado funcional (mongodump automático + mongorestore --drop), restauración de snapshot en <500 ms.
+- **Puerta 🚪 bajar del micro**: botón amber-orange en la barra inferior, visible SOLO cuando `mySeat !== null`, disponible para TODOS los usuarios.
+
+### Testing & Lint (iter 20)
+- Backend: ruff check routes/ → All checks passed!
+- Frontend: ESLint de ControlPanel.js, RoomView.js, ProfileView.js, Animations.js → No issues found
+- Screenshots capturados: Wallet con canje visible, RoomView con 4 botones flotantes (🖼/🔒/🎤/botón privacidad) + 🚪 en barra inferior.
+
+---
+
+
 ## Implementado en esta sesión (Abr 2026) — Iteración 19 (4 AJUSTES FINALES v8.0)
 
 ### P0 — Modo Fantasma EXCLUSIVO del Dueño ✅

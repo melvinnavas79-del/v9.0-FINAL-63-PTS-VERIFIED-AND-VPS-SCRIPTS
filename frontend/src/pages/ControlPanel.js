@@ -716,7 +716,7 @@ const BotTab = ({ userId }) => {
       <div className="bg-gray-800 rounded-xl p-3 mb-4">
         <h4 className="text-white/70 text-xs font-bold mb-2">Vigilancia de Salas</h4>
         <p className="text-white/40 text-[10px] mb-2">El bot solo responde cuando le hablan directamente (digan "bot...")</p>
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-2 gap-2 mb-2">
           <button onClick={async () => {
             try {
               const r = await axios.post(`${API}/bot/activate-all-rooms?admin_id=${userId}`);
@@ -734,6 +734,7 @@ const BotTab = ({ userId }) => {
             Desactivar de TODAS
           </button>
         </div>
+        <BotGhostToggle />
       </div>
 
       {/* Voice Selector */}
@@ -897,6 +898,44 @@ const PrizesConfig = ({ userId }) => {
       </button>
     </div>
   );
+
+// Toggle para activar/desactivar el Modo Fantasma del BOT (invisible en salas)
+const BotGhostToggle = () => {
+  const BOT_ID = 'system_bot_lluvia';
+  const [ghost, setGhost] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    axios.get(`${API}/users/${BOT_ID}`).then(r => setGhost(!!r.data?.ghost_mode)).catch(() => {});
+  }, []);
+
+  const toggle = async () => {
+    setLoading(true);
+    try {
+      const r = await axios.post(`${API}/users/${BOT_ID}/ghost-mode`);
+      setGhost(r.data.ghost_mode);
+    } catch (e) { alert(e.response?.data?.detail || 'Error'); }
+    setLoading(false);
+  };
+
+  return (
+    <div className="flex items-center justify-between bg-black/40 rounded-lg p-2 border border-purple-700/40">
+      <div>
+        <p className="text-purple-300 text-xs font-bold">👻 Modo Fantasma del Bot</p>
+        <p className="text-white/40 text-[10px]">Bot invisible en salas · supervisión silenciosa</p>
+      </div>
+      <button
+        onClick={toggle}
+        disabled={loading}
+        data-testid="bot-ghost-toggle"
+        className={`px-3 py-1.5 rounded-lg text-xs font-bold ${ghost ? 'bg-purple-600 text-white' : 'bg-gray-700 text-gray-400'}`}
+      >
+        {loading ? '…' : ghost ? 'ACTIVO' : 'INACTIVO'}
+      </button>
+    </div>
+  );
+};
+
 };
 
 const TechConsoleTab = ({ userId }) => {

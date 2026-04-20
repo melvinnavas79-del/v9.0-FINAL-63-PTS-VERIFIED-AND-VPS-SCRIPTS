@@ -127,6 +127,7 @@ const RoomView = ({ roomId, onBack }) => {
     };
   }, [roomId]);
 
+  const lastBroadcastIdRef = useRef(null);
   const loadRoom = async () => {
     try {
       const r = await axios.get(`${API}/rooms/${roomId}`);
@@ -138,6 +139,16 @@ const RoomView = ({ roomId, onBack }) => {
       // Keep the AudioContext aware of the latest room name for MiniPlayer
       if (r.data?.name) {
         joinRoom(roomId, r.data.name, user.id);
+      }
+      // Entrada Épica broadcast: todos los clientes presentes reciben la animación.
+      const brd = r.data.last_entry_broadcast;
+      if (brd && brd.id && brd.id !== lastBroadcastIdRef.current) {
+        lastBroadcastIdRef.current = brd.id;
+        // Evitar autoplay al entrar por primera vez (ya mostramos la anim propia)
+        const createdMs = Date.parse(brd.created_at || '');
+        if (!isNaN(createdMs) && Date.now() - createdMs < 15_000) {
+          setEntryAnim({ animation: brd.animation, username: brd.username });
+        }
       }
     } catch (e) {}
   };
@@ -1063,6 +1074,28 @@ const RoomView = ({ roomId, onBack }) => {
             title={(room.is_private || room.has_password) ? 'Sala privada — click para volver pública' : 'Hacer sala privada'}
           >
             {(room.is_private || room.has_password) ? '🔒' : '🔓'}
+          </button>
+
+          {/* Selector de micros: 9 / 12 / 16 / 24 */}
+          <button
+            data-testid="floating-seats-btn"
+            onClick={async () => {
+              const current = room.max_seats || 10;
+              const options = [9, 12, 16, 24];
+              const pick = window.prompt(`🎤 Elige cantidad de micros (actual: ${current}). Opciones: ${options.join(', ')}`, String(current));
+              if (!pick) return;
+              const n = parseInt(pick, 10);
+              if (!options.includes(n)) { alert('Solo 9, 12, 16 o 24'); return; }
+              try {
+                await axios.post(`${API}/admin/console/expand-room?admin_id=${user.id}&room_id=${room.id}&max_seats=${n}`);
+                alert(`✅ Sala ajustada a ${n} micros`);
+                loadRoom();
+              } catch (e) { alert(e.response?.data?.detail || 'Error'); }
+            }}
+            className="w-12 h-12 rounded-full bg-gradient-to-br from-emerald-500 to-teal-700 flex items-center justify-center text-lg active:scale-90 shadow-lg shadow-emerald-500/40 border border-emerald-300/40"
+            title="Cambiar número de micros (9 / 12 / 16 / 24)"
+          >
+            🎤
           </button>
         </div>
       )}
