@@ -1,0 +1,33 @@
+{
+  "summary": "Iteration 10 — Full-stack verification of (a) Agora→WebRTC self-hosted migration, (b) /api/diagnostics endpoints, (c) RoomView UI reorganization (rankings top, events moved to bottom, floating-top-btn removed). Backend: 12/12 pytest cases pass including 2-peer WebSocket signaling relay (offer/answer/ice/peer-joined/peer-left), PayPal LIVE OAuth + real test order (HTTP 201), diagnostics 200-ok for owner + 403 non-owner + 404 missing user. Frontend: 15/15 data-testid visibility checks pass on RoomView for Melvin_Live; top-rankings-btn opens GiftRanking modal; events-room-btn is now in the bottom bar (y=774 on 844px viewport, i.e. bottom region) and no longer in the header; floating-top-btn is fully removed; owner-only floating-fondo-btn still rendered. AudioContext WebSocket wss://<backend>/api/ws/audio/<room_id>?user_id=<uid> opens on room entry (confirmed via Playwright page.on('websocket')). No 5xx errors from any API call during room entry flow.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "RoomView avatar", "issues": ["Owner avatar /api/uploads/avatar_8a53b7fb-098b-49e0-ad1c-9df1ba7a48e7.jpeg returns 404 (file missing on disk). Pre-existing, not introduced by this iteration — cosmetic only (shows fallback)."]},
+      {"screen": "RoomView top banner", "issues": ["The room's custom banner text appears to say '500 Internal Server Error' (user-set content by owner). Looks alarming at a glance but it is stored room text, not an API error. Consider sanitizing/validating banner text in the owner UI."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration_10.py",
+    "/app/test_reports/pytest/iter10_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "routes/webrtc.py: ROOMS dict is in-process memory only. If backend is scaled to >1 worker/pod, peers in the same room but different workers will NOT see each other's signaling. For current single-instance VPS deploy this is fine, but document this limitation. Migration path to Redis pub/sub if scaling is needed.",
+    "routes/webrtc.py: The audio_signaling handler does not validate user_id against an auth token. Any client that knows/guesses a (room_id, user_id) pair can connect and spoof/spam signaling. For a production app with paying users, consider JWT/session validation on the WS handshake (e.g., require a signed token query param).",
+    "routes/diagnostics.py: uses requests (sync) inside async endpoints — this blocks the event loop for up to 20 s during PayPal OAuth + create-order calls. Switch to httpx.AsyncClient to avoid blocking other requests during diagnostics.",
+    "routes/diagnostics.py: _check_env exposes PAYPAL_CLIENT_SECRET length/set flags, which is fine, but also logs client_id_prefix (first 10 chars). First-10 of a PayPal client_id is low-risk but consider showing only first 4 + last 4 for defense-in-depth.",
+    "AudioContext: Playwright observed 2 WS connections opened in quick succession on room entry (likely React StrictMode double-effect or parent re-render). The second connection is closed gracefully by the server's existing 'close old connection for same user_id' logic in webrtc.py, so it is not a bug, but eliminating the double-open on the client would reduce log noise.",
+    "RoomView.js is still 1100+ lines (flagged in iteration 9). Unchanged this iteration."
+  ],
+  "updated_files": ["/app/backend/tests/test_iteration_10.py"],
+  "success_rate": {"backend": "100% (12/12)", "frontend": "100% (15/15 testid checks + rankings modal opens + events in bottom + audio WS connects)"},
+  "test_credentials": "Melvin_Live / test123 (owner, id=b45958bc-2c6b-49ea-8102-a11197001e53)",
+  "seed_data_creation": "Created throwaway non-owner user TEST_diag_nonowner_iter10 / pass1234 for 403 auth check on /api/diagnostics. No production data touched.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Iteration 10 validated: WebRTC signaling endpoint (/api/webrtc/config, /api/webrtc/rooms/{id}/peers, /api/ws/audio/{room_id}?user_id=) works fully including 2-peer relay; /api/diagnostics returns structured JSON with paypal.status=ok (LIVE OAuth succeeds in ~300-700ms), uploads.status=ok, mongo.status=ok; /api/diagnostics/paypal/test-order creates real PayPal LIVE orders returning HTTP 201 CREATED status (order is not captured so no charge). RoomView UI reorganization verified: top-rankings-btn in top toolbar, events-room-btn in bottom bar, floating-top-btn removed. Audio WebSocket opens on room entry. Two known cosmetic issues: (1) owner avatar file missing 404, (2) room banner text contains '500 Internal Server Error' as user-set content (not an API error). Do NOT re-flag these unless explicitly asked.",
+  "rca of the issue": "N/A — no bugs found. Every item in the review request passed. The only surface-level concerns are the in-memory ROOMS dict (single-worker assumption) and the lack of auth validation on the signaling WebSocket, both flagged as code-review comments for main agent to consider for hardening."
+}

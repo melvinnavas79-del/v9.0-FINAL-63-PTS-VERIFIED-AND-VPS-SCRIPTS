@@ -4,7 +4,7 @@ import { useAudio } from '../contexts/AudioContext';
 /**
  * Floating mini-player that stays visible when a user is connected to a room
  * but has navigated away to another page (Home, Rankings, Store, etc.).
- * Allows quick mute/unmute and returning to the room without dropping Agora.
+ * Allows quick mute/unmute and returning to the room without dropping the WebRTC call.
  */
 const MiniPlayer = ({ visible, onOpenRoom }) => {
   const { activeRoom, audioStatus, isMuted, toggleMute, leaveRoom, mySeat } = useAudio();

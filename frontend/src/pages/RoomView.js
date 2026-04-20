@@ -82,7 +82,7 @@ const RoomView = ({ roomId, onBack }) => {
 
   useEffect(() => {
     loadRoom(); markJoinAndLoadChat(); loadGifts(); loadSobres(); loadCofres(); checkBotActive(); loadMyEvents(); loadPendingRequests(); loadPK();
-    // Join Agora via global context (persists across navigation).
+    // Join WebRTC signaling via global context (persists across navigation).
     // Trigger welcome/entry animation once per room join.
     (async () => {
       const alreadyInThisRoom = activeRoom?.roomId === roomId;
@@ -116,7 +116,7 @@ const RoomView = ({ roomId, onBack }) => {
     }, 5000);
     return () => {
       clearInterval(r); clearInterval(c); clearInterval(cf); clearInterval(ga);
-      // NOTE: We intentionally do NOT leave Agora here.
+      // NOTE: We intentionally do NOT leave the WebRTC session here.
       // Audio persists via AudioContext until user explicitly taps "Salir" / ✕.
       // Cleanup local room music audio element only.
       if (audioElementRef.current) {
@@ -837,8 +837,6 @@ const RoomView = ({ roomId, onBack }) => {
             {user.role === 'dueño' && (
               <button data-testid="bot-toggle-room" onClick={toggleBot} className={`min-w-[44px] min-h-[44px] rounded-full flex items-center justify-center text-base ${botOn ? 'bg-green-500' : 'bg-gray-600'}`}>🤖</button>
             )}
-            {/* Events trigger */}
-            <button data-testid="events-room-btn" onClick={() => { setEventPanel(true); loadMyEvents(); loadPendingRequests(); }} className="min-w-[44px] min-h-[44px] rounded-full bg-yellow-600 flex items-center justify-center text-base">👑</button>
             <span className={`w-2.5 h-2.5 rounded-full ${audioStatus === 'on' ? 'bg-green-400' : 'bg-red-400'}`} />
             <span className="text-white/50 text-xs">{room.active_users}</span>
           </div>
@@ -890,6 +888,13 @@ const RoomView = ({ roomId, onBack }) => {
             title="Enviar regalos">
             <span className="text-base">🎁</span>
             <span className="text-fuchsia-200 text-[10px] font-bold">Regalos</span>
+          </button>
+          {/* Rankings (Diario/Semanal/Mensual) — movido a la fila de arriba */}
+          <button data-testid="top-rankings-btn" onClick={() => setGiftRankOpen(true)}
+            className="flex-shrink-0 bg-gradient-to-br from-yellow-400/30 to-orange-500/30 border border-yellow-400/40 rounded-full px-3 py-2 flex items-center gap-1 min-h-[40px] active:scale-95 transition-transform"
+            title="Ranking Diario / Semanal / Mensual">
+            <span className="text-base">👑</span>
+            <span className="text-yellow-200 text-[10px] font-bold">Rankings</span>
           </button>
         </div>
       </div>
@@ -1009,33 +1014,23 @@ const RoomView = ({ roomId, onBack }) => {
         </div>
       )}
 
-      {/* FLOATING RIGHT SIDE BUTTONS - Top (👑) + Fondo (🖼) always visible */}
-      <div
-        className="fixed right-3 z-[55] flex flex-col gap-2 pointer-events-auto"
-        style={{ bottom: 'calc(env(safe-area-inset-bottom, 14px) + 96px)' }}
-      >
-        <button
-          data-testid="floating-top-btn"
-          onClick={() => setGiftRankOpen(true)}
-          className="w-12 h-12 rounded-full bg-gradient-to-br from-yellow-400 to-orange-500 flex items-center justify-center text-lg active:scale-90 shadow-lg shadow-yellow-500/40 border border-yellow-300/40"
-          title="Ranking de regalos (diario/semanal/mensual)"
+      {/* FLOATING RIGHT SIDE BUTTONS - Fondo (solo dueño/admin) */}
+      {(room.owner_id === user.id || user.role === 'dueño' || user.role === 'admin') && (
+        <div
+          className="fixed right-3 z-[55] flex flex-col gap-2 pointer-events-auto"
+          style={{ bottom: 'calc(env(safe-area-inset-bottom, 14px) + 96px)' }}
         >
-          👑
-        </button>
-        {(room.owner_id === user.id || user.role === 'dueño' || user.role === 'admin') && (
-          <>
-            <button
-              data-testid="floating-fondo-btn"
-              onClick={() => bgRef.current?.click()}
-              className="w-12 h-12 rounded-full bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center text-lg active:scale-90 shadow-lg shadow-cyan-500/40 border border-cyan-300/40"
-              title="Cambiar fondo de la sala"
-            >
-              🖼
-            </button>
-            <input ref={bgRef} type="file" accept="image/*" onChange={uploadBackground} className="hidden" />
-          </>
-        )}
-      </div>
+          <button
+            data-testid="floating-fondo-btn"
+            onClick={() => bgRef.current?.click()}
+            className="w-12 h-12 rounded-full bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center text-lg active:scale-90 shadow-lg shadow-cyan-500/40 border border-cyan-300/40"
+            title="Cambiar fondo de la sala"
+          >
+            🖼
+          </button>
+          <input ref={bgRef} type="file" accept="image/*" onChange={uploadBackground} className="hidden" />
+        </div>
+      )}
 
       {/* BOTTOM BAR - ALWAYS VISIBLE */}
       <div className="flex-shrink-0 bg-black/90 border-t border-white/5 px-3" style={{paddingTop: '10px', paddingBottom: 'max(14px, env(safe-area-inset-bottom, 14px))'}}>
@@ -1054,6 +1049,10 @@ const RoomView = ({ roomId, onBack }) => {
           </div>
         )}
         <div className="flex items-center justify-center gap-3">
+          {/* Events trigger - movido aquí desde el header */}
+          <button data-testid="events-room-btn" onClick={() => { setEventPanel(true); loadMyEvents(); loadPendingRequests(); }}
+            className="w-12 h-12 rounded-full bg-gradient-to-br from-yellow-500 to-orange-600 flex items-center justify-center text-lg active:scale-90 shadow-lg shadow-yellow-500/30 border border-yellow-300/30" title="Eventos (King / CP)">👑</button>
+
           {/* Gift */}
           <button data-testid="gift-bottom-btn" onClick={() => setPanel('gifts-all')}
             className="w-14 h-14 rounded-full bg-pink-500 flex items-center justify-center text-2xl active:scale-90 shadow-lg shadow-pink-500/30">🎁</button>
