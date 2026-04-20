@@ -19,9 +19,14 @@ const UserProfileModal = ({ targetUser, currentUser, roomId, onClose, onRefresh 
   const [giveType, setGiveType] = useState('coins');
   const [showGive, setShowGive] = useState(false);
   const [loading, setLoading] = useState('');
+  const [following, setFollowing] = useState(false);
+
+  const targetId = targetUser.user_id || targetUser.id;
+  const isSelf = targetId === currentUser.id;
 
   useEffect(() => {
     loadPermissions();
+    if (!isSelf) loadFollowStatus();
   }, []);
 
   const loadPermissions = async () => {
@@ -29,6 +34,27 @@ const UserProfileModal = ({ targetUser, currentUser, roomId, onClose, onRefresh 
       const r = await axios.get(`${API}/svip/permissions/${currentUser.id}`);
       setPermissions(r.data);
     } catch (e) {}
+  };
+
+  const loadFollowStatus = async () => {
+    try {
+      const r = await axios.get(`${API}/social/follow-status?follower_id=${currentUser.id}&target_id=${targetId}`);
+      setFollowing(r.data?.following || false);
+    } catch (e) { setFollowing(false); }
+  };
+
+  const toggleFollow = async () => {
+    setLoading('follow');
+    try {
+      if (following) {
+        await axios.delete(`${API}/social/follow`, { data: { follower_id: currentUser.id, target_id: targetId } });
+        setFollowing(false);
+      } else {
+        await axios.post(`${API}/social/follow`, { follower_id: currentUser.id, target_id: targetId });
+        setFollowing(true);
+      }
+    } catch (e) { alert(e.response?.data?.detail || 'Error'); }
+    setLoading('');
   };
 
   const loadDeviceInfo = async () => {
@@ -104,7 +130,6 @@ const UserProfileModal = ({ targetUser, currentUser, roomId, onClose, onRefresh 
     } catch (e) { alert(e.response?.data?.detail || 'Error'); }
   };
 
-  const isSelf = (targetUser.user_id || targetUser.id) === currentUser.id;
   if (!permissions) return null;
 
   return (
@@ -136,6 +161,22 @@ const UserProfileModal = ({ targetUser, currentUser, roomId, onClose, onRefresh 
               <div className="text-white/30 text-[9px]">Diamantes</div>
             </div>
           </div>
+
+          {/* FOLLOW / UNFOLLOW — visible para TODOS excepto uno mismo */}
+          {!isSelf && (
+            <button
+              data-testid="modal-follow-btn"
+              onClick={toggleFollow}
+              disabled={loading === 'follow'}
+              className={`w-full py-2.5 rounded-xl text-sm font-bold active:scale-95 disabled:opacity-50 transition-all ${
+                following
+                  ? 'bg-white/10 text-white/80 hover:bg-white/15'
+                  : 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-md'
+              }`}
+            >
+              {loading === 'follow' ? '…' : (following ? '✓ Siguiendo (tocar para dejar)' : '+ Seguir a este usuario')}
+            </button>
+          )}
 
           {/* SVIP 7+ / Moderator: Mute & Kick */}
           {!isSelf && (permissions.can_mute || permissions.can_kick) && (

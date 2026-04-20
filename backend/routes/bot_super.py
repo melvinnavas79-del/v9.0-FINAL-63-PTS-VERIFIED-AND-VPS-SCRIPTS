@@ -20,7 +20,7 @@ Seguridad:
 - Endpoints de auditoría solo accesibles al dueño.
 """
 from fastapi import APIRouter, HTTPException
-from database import db, datetime, timezone, uuid
+from database import db, datetime, timezone, uuid, create_notification
 import os
 import re
 import json
@@ -428,11 +428,72 @@ async def log_system_error(exc: BaseException, context: dict = None) -> dict:
             old_ids = [d["_id"] async for d in old_cursor]
             if old_ids:
                 await db.system_errors.delete_many({"_id": {"$in": old_ids}})
+
+        # Push alert a TODOS los dueños si es severidad HIGH (500+ errors).
+        # Evita spam: solo si en los últimos 5 min no ha habido otra alerta del mismo type+file.
+        if _is_high_severity(exc):
+            await _alert_owners(
+                title="⚠️ Error técnico detectado",
+                message=doc["message"][:200],
+                data={"error_id": doc["id"], "file": doc["file"], "line": doc["line"], "type": doc["type"]},
+                dedupe_key=f"err:{doc['type']}:{doc['file']}:{doc['line']}",
+                dedupe_minutes=5,
+            )
     except Exception:
         # Never throw inside the error logger
         pass
     doc.pop("_id", None)
     return doc
+
+
+def _is_high_severity(exc: BaseException) -> bool:
+    """HTTPException >=500 o cualquier excepción no-HTTP."""
+    try:
+        from fastapi import HTTPException as FastAPIHTTPException
+        from starlette.exceptions import HTTPException as StarletteHTTPException
+        if isinstance(exc, (FastAPIHTTPException, StarletteHTTPException)):
+            return exc.status_code >= 500
+    except Exception:
+        pass
+    # RequestValidationError también es medium, no alta. Solo HIGH si no es validación.
+    try:
+        from fastapi.exceptions import RequestValidationError
+        if isinstance(exc, RequestValidationError):
+            return False
+    except Exception:
+        pass
+    return True
+
+
+async def _alert_owners(title: str, message: str, data: dict, dedupe_key: str, dedupe_minutes: int = 5):
+    """Envía una notificación push a todos los dueños / super-admins.
+    Dedupe por `dedupe_key` para evitar spam si el mismo error se repite."""
+    try:
+        from datetime import timedelta
+        threshold = (datetime.now(timezone.utc) - timedelta(minutes=dedupe_minutes)).isoformat()
+        existing = await db.system_error_alerts.find_one({
+            "key": dedupe_key,
+            "created_at": {"$gte": threshold},
+        })
+        if existing:
+            return
+        await db.system_error_alerts.insert_one({
+            "key": dedupe_key,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        })
+
+        # Emitir a todos los dueños (hay uno en la práctica, pero soporta varios)
+        owners = db.users.find({"role": "dueño"}, {"_id": 0, "id": 1})
+        async for o in owners:
+            await create_notification(
+                category="system_alert",
+                title=title,
+                message=message,
+                target_user_id=o["id"],
+                data=data,
+            )
+    except Exception:
+        pass
 
 
 @router.get("/bot/super/errors")
@@ -610,4 +671,12 @@ async def log_suspicious_input(source: str, text: str, user_id: str = None):
         "created_at": datetime.now(timezone.utc).isoformat(),
         "resolved": False,
     })
+    # Alerta HIGH al dueño — intento de hackeo
+    await _alert_owners(
+        title="🚨 Intento de inyección detectado",
+        message=f"Origen: {source}. Extracto: {text[:120]}",
+        data={"source": source, "user_id": user_id, "kind": "injection"},
+        dedupe_key=f"injection:{source}:{user_id or 'anon'}",
+        dedupe_minutes=2,
+    )
     return True

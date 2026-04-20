@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useUser } from '../contexts/UserContext';
 import SuperAdminTools from '../components/SuperAdminTools';
+import SystemHealthPanel from '../components/SystemHealthPanel';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -219,6 +220,7 @@ const ControlPanel = ({ onBack }) => {
     { id: 'console', label: 'Consola', icon: '💻' },
     { id: 'bot', label: 'Bot IA', icon: '🤖' },
     { id: 'security', label: 'Seguridad', icon: '🛡️' },
+    { id: 'health', label: 'Salud', icon: '🩺' },
   ];
 
   return (
@@ -631,6 +633,11 @@ const ControlPanel = ({ onBack }) => {
         {/* SEGURIDAD - Super Admin Tools (Device/IP ban + fake accounts) */}
         {activeTab === 'security' && (
           <SuperAdminTools adminId={user.id} />
+        )}
+
+        {/* SALUD DEL SISTEMA - Ojo Técnico del Bot */}
+        {activeTab === 'health' && (
+          <SystemHealthPanel userId={user.id} />
         )}
       </div>
     </div>

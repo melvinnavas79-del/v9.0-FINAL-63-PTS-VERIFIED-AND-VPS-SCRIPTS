@@ -37,7 +37,8 @@ async def get_notifications(user_id: str, limit: int = 30):
         active_cats.append("evento_cp")
     if prefs.get("alertas_conexion", True):
         active_cats.append("alerta_conexion")
-    active_cats.append("invitacion")
+    # Siempre activas (no-opcionales para la mayoría de usuarios)
+    active_cats.extend(["invitacion", "social_follow", "social_friend_active", "system_alert", "badge"])
     query = {
         "category": {"$in": active_cats},
         "$or": [{"target_user_id": None}, {"target_user_id": user_id}]
@@ -60,7 +61,7 @@ async def get_unread_count(user_id: str):
         active_cats.append("evento_cp")
     if prefs.get("alertas_conexion", True):
         active_cats.append("alerta_conexion")
-    active_cats.append("invitacion")
+    active_cats.extend(["invitacion", "social_follow", "social_friend_active", "system_alert", "badge"])
     count = await db.notifications.count_documents({
         "category": {"$in": active_cats},
         "$or": [{"target_user_id": None}, {"target_user_id": user_id}],

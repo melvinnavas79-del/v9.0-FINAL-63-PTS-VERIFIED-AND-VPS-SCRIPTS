@@ -1,0 +1,55 @@
+{
+  "summary": "Iter 15 (FINAL) — 18/18 backend pytest PASS + frontend smoke of ControlPanel→Salud tab. Validated: (1) /api/notifications/{user_id} + /unread-count returns 200 with categories active_cats extended (social_follow, social_friend_active, system_alert, invitacion, badge). (2) Injection attempt via POST /api/rooms/{id}/chat with text='<script>x</script>' (3x rapid) → log_suspicious_input fires, creates exactly 1 system_alert notification titled '🚨 Intento de inyección…' thanks to the 2-min dedupe on key=injection:{source}:{user_id} in db.system_error_alerts; unread-count rises by 1 (not 3). (3) /bot/super/integrity|errors|errors/stats|errors/{id}/resolve all 200 with correct shape for owner; resolve flow verified (3→2 items live in UI). (4) /api/rooms returns ALL rooms incl. active_users=0; sort order descending by (owner_svip, active_users) confirmed. (5) Frontend ControlPanel exposes ctrl-tab-health; click renders SystemHealthPanel with semáforo rojo (3 unresolved errors), 3 sub-tabs (integrity/errors/stats), refresh button, and resolve-error-{id} button that removes the row from the live list. (6) UserProfileModal carries data-testid='modal-follow-btn' + loadFollowStatus/toggleFollow; /api/social/follow + /follow-status + DELETE /follow all verified via curl. (7) Regression iter 10-14 all green: /login, /webrtc/config, /auth/firebase/status, /diagnostics, /bot/super/init, /bot/super/actions, /social/follow-status.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {
+        "endpoint": "POST /api/rooms/{id}/chat (injection path)",
+        "issue": "send_chat persists the raw <script>x</script> message into db.room_chat BEFORE log_suspicious_input runs. The alert fires as a side-channel, but the XSS payload is still stored and returned in GET /rooms/{id}/chat. Spec says 'el bot bloqueó antes de tocar la DB' (hint string inside log_suspicious_input), but in practice it does NOT block — it only logs. If the front renders chat via innerHTML anywhere, payload would execute. Consider either (a) sanitize/reject on detection, or (b) update the hint text to reflect detection-only behavior."
+      }
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {
+        "screen": "ControlPanel/Salud",
+        "issues": ["Semáforo rojo banner se muestra solo cuando unresolved>0 o issues>0 — en estado 0/0 debería mostrar un banner verde explícito. Actualmente solo renderiza el rojo condicionalmente; no vi un verde claro. Verificar que existe el estado saludable visualmente (no pudimos llegar a 0 errores por SuspiciousInput persistentes)."]
+      }
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration_15.py",
+    "/app/test_reports/pytest/iter15_results.xml"
+  ],
+  "action_items": [
+    "(optional, seguridad) En send_chat: si log_suspicious_input retorna True, considerar NO insertar el mensaje en room_chat (o reemplazar text por '[mensaje bloqueado por seguridad]') para honrar la afirmación 'bloqueó antes de tocar la DB'. Actualmente la detección es sólo audit/alert, no bloqueo.",
+    "(optional, UX) En SystemHealthPanel, mostrar explícitamente un banner verde '✅ Sistema saludable' cuando integrity.healthy==true && stats.unresolved==0; hoy solo hay banner rojo condicional."
+  ],
+  "critical_code_review_comments": [
+    "bot_super._alert_owners: correcta dedupe con collection system_error_alerts (key + created_at > threshold). 2 min para injection, 5 min para errores. Good.",
+    "bot_super._is_high_severity: devuelve False para RequestValidationError y status<500, True para excepciones no-HTTP. Correcto: evita spam del dueño por 422s triviales.",
+    "notifications.py active_cats: se añaden las 5 nuevas categorías siempre (invitacion, social_follow, social_friend_active, system_alert, badge) — buena decisión, son universales. Las categorías antiguas (regalo_global, evento_cp, alerta_conexion) siguen respetando config del user.",
+    "rooms.py send_chat: log_suspicious_input está wired en el path correcto (después de insertar en DB pero antes de bot_auto_reply). Si se quiere bloqueo real, habría que moverlo ANTES del insert y retornar 400.",
+    "SystemHealthPanel (frontend): auto-refresh cada 20s, tab activa persiste en state, maneja loading state y errores. Buen componente contenido (194 líneas).",
+    "UserProfileModal.toggleFollow: usa axios.delete con data body — funciona pero no es idiomático para HTTP DELETE. FastAPI lo acepta si el endpoint usa Body(...) / pydantic model. Verificado por curl que funciona.",
+    "/api/rooms: no hay paginación todavía; .to_list(200) devuelve máximo 200 salas. Con el crecimiento de la plataforma esto se convertirá en un cuello de botella — considerar skip/limit o cursor pagination.",
+    "bot_super.py: 683 líneas, aprox límite de 700. Incluye error logger + integrity + code-map + moderación + injection detector. Se recomienda split en iter 16: bot_super_errors.py / bot_super_moderation.py / bot_super_integrity.py."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iteration_15.py",
+    "/app/test_reports/iteration_15.json",
+    "/app/test_reports/pytest/iter15_results.xml"
+  ],
+  "success_rate": {
+    "backend": "100% (18/18)",
+    "frontend": "100% smoke (ControlPanel/Salud panel rendered, 3 sub-tabs OK, resolve button OK, stats OK). UserProfileModal follow button validated via source + API curl; no full UI modal open since owner's room has no other users on seats."
+  },
+  "test_credentials": "Melvin_Live / test123 (dueño id b45958bc-2c6b-49ea-8102-a11197001e53); followed user id used in curl: 4bea36c7-5c7f-48b0-ae68-97af4ac8890b.",
+  "seed_data_creation": "Generó 3 entries SuspiciousInput (por los 3 POST /chat con <script>x</script>) + 1 entry system_error_alerts (dedupe key injection:routes/rooms.py:send_chat:b45958bc-...) + 1 notificación system_alert al dueño + 1-2 RequestValidationError (por POST /register con body inválido, para el test de resolve). Persistent collection system_error_alerts debe limpiarse entre reruns si se espera que la alerta se cree de nuevo dentro de 2 min.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Iter 15 final: todo verde en backend + smoke de frontend. NOTE IMPORTANTE: si se relanzan los tests del injection alert dentro de 2 min, el alert NO se creará por la dedupe; el test verifica len(alerts) >= 1 y == 1, y necesita purgar db.system_error_alerts si se rerun inmediato. No hay regresiones. Un único minor de seguridad: el mensaje <script> se guarda en room_chat (no bloqueo, solo log). Considerar fix en iter 16 si se quiere bloqueo real. Semáforo verde del SystemHealthPanel no pudo observarse porque hay SuspiciousInput persistentes; comportamiento rojo sí confirmado.",
+  "rca of the issue": "N/A — no hay bugs bloqueantes. El único minor (send_chat no bloquea la inyección sino que sólo la audita) es decisión de producto; el hint string dentro de log_suspicious_input es inexacto y debe corregirse o la lógica cambiarse."
+}
