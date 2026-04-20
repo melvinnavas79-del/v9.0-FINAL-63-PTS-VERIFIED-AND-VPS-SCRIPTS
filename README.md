@@ -20,7 +20,8 @@ lluvia-live/
 │   ├── logo-wordmark.svg    # Logo vectorial puro para impresión
 │   ├── source/              # Master 1024×1024 oficial
 │   ├── favicon/             # Favicons y PWA icons (14 tamaños)
-│   └── icons/               # App icons (Android mipmap + iOS Asset Catalog)
+│   ├── icons/               # App icons (Android mipmap + iOS Asset Catalog)
+│   └── videos/              # Splash 3s + Promo 20s (vertical + horizontal)
 │
 ├── backend/                 # API (FastAPI + MongoDB)
 │   ├── server.py            # Punto de entrada

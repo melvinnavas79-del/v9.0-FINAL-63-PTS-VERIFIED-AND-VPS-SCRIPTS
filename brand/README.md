@@ -33,6 +33,13 @@ brand/
 │   └── ios/
 │       ├── Contents.json                Asset Catalog de Xcode
 │       └── icon-*.png                   15 tamaños oficiales de Apple
+│
+└── videos/                              Material audiovisual oficial
+    ├── splash-1080x1080.mp4             Splash screen 3s (iOS/Android)
+    ├── splash-1080x1080.webm            Splash para web/PWA
+    ├── promo-1080x1920.mp4              Promo 20s vertical (TikTok/Reels)
+    ├── promo-1920x1080.mp4              Promo 20s horizontal (YouTube)
+    └── README.md                        Storyboard + integración
 ```
 
 ## Integración rápida
