@@ -14,6 +14,14 @@ lluvia-live/
 ├── SECURITY.md              # Política de divulgación responsable
 ├── README.md                # Este documento
 │
+├── brand/                   # Identidad visual oficial
+│   ├── BRAND-GUIDELINES.md  # Guía de marca (paleta, tipografía, usos)
+│   ├── logo-full-color.svg  # Logo oficial (SVG con raster embebido)
+│   ├── logo-wordmark.svg    # Logo vectorial puro para impresión
+│   ├── source/              # Master 1024×1024 oficial
+│   ├── favicon/             # Favicons y PWA icons (14 tamaños)
+│   └── icons/               # App icons (Android mipmap + iOS Asset Catalog)
+│
 ├── backend/                 # API (FastAPI + MongoDB)
 │   ├── server.py            # Punto de entrada
 │   ├── database.py          # Conexión MongoDB y modelos

@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Lluvia Live — Wordmark vectorial puro
+  © 2026 Melvin H. Navas Hernández
+  Uso: impresión, bordado, favicons <16px, materiales que requieren vector real.
+-->
+<svg xmlns="http://www.w3.org/2000/svg"
+     viewBox="0 0 800 500"
+     width="800" height="500"
+     preserveAspectRatio="xMidYMid meet"
+     font-family="Georgia, 'Times New Roman', serif">
+  <title>Lluvia Live</title>
+
+  <defs>
+    <linearGradient id="oro" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%"  stop-color="#FFF4C2"/>
+      <stop offset="25%" stop-color="#FFD700"/>
+      <stop offset="60%" stop-color="#E5A200"/>
+      <stop offset="100%" stop-color="#8B5E00"/>
+    </linearGradient>
+    <linearGradient id="turquesa" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%"  stop-color="#BFF5FA"/>
+      <stop offset="50%" stop-color="#5FE3F0"/>
+      <stop offset="100%" stop-color="#0099AA"/>
+    </linearGradient>
+    <filter id="shine">
+      <feGaussianBlur stdDeviation="1.2"/>
+    </filter>
+  </defs>
+
+  <!-- Fondo opcional (transparente por defecto) -->
+  <rect width="800" height="500" fill="none"/>
+
+  <!-- Corona real · cinco puntas con gemas turquesas -->
+  <g transform="translate(250,30)">
+    <!-- Banda base -->
+    <rect x="0" y="110" width="300" height="42" rx="4" fill="url(#oro)" stroke="#7A5200" stroke-width="1.5"/>
+    <rect x="0" y="140" width="300" height="10" fill="#8B5E00" opacity="0.35"/>
+    <!-- Cinco picos -->
+    <path d="M0,110 L30,50 L60,110 L90,30 L120,110 L150,10 L180,110 L210,30 L240,110 L270,50 L300,110 Z"
+          fill="url(#oro)" stroke="#7A5200" stroke-width="2" stroke-linejoin="round"/>
+    <!-- Esferas en los picos -->
+    <circle cx="30" cy="50" r="11" fill="url(#oro)" stroke="#7A5200"/>
+    <circle cx="90" cy="30" r="11" fill="url(#oro)" stroke="#7A5200"/>
+    <circle cx="150" cy="10" r="14" fill="url(#oro)" stroke="#7A5200"/>
+    <circle cx="210" cy="30" r="11" fill="url(#oro)" stroke="#7A5200"/>
+    <circle cx="270" cy="50" r="11" fill="url(#oro)" stroke="#7A5200"/>
+    <!-- 3 gemas turquesas en la banda -->
+    <g stroke="#035561" stroke-width="1">
+      <polygon points="60,125 75,118 90,125 75,145" fill="url(#turquesa)" filter="url(#shine)"/>
+      <polygon points="135,122 150,112 165,122 150,148" fill="url(#turquesa)" filter="url(#shine)"/>
+      <polygon points="210,125 225,118 240,125 225,145" fill="url(#turquesa)" filter="url(#shine)"/>
+    </g>
+  </g>
+
+  <!-- Wordmark "LLUVIA" -->
+  <text x="400" y="290" text-anchor="middle"
+        font-size="120" font-weight="900" letter-spacing="4"
+        fill="url(#oro)" stroke="#7A5200" stroke-width="2"
+        paint-order="stroke fill">LLUVIA</text>
+
+  <!-- Wordmark "LIVE" -->
+  <text x="400" y="410" text-anchor="middle"
+        font-size="120" font-weight="900" letter-spacing="6"
+        fill="url(#oro)" stroke="#7A5200" stroke-width="2"
+        paint-order="stroke fill">LIVE</text>
+
+  <!-- Gotas doradas decorativas (5 bajo el wordmark) -->
+  <g fill="url(#oro)" stroke="#7A5200" stroke-width="1">
+    <path d="M160,440 Q160,462 170,462 Q180,462 180,440 Q180,430 170,412 Q160,430 160,440 Z"/>
+    <path d="M260,455 Q260,475 268,475 Q276,475 276,455 Q276,447 268,432 Q260,447 260,455 Z"/>
+    <path d="M400,460 Q400,482 410,482 Q420,482 420,460 Q420,450 410,432 Q400,450 400,460 Z"/>
+    <path d="M540,455 Q540,475 548,475 Q556,475 556,455 Q556,447 548,432 Q540,447 540,455 Z"/>
+    <path d="M640,440 Q640,462 650,462 Q660,462 660,440 Q660,430 650,412 Q640,430 640,440 Z"/>
+  </g>
+</svg>

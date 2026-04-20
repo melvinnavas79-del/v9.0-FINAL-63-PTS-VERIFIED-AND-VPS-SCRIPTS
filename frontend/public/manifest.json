@@ -1,21 +1,24 @@
 {
   "short_name": "Lluvia Live",
-  "name": "Lluvia Live - Conecta, Chatea, Vive",
+  "name": "Lluvia Live — Conecta, Chatea, Vive",
+  "description": "Plataforma social de audio en vivo con salas, regalos y juegos.",
   "icons": [
     {
       "src": "icon-192.png",
       "type": "image/png",
-      "sizes": "192x192"
+      "sizes": "192x192",
+      "purpose": "any maskable"
     },
     {
       "src": "icon-512.png",
       "type": "image/png",
-      "sizes": "512x512"
+      "sizes": "512x512",
+      "purpose": "any maskable"
     }
   ],
-  "start_url": ".",
+  "start_url": "/",
   "display": "standalone",
-  "theme_color": "#1e1b4b",
-  "background_color": "#1e1b4b",
+  "theme_color": "#FFD700",
+  "background_color": "#0B0F1A",
   "orientation": "portrait"
 }
