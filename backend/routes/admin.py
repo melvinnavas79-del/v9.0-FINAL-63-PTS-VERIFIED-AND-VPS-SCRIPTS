@@ -228,6 +228,16 @@ async def console_give_coins(admin_id: str, target_id: str, amount: int):
     user = await db.users.find_one({"id": target_id})
     return {"success": True, "new_coins": user['coins']}
 
+@router.post("/admin/console/give-diamonds")
+async def console_give_diamonds(admin_id: str, target_id: str, amount: int):
+    """Otorga (o resta si amount negativo) diamantes al target. Solo dueño."""
+    admin = await db.users.find_one({"id": admin_id})
+    if not admin or admin.get('role') != 'dueño':
+        raise HTTPException(status_code=403, detail="Solo el dueño")
+    await db.users.update_one({"id": target_id}, {"$inc": {"diamonds": amount}})
+    user = await db.users.find_one({"id": target_id})
+    return {"success": True, "new_diamonds": user.get('diamonds', 0)}
+
 @router.post("/admin/console/set-level")
 async def console_set_level(admin_id: str, target_id: str, level: int):
     """Console Set Level."""

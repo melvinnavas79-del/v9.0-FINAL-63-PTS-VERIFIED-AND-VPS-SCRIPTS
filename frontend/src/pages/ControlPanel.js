@@ -97,11 +97,24 @@ const ControlPanel = ({ onBack }) => {
   const runConsole = async (action) => {
     const target = consoleTarget;
     if (!target && action !== 'broadcast') return alert('Selecciona un usuario');
+    // Confirmación de rango para acciones destructivas / Aristocracia alta
+    if (action === 'set-aristocracy') {
+      const lvl = Number(consoleValue);
+      if (isNaN(lvl) || lvl < 0 || lvl > 10) return alert('Aristocracia debe ser 0-10');
+      if (lvl >= 6 && !window.confirm(`⚠️ Aristocracia nivel ${lvl} es un rango ALTO. ¿Confirmas otorgar este rango al usuario ${target}?`)) return;
+    }
+    if (action === 'give-diamonds' && Math.abs(Number(consoleValue)) > 100000) {
+      if (!window.confirm(`⚠️ Vas a ${Number(consoleValue) >= 0 ? 'dar' : 'quitar'} ${Math.abs(Number(consoleValue)).toLocaleString()} diamantes. ¿Confirmas?`)) return;
+    }
+    if (action === 'ban' && !window.confirm(`🚫 ¿Confirmas BANEAR al usuario ${target}? Quedará bloqueado de toda la plataforma.`)) return;
     try {
       let res;
       switch(action) {
         case 'give-coins':
           res = await axios.post(`${API}/admin/console/give-coins?admin_id=${user.id}&target_id=${target}&amount=${Number(consoleValue)}`);
+          break;
+        case 'give-diamonds':
+          res = await axios.post(`${API}/admin/console/give-diamonds?admin_id=${user.id}&target_id=${target}&amount=${Number(consoleValue)}`);
           break;
         case 'set-level':
           res = await axios.post(`${API}/admin/console/set-level?admin_id=${user.id}&target_id=${target}&level=${Number(consoleValue)}`);
@@ -124,7 +137,7 @@ const ControlPanel = ({ onBack }) => {
           break;
         default: break;
       }
-      alert('Ejecutado');
+      alert('✓ Ejecutado');
       loadAll();
     } catch (err) { alert(err.response?.data?.detail || 'Error'); }
   };
@@ -525,12 +538,13 @@ const ControlPanel = ({ onBack }) => {
 
             {/* Actions */}
             <div className="grid grid-cols-2 gap-3 mb-6">
-              <button onClick={() => runConsole('give-coins')} className="bg-green-800 text-green-300 p-3 rounded-xl font-bold text-sm">💰 Dar Monedas</button>
-              <button onClick={() => runConsole('set-level')} className="bg-blue-800 text-blue-300 p-3 rounded-xl font-bold text-sm">⬆️ Set Nivel</button>
-              <button onClick={() => runConsole('set-aristocracy')} className="bg-purple-800 text-purple-300 p-3 rounded-xl font-bold text-sm">👑 Set Aristocracia</button>
-              <button onClick={() => runConsole('verify')} className="bg-cyan-800 text-cyan-300 p-3 rounded-xl font-bold text-sm">✅ Verificar</button>
-              <button onClick={() => runConsole('ban')} className="bg-red-800 text-red-300 p-3 rounded-xl font-bold text-sm">🚫 Banear</button>
-              <button onClick={() => runConsole('unban')} className="bg-yellow-800 text-yellow-300 p-3 rounded-xl font-bold text-sm">🔓 Desbanear</button>
+              <button data-testid="console-give-coins" onClick={() => runConsole('give-coins')} className="bg-green-800 text-green-300 p-3 rounded-xl font-bold text-sm">💰 Dar Monedas</button>
+              <button data-testid="console-give-diamonds" onClick={() => runConsole('give-diamonds')} className="bg-sky-800 text-sky-300 p-3 rounded-xl font-bold text-sm">💎 Dar Diamantes</button>
+              <button data-testid="console-set-level" onClick={() => runConsole('set-level')} className="bg-blue-800 text-blue-300 p-3 rounded-xl font-bold text-sm">⬆️ Set Nivel</button>
+              <button data-testid="console-set-aristocracy" onClick={() => runConsole('set-aristocracy')} className="bg-purple-800 text-purple-300 p-3 rounded-xl font-bold text-sm">👑 Set Aristocracia</button>
+              <button data-testid="console-verify" onClick={() => runConsole('verify')} className="bg-cyan-800 text-cyan-300 p-3 rounded-xl font-bold text-sm">✅ Verificar</button>
+              <button data-testid="console-ban" onClick={() => runConsole('ban')} className="bg-red-800 text-red-300 p-3 rounded-xl font-bold text-sm">🚫 Banear</button>
+              <button data-testid="console-unban" onClick={() => runConsole('unban')} className="bg-yellow-800 text-yellow-300 p-3 rounded-xl font-bold text-sm">🔓 Desbanear</button>
             </div>
 
             {/* Broadcast */}

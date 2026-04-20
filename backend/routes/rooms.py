@@ -1,5 +1,5 @@
 """
-Room routes: CRUD, join/leave, seats, chat, music, photos, Agora tokens.
+Room routes: CRUD, join/leave, seats, chat, music, photos.
 """
 from fastapi import APIRouter, HTTPException, UploadFile, File
 from database import (
@@ -10,6 +10,39 @@ import os
 import shutil
 
 router = APIRouter()
+
+
+# ==================== AUTHORITY HELPERS ====================
+
+async def _get_authority(user_id: str, room: dict) -> dict:
+    """
+    Returns the authority level of `user_id` over `room`.
+
+    Result:
+      { "level": "super" | "owner" | "moderator" | "none",
+        "user": <user doc> }
+
+    - "super"     → dueño de la plataforma o is_super_admin (puede todo en cualquier sala)
+    - "owner"     → dueño de la sala (puede todo en su sala)
+    - "moderator" → admin/moderador del rol (puede kick/ban/mute)
+    - "none"      → usuario normal
+    """
+    user = await db.users.find_one({"id": user_id})
+    if not user:
+        return {"level": "none", "user": None}
+    role = user.get("role", "usuario")
+    if role == "dueño" or user.get("is_super_admin"):
+        return {"level": "super", "user": user}
+    if room and room.get("owner_id") == user_id:
+        return {"level": "owner", "user": user}
+    if role in ("admin", "moderador"):
+        return {"level": "moderator", "user": user}
+    return {"level": "none", "user": user}
+
+
+def _authority_can_manage_room(authority_level: str) -> bool:
+    return authority_level in ("super", "owner", "moderator")
+
 
 # ==================== ROOM CRUD ====================
 
@@ -94,6 +127,12 @@ async def join_room(room_id: str, user_id: str, seat_index: int):
     user = await db.users.find_one({"id": user_id})
     if not user:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    # Si el usuario está baneado de esta sala (kick/ban-user previo), rechazar
+    # A menos que sea Super Admin (role=dueño / is_super_admin).
+    banned = room.get("banned_users", [])
+    is_super = user.get("role") == "dueño" or user.get("is_super_admin")
+    if user_id in banned and not is_super:
+        raise HTTPException(status_code=403, detail="Has sido expulsado de esta sala")
     seats = room.get('seats', [None] * 10)
     seat_locks = room.get('seat_locks', [False] * 10)
     # Extend if needed
@@ -432,12 +471,13 @@ async def remove_room_background(room_id: str, owner_id: str):
 
 @router.post("/rooms/{room_id}/lock-seat")
 async def lock_seat(room_id: str, owner_id: str, seat_index: int):
-    """Lock/unlock a seat. Only room owner can manage locks."""
+    """Lock/unlock a seat. Allowed: room owner OR platform super admin (dueño/is_super_admin)."""
     room = await db.rooms.find_one({"id": room_id})
     if not room:
         raise HTTPException(status_code=404, detail="Sala no encontrada")
-    if room['owner_id'] != owner_id:
-        raise HTTPException(status_code=403, detail="Solo el dueno de la sala")
+    auth = await _get_authority(owner_id, room)
+    if auth["level"] not in ("super", "owner"):
+        raise HTTPException(status_code=403, detail="Solo el dueño de la sala o Super Admin")
     locks = room.get('seat_locks', [False] * 10)
     while len(locks) < 10:
         locks.append(False)
@@ -449,16 +489,17 @@ async def lock_seat(room_id: str, owner_id: str, seat_index: int):
     if locks[seat_index] and seat_index < len(seats) and seats[seat_index]:
         seats[seat_index] = None
     await db.rooms.update_one({"id": room_id}, {"$set": {"seat_locks": locks, "seats": seats}})
-    return {"success": True, "seat_locks": locks}
+    return {"success": True, "seat_locks": locks, "authority": auth["level"]}
 
 @router.post("/rooms/{room_id}/lock-all")
 async def lock_all_seats(room_id: str, owner_id: str):
-    """Lock all empty seats."""
+    """Lock all empty seats. Owner or Super Admin."""
     room = await db.rooms.find_one({"id": room_id})
     if not room:
         raise HTTPException(status_code=404, detail="Sala no encontrada")
-    if room['owner_id'] != owner_id:
-        raise HTTPException(status_code=403, detail="Solo el dueno de la sala")
+    auth = await _get_authority(owner_id, room)
+    if auth["level"] not in ("super", "owner"):
+        raise HTTPException(status_code=403, detail="Solo el dueño de la sala o Super Admin")
     seats = room.get('seats', [])
     locks = [seats[i] is None for i in range(10)] if len(seats) >= 10 else [True] * 10
     await db.rooms.update_one({"id": room_id}, {"$set": {"seat_locks": locks}})
@@ -466,16 +507,136 @@ async def lock_all_seats(room_id: str, owner_id: str):
 
 @router.post("/rooms/{room_id}/unlock-all")
 async def unlock_all_seats(room_id: str, owner_id: str):
-    """Unlock all seats."""
+    """Unlock all seats. Owner or Super Admin."""
     room = await db.rooms.find_one({"id": room_id})
     if not room:
         raise HTTPException(status_code=404, detail="Sala no encontrada")
-    if room['owner_id'] != owner_id:
-        raise HTTPException(status_code=403, detail="Solo el dueno de la sala")
+    auth = await _get_authority(owner_id, room)
+    if auth["level"] not in ("super", "owner"):
+        raise HTTPException(status_code=403, detail="Solo el dueño de la sala o Super Admin")
     max_seats = room.get('max_seats', 10)
     locks = [False] * max_seats
     await db.rooms.update_one({"id": room_id}, {"$set": {"seat_locks": locks}})
     return {"success": True, "seat_locks": locks}
+
+
+# ==================== ROOM MODERATION (kick / ban-from-room) ====================
+
+@router.post("/rooms/{room_id}/kick-from-seat")
+async def kick_user_from_seat(room_id: str, admin_id: str, target_user_id: str):
+    """
+    Bajar a un usuario del micrófono (libera su asiento). No lo expulsa de la sala.
+    Allowed: Super Admin (dueño/is_super_admin), room owner, or moderator role.
+    Super Admin puede ejecutar en cualquier sala; dueño de sala en la suya;
+    moderador en cualquiera salvo cuando el target es el dueño de la sala.
+    """
+    room = await db.rooms.find_one({"id": room_id})
+    if not room:
+        raise HTTPException(status_code=404, detail="Sala no encontrada")
+    auth = await _get_authority(admin_id, room)
+    if not _authority_can_manage_room(auth["level"]):
+        raise HTTPException(status_code=403, detail="No tienes autoridad en esta sala")
+
+    target = await db.users.find_one({"id": target_user_id})
+    if not target:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+
+    # Jerarquía: solo el super puede tocar a otro dueño de la plataforma
+    if target.get("role") == "dueño" and auth["level"] != "super":
+        raise HTTPException(status_code=403, detail="Solo un Super Admin puede mover a otro dueño")
+    # Un moderator no puede kickear al dueño de la sala
+    if auth["level"] == "moderator" and room.get("owner_id") == target_user_id:
+        raise HTTPException(status_code=403, detail="No puedes bajar al dueño de la sala")
+
+    seats = room.get("seats", [])
+    changed = False
+    for i, s in enumerate(seats):
+        if s and s.get("user_id") == target_user_id:
+            seats[i] = None
+            changed = True
+    if not changed:
+        return {"success": True, "kicked": False, "message": "El usuario no estaba en ningún asiento"}
+
+    await db.rooms.update_one({"id": room_id}, {"$set": {"seats": seats}})
+    # Chat marker
+    await db.room_chat.insert_one({
+        "id": str(uuid.uuid4()), "room_id": room_id,
+        "user_id": "system", "username": "🛡️ Moderación", "avatar": "",
+        "text": f"{target.get('username','Usuario')} fue bajado del micro por {auth['user'].get('username','admin')}",
+        "type": "system", "created_at": datetime.now(timezone.utc).isoformat()
+    })
+    return {"success": True, "kicked": True, "authority": auth["level"]}
+
+
+@router.post("/rooms/{room_id}/ban-user")
+async def ban_user_from_room(room_id: str, admin_id: str, target_user_id: str):
+    """
+    Banear usuario de ESTA sala específicamente. Añade a `room.banned_users`
+    (lista) y bajamos su asiento. Al intentar join será rechazado.
+    Authority: Super Admin (any room), room owner (own room), moderator.
+    """
+    room = await db.rooms.find_one({"id": room_id})
+    if not room:
+        raise HTTPException(status_code=404, detail="Sala no encontrada")
+    auth = await _get_authority(admin_id, room)
+    if not _authority_can_manage_room(auth["level"]):
+        raise HTTPException(status_code=403, detail="No tienes autoridad en esta sala")
+
+    target = await db.users.find_one({"id": target_user_id})
+    if not target:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    if target.get("role") == "dueño" and auth["level"] != "super":
+        raise HTTPException(status_code=403, detail="Solo un Super Admin puede banear a otro dueño")
+
+    seats = room.get("seats", [])
+    for i, s in enumerate(seats):
+        if s and s.get("user_id") == target_user_id:
+            seats[i] = None
+
+    banned = list(room.get("banned_users", []))
+    if target_user_id not in banned:
+        banned.append(target_user_id)
+
+    await db.rooms.update_one(
+        {"id": room_id},
+        {"$set": {"seats": seats, "banned_users": banned}},
+    )
+    await db.room_chat.insert_one({
+        "id": str(uuid.uuid4()), "room_id": room_id,
+        "user_id": "system", "username": "🛡️ Moderación", "avatar": "",
+        "text": f"{target.get('username','Usuario')} fue expulsado de la sala por {auth['user'].get('username','admin')}",
+        "type": "system", "created_at": datetime.now(timezone.utc).isoformat()
+    })
+    return {"success": True, "banned": True, "authority": auth["level"]}
+
+
+@router.post("/rooms/{room_id}/unban-user")
+async def unban_user_from_room(room_id: str, admin_id: str, target_user_id: str):
+    """Retira a `target_user_id` de la lista de expulsados de la sala."""
+    room = await db.rooms.find_one({"id": room_id})
+    if not room:
+        raise HTTPException(status_code=404, detail="Sala no encontrada")
+    auth = await _get_authority(admin_id, room)
+    if not _authority_can_manage_room(auth["level"]):
+        raise HTTPException(status_code=403, detail="No tienes autoridad")
+    banned = [uid for uid in room.get("banned_users", []) if uid != target_user_id]
+    await db.rooms.update_one({"id": room_id}, {"$set": {"banned_users": banned}})
+    return {"success": True}
+
+
+@router.get("/rooms/{room_id}/authority/{user_id}")
+async def room_authority(room_id: str, user_id: str):
+    """Frontend helper: devuelve si `user_id` es super/owner/moderator/none en la sala."""
+    room = await db.rooms.find_one({"id": room_id})
+    if not room:
+        raise HTTPException(status_code=404, detail="Sala no encontrada")
+    auth = await _get_authority(user_id, room)
+    return {
+        "level": auth["level"],
+        "is_room_owner": room.get("owner_id") == user_id,
+        "is_super_admin": auth["level"] == "super",
+        "can_manage": _authority_can_manage_room(auth["level"]),
+    }
 
 @router.post("/rooms/{room_id}/expand-seats")
 async def expand_seats(room_id: str, admin_id: str, max_seats: int = 24):

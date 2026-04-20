@@ -946,14 +946,17 @@ const RoomView = ({ roomId, onBack }) => {
 
       {/* SEATS - Circular design with neon glow */}
       <div className="flex-shrink-0 px-3 mb-1 overflow-y-auto" style={{maxHeight: '40vh'}}>
-        {/* Owner controls */}
-        {room.owner_id === user.id && (
+        {/* Owner / Super Admin controls */}
+        {(room.owner_id === user.id || user.role === 'dueño' || user.is_super_admin) && (
           <div className="flex gap-1 mb-2 justify-between">
             <div className="flex gap-1">
-              <button onClick={async () => { await axios.post(`${API}/rooms/${roomId}/lock-all?owner_id=${user.id}`); loadRoom(); }}
+              <button data-testid="room-lock-all-btn" onClick={async () => { await axios.post(`${API}/rooms/${roomId}/lock-all?owner_id=${user.id}`); loadRoom(); }}
                 className="text-[9px] bg-red-500/20 text-red-300 px-2 py-1 rounded-lg active:scale-95">Cerrar</button>
-              <button onClick={async () => { await axios.post(`${API}/rooms/${roomId}/unlock-all?owner_id=${user.id}`); loadRoom(); }}
+              <button data-testid="room-unlock-all-btn" onClick={async () => { await axios.post(`${API}/rooms/${roomId}/unlock-all?owner_id=${user.id}`); loadRoom(); }}
                 className="text-[9px] bg-green-500/20 text-green-300 px-2 py-1 rounded-lg active:scale-95">Abrir</button>
+              {user.role === 'dueño' && room.owner_id !== user.id && (
+                <span className="text-[9px] bg-gradient-to-r from-purple-500/20 to-pink-500/20 text-purple-200 px-2 py-1 rounded-lg border border-purple-500/30">👑 Super Admin</span>
+              )}
             </div>
             {user.role === 'dueño' && (
               <button onClick={async () => {
@@ -973,7 +976,8 @@ const RoomView = ({ roomId, onBack }) => {
           currentUserId={user.id}
           isMuted={isMuted}
           onSeatClick={(i, seat, isLocked) => {
-            if (isLocked && room.owner_id === user.id) {
+            const canManageLocks = room.owner_id === user.id || user.role === 'dueño' || user.is_super_admin;
+            if (isLocked && canManageLocks) {
               axios.post(`${API}/rooms/${roomId}/lock-seat?owner_id=${user.id}&seat_index=${i}`).then(() => loadRoom());
               return;
             }
