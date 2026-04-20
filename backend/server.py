@@ -26,22 +26,8 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.cors import CORSMiddleware
 import os
 import logging
-from database import ROOT_DIR, UPLOAD_DIR, client
+from database import UPLOAD_DIR, client
 
-# ==================== APP ====================
-app = FastAPI(title="Lluvia Live API", version="2.0.0", docs_url="/api/docs")
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_credentials=True,
-    allow_origins=os.environ.get('CORS_ORIGINS', '*').split(','),
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-
-# ==================== ROUTE REGISTRATION ====================
 from routes.auth import router as auth_router
 from routes.rooms import router as rooms_router
 from routes.games import router as games_router
@@ -57,8 +43,29 @@ from routes.webrtc import router as webrtc_router
 from routes.diagnostics import router as diagnostics_router
 from routes.friends import router as friends_router
 from routes.bot_super import router as bot_super_router
+from routes.reels import router as reels_router
 
-for r in [auth_router, rooms_router, games_router, bot_router, events_router, admin_router, social_router, store_router, notif_router, badges_router, levels_router, webrtc_router, diagnostics_router, friends_router, bot_super_router]:
+# ==================== APP ====================
+app = FastAPI(title="Lluvia Live API", version="2.0.0", docs_url="/api/docs")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_credentials=True,
+    allow_origins=os.environ.get('CORS_ORIGINS', '*').split(','),
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+
+# ==================== ROUTE REGISTRATION ====================
+_ALL_ROUTERS = [
+    auth_router, rooms_router, games_router, bot_router, events_router,
+    admin_router, social_router, store_router, notif_router, badges_router,
+    levels_router, webrtc_router, diagnostics_router, friends_router,
+    bot_super_router, reels_router,
+]
+for r in _ALL_ROUTERS:
     app.include_router(r, prefix="/api")
 
 # ==================== STATIC FILES ====================

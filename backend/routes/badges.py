@@ -2,7 +2,7 @@
 Badges routes: Automatic achievement badges awarded based on user activity.
 """
 from fastapi import APIRouter, HTTPException
-from database import db, uuid, datetime, timezone, create_notification
+from database import db, create_notification
 
 router = APIRouter()
 

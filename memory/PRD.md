@@ -3,7 +3,52 @@
 ## Product
 Red social de audio en vivo con gamificación (monedas/diamantes), salas con **WebRTC self-hosted** (zero dependencia externa, zero costo variable), eventos (King/CP/PK), minijuegos, bot AI moderador y pagos reales PayPal Live. 100% white-label para deploy independiente en VPS.
 
-## Implementado en esta sesión (Abr 2026) — Iteración 16 (FINAL + LIMPIEZA)
+## Implementado en esta sesión (Abr 2026) — Iteración 17 (CÓDIGO IMPECABLE + REELS)
+
+### P0 — Código 100% limpio (ruff 0 errores con y sin config) ✅
+- `pyproject.toml` profesional: line-length 200, select E/F/W, sin ignores
+- Fixes aplicados:
+  - `ruff --fix --unsafe-fixes` en todos los archivos (185 autofixes)
+  - Trailing whitespace removido via sed en todo el backend
+  - Imports reorganizados en server.py (movidos al top del archivo, elimina 15× E402)
+  - Código muerto eliminado: 4× `llm_key` no usado en bot.py (F841), `result` sobrescrito en games.py (F841), `receiver_new` en social.py (F841), stubs pydantic huérfanos en bot.py (F842)
+  - Líneas >200 chars refactorizadas (3 casos: bot.py system messages, inserts con muchos campos, array router)
+  - `timedelta` movido a import propio en games.py (ruff había quitado el import al desinfectar)
+- **Verificación**:
+  - `ruff check routes/ server.py database.py` → **All checks passed!**
+  - `ruff check --isolated --select E,F,W --line-length 200` → **All checks passed!**
+  - ESLint frontend → **No issues found**
+
+### P0 — Sistema Reels (videos + fotos) ✅
+- **Backend nuevo**: `/app/backend/routes/reels.py` (220 líneas, 100% documentado)
+  - `POST /api/reels/upload` → upload chunked de video/imagen, valida ext + content-type + 100MB máx
+  - `POST /api/reels` → crear reel con video_url o image_url
+  - `GET /api/reels?limit&skip` → feed paginado con conteo de comentarios
+  - `POST /api/reels/{id}/like` → toggle like
+  - `GET /api/reels/{id}/comments` + `POST /api/reels/{id}/comment` → comentarios
+  - `DELETE /api/reels/{id}` → solo autor o role=dueño
+  - `GET /api/uploads/reels/{filename}` → servir archivo con media-type correcto para streaming
+- **Integración con Bot Super Admin**: comentarios pasan por `log_suspicious_input` (bloqueo XSS automático)
+- **Frontend arreglado**: `ReelsView.js` ahora usa `/api/reels/upload` (antes usaba `/api/upload` inexistente). Detecta automáticamente video vs imagen. data-testids: `reels-feed`, `reel-card-{id}`, `reel-video-{id}`, `reel-image-{id}`, `reel-like-{id}`, `reels-empty`
+- **Testeado end-to-end**: upload → create → list → like → comment → delete, todos HTTP 200/201 ✓
+
+### Smoke tests finales
+```
+/api/rooms                  → HTTP 200
+/api/webrtc/config          → HTTP 200
+/api/agora/token            → HTTP 404 (endpoint eliminado)
+/api/reels                  → HTTP 200
+/api/bot/super/integrity    → HTTP 200 (healthy=true)
+/api/diagnostics            → HTTP 200 (paypal/uploads/mongo=ok)
+```
+
+### Dependencias
+- `requirements.txt`: 45 líneas (antes 138 con basura pip freeze)
+- `package.json`: 54 dependencies directas
+- Cero paquetes con "agora" o "emergent" en deps
+- Purga total verificada: 0 matches de "Agora" o "Emergent" en código y docs
+
+## Implementado en esta sesión (Abr 2026) — Iteración 16 (Purga Total)
 
 ### P0 — PURGA TOTAL DE AGORA ✅
 - Eliminado endpoint `POST /api/agora/token` de `routes/rooms.py`

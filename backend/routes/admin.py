@@ -2,7 +2,7 @@
 Admin routes: Console commands, role management, user admin, config.
 """
 from fastapi import APIRouter, HTTPException, UploadFile, File, Request
-from database import db, serialize_user, serialize_room, has_permission, ROLE_HIERARCHY, uuid, datetime, timezone, create_notification, IDChange, UPLOAD_DIR
+from database import db, serialize_user, serialize_room, has_permission, ROLE_HIERARCHY, uuid, datetime, timezone, IDChange, UPLOAD_DIR
 from datetime import timedelta
 from typing import Dict, Any
 
@@ -41,7 +41,7 @@ async def set_owner(user_id: str, owner_key: str):
     """Set Owner."""
     if owner_key != "lluvia_owner_melvin":
         raise HTTPException(status_code=403, detail="Clave inválida")
-    
+
     await db.users.update_one(
         {"id": user_id},
         {"$set": {
@@ -56,7 +56,7 @@ async def set_owner(user_id: str, owner_key: str):
             "ghost_mode": False
         }}
     )
-    
+
     user = await db.users.find_one({"id": user_id})
     if not user:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
@@ -67,12 +67,12 @@ async def set_admin(user_id: str, admin_key: str):
     """Set Admin."""
     if admin_key != "lluvia_admin_2024":
         raise HTTPException(status_code=403, detail="Clave inválida")
-    
+
     await db.users.update_one(
         {"id": user_id},
         {"$set": {"is_admin": True, "role": "admin", "vip_status": "ADMIN", "badges": ROLE_BADGES["admin"]}}
     )
-    
+
     user = await db.users.find_one({"id": user_id})
     if not user:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
@@ -84,21 +84,21 @@ async def set_role(user_id: str, admin_id: str, role: str):
     admin = await db.users.find_one({"id": admin_id})
     if not admin:
         raise HTTPException(status_code=404, detail="Admin no encontrado")
-    
+
     admin_role = admin.get('role', 'usuario')
     if not has_permission(admin_role, 'admin'):
         raise HTTPException(status_code=403, detail="No tienes permisos")
-    
+
     if role not in ROLE_HIERARCHY:
         raise HTTPException(status_code=400, detail="Rol inválido")
-    
+
     # Can't assign role equal or higher than yours (except dueño can do anything)
     if admin_role != "dueño" and ROLE_HIERARCHY.get(role, 0) >= ROLE_HIERARCHY.get(admin_role, 0):
         raise HTTPException(status_code=403, detail="No puedes asignar un rol igual o mayor al tuyo")
-    
+
     is_admin = role in ["dueño", "admin"]
     vip_map = {"dueño": "DUEÑO", "admin": "ADMIN", "moderador": "MODERADOR", "supervisor": "SUPERVISOR", "usuario": "NORMAL"}
-    
+
     await db.users.update_one(
         {"id": user_id},
         {"$set": {
@@ -108,7 +108,7 @@ async def set_role(user_id: str, admin_id: str, role: str):
             "badges": ROLE_BADGES.get(role, ROLE_BADGES["usuario"])
         }}
     )
-    
+
     user = await db.users.find_one({"id": user_id})
     return serialize_user(user)
 
@@ -118,11 +118,11 @@ async def admin_get_users(admin_id: str):
     admin = await db.users.find_one({"id": admin_id})
     if not admin:
         raise HTTPException(status_code=403, detail="No tienes permisos")
-    
+
     admin_role = admin.get('role', 'usuario')
     if not has_permission(admin_role, 'supervisor'):
         raise HTTPException(status_code=403, detail="No tienes permisos")
-    
+
     users = await db.users.find().to_list(500)
     return [serialize_user(u) for u in users]
 
@@ -132,11 +132,11 @@ async def get_staff(admin_id: str):
     admin = await db.users.find_one({"id": admin_id})
     if not admin:
         raise HTTPException(status_code=403, detail="No tienes permisos")
-    
+
     admin_role = admin.get('role', 'usuario')
     if not has_permission(admin_role, 'moderador'):
         raise HTTPException(status_code=403, detail="No tienes permisos")
-    
+
     staff = await db.users.find({"role": {"$in": ["dueño", "admin", "moderador", "supervisor"]}}).to_list(100)
     return [serialize_user(s) for s in staff]
 
@@ -146,19 +146,19 @@ async def admin_update_user(user_id: str, admin_id: str, updates: Dict[str, Any]
     admin = await db.users.find_one({"id": admin_id})
     if not admin:
         raise HTTPException(status_code=403, detail="No tienes permisos")
-    
+
     admin_role = admin.get('role', 'usuario')
     if not has_permission(admin_role, 'moderador'):
         raise HTTPException(status_code=403, detail="No tienes permisos")
-    
+
     updates.pop('password', None)
     updates.pop('_id', None)
     updates.pop('id', None)
-    
+
     # Only dueño/admin can change roles
     if 'role' in updates and not has_permission(admin_role, 'admin'):
         updates.pop('role', None)
-    
+
     await db.users.update_one({"id": user_id}, {"$set": updates})
     user = await db.users.find_one({"id": user_id})
     return serialize_user(user)
@@ -169,15 +169,15 @@ async def admin_delete_user(user_id: str, admin_id: str):
     admin = await db.users.find_one({"id": admin_id})
     if not admin:
         raise HTTPException(status_code=403, detail="No tienes permisos")
-    
+
     admin_role = admin.get('role', 'usuario')
     if not has_permission(admin_role, 'admin'):
         raise HTTPException(status_code=403, detail="No tienes permisos")
-    
+
     target = await db.users.find_one({"id": user_id})
     if target and target.get('role') == 'dueño':
         raise HTTPException(status_code=403, detail="No puedes eliminar al dueño")
-    
+
     await db.users.delete_one({"id": user_id})
     return {"success": True}
 
@@ -189,15 +189,15 @@ async def verify_user(user_id: str, admin_id: str):
     admin = await db.users.find_one({"id": admin_id})
     if not admin or not has_permission(admin.get('role', 'usuario'), 'admin'):
         raise HTTPException(status_code=403, detail="No tienes permisos")
-    
+
     user = await db.users.find_one({"id": user_id})
     if not user:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
-    
+
     badges = list(user.get('badges', []))
     if '✅ Verificado' not in badges:
         badges.append('✅ Verificado')
-    
+
     await db.users.update_one({"id": user_id}, {"$set": {"verified": True, "badges": badges}})
     return {"success": True}
 
@@ -207,11 +207,11 @@ async def unverify_user(user_id: str, admin_id: str):
     admin = await db.users.find_one({"id": admin_id})
     if not admin or not has_permission(admin.get('role', 'usuario'), 'admin'):
         raise HTTPException(status_code=403, detail="No tienes permisos")
-    
+
     user = await db.users.find_one({"id": user_id})
     if not user:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
-    
+
     badges = [b for b in user.get('badges', []) if b != '✅ Verificado']
     await db.users.update_one({"id": user_id}, {"$set": {"verified": False, "badges": badges}})
     return {"success": True}
@@ -306,17 +306,17 @@ async def expand_room_seats(admin_id: str, room_id: str, max_seats: int):
         raise HTTPException(status_code=403, detail="Solo el dueño")
     if max_seats < 9 or max_seats > 24:
         raise HTTPException(status_code=400, detail="Mínimo 9, máximo 24 micros")
-    
+
     room = await db.rooms.find_one({"id": room_id})
     if not room:
         raise HTTPException(status_code=404, detail="Sala no encontrada")
-    
+
     current_seats = room.get('seats', [])
     if max_seats > len(current_seats):
         current_seats.extend([None] * (max_seats - len(current_seats)))
     else:
         current_seats = current_seats[:max_seats]
-    
+
     await db.rooms.update_one({"id": room_id}, {"$set": {"seats": current_seats, "max_seats": max_seats}})
     return {"success": True, "max_seats": max_seats}
 
@@ -326,7 +326,7 @@ async def update_store_package(admin_id: str, package_id: str, coins: int, diamo
     admin = await db.users.find_one({"id": admin_id})
     if not admin or admin.get('role') != 'dueño':
         raise HTTPException(status_code=403, detail="Solo el dueño")
-    
+
     await db.store_config.update_one(
         {"package_id": package_id},
         {"$set": {"package_id": package_id, "coins": coins, "diamonds": diamonds, "price": price, "name": name}},
@@ -346,11 +346,11 @@ async def admin_delete_room(room_id: str, admin_id: str):
     admin = await db.users.find_one({"id": admin_id})
     if not admin:
         raise HTTPException(status_code=403, detail="No tienes permisos")
-    
+
     admin_role = admin.get('role', 'usuario')
     if not has_permission(admin_role, 'moderador'):
         raise HTTPException(status_code=403, detail="No tienes permisos")
-    
+
     await db.rooms.delete_one({"id": room_id})
     return {"success": True}
 
@@ -364,34 +364,34 @@ async def change_user_id(data: IDChange):
     user = await db.users.find_one({"id": data.user_id})
     if not user:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
-    
+
     tiers = {
         "basic": {"cost": 30, "min_len": 6, "max_len": 7, "type": "numbers"},
         "lindo": {"cost": 1500, "min_len": 5, "max_len": 5, "type": "numbers"},
         "letras": {"cost": 3000, "min_len": 4, "max_len": 5, "type": "letters"},
         "custom": {"cost": 5000, "min_len": 1, "max_len": 20, "type": "any"},
     }
-    
+
     if data.tier not in tiers:
         raise HTTPException(status_code=400, detail="Tier inválido")
-    
+
     tier = tiers[data.tier]
-    
+
     if user.get('diamonds', 0) < tier['cost']:
         raise HTTPException(status_code=400, detail=f"Necesitas {tier['cost']} diamantes")
-    
+
     if len(data.new_id) < tier['min_len'] or len(data.new_id) > tier['max_len']:
         raise HTTPException(status_code=400, detail=f"ID debe tener {tier['min_len']}-{tier['max_len']} caracteres")
-    
+
     existing = await db.users.find_one({"custom_id": data.new_id})
     if existing:
         raise HTTPException(status_code=400, detail="ID ya está en uso")
-    
+
     await db.users.update_one(
         {"id": data.user_id},
         {"$inc": {"diamonds": -tier['cost']}, "$set": {"custom_id": data.new_id}}
     )
-    
+
     return {"success": True, "new_custom_id": data.new_id, "cost": tier['cost']}
 
 @router.post("/upload")
@@ -401,15 +401,15 @@ async def upload_file(file: UploadFile = File(...)):
     allowed = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'mp4', 'mov', 'avi', 'webm', 'mp3', 'wav']
     if ext not in allowed:
         raise HTTPException(status_code=400, detail=f"Formato no soportado. Usa: {', '.join(allowed)}")
-    
+
     file_id = str(uuid.uuid4())
     filename = f"{file_id}.{ext}"
     filepath = UPLOAD_DIR / filename
-    
+
     with open(filepath, "wb") as f:
         content = await file.read()
         f.write(content)
-    
+
     file_url = f"/api/uploads/{filename}"
     return {"success": True, "url": file_url, "filename": filename}
 

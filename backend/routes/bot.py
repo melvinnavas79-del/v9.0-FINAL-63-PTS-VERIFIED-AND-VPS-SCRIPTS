@@ -57,7 +57,7 @@ async def bot_command(msg: BotMessage):
     admin = await db.users.find_one({"id": msg.admin_id})
     if not admin or admin.get('role') != 'dueño':
         raise HTTPException(status_code=403, detail="Solo el dueño puede usar el Bot")
-    
+
     # Get context
     total_users = await db.users.count_documents({})
     total_rooms = await db.rooms.count_documents({})
@@ -65,14 +65,14 @@ async def bot_command(msg: BotMessage):
     rooms_data = await db.rooms.find().to_list(100)
     for r in rooms_data:
         online_seats += sum(1 for s in r.get('seats', []) if s)
-    
+
     top_spender = await db.users.find().sort("total_spent", -1).limit(1).to_list(1)
     top_rich = await db.users.find().sort("coins", -1).limit(3).to_list(3)
     total_coins = sum(u.get('coins', 0) for u in await db.users.find().to_list(500))
-    
+
     all_users = await db.users.find({}, {"_id": 0, "password": 0}).to_list(50)
     user_list = ", ".join([f"{u['username']}(Lv.{u.get('level',1)},coins:{u.get('coins',0)})" for u in all_users[:20]])
-    
+
     context = f"""
 DATOS DE LLUVIA LIVE:
 - Total usuarios: {total_users}
@@ -130,14 +130,22 @@ REGLAS:
             notes_lines.append(f"[{n.get('category','')}] {n.get('title','')}: {n.get('content','')}")
         notes_text = "\n".join(notes_lines)
         context += f"\n\nNOTAS GUARDADAS DEL DUEÑO:\n{notes_text}"
-    
-    llm_key = os.environ.get('GEMINI_API_KEY') or os.environ.get('GOOGLE_API_KEY')
+
+    sys_msg = (
+        "Eres el Bot personal de Melvin, dueño de Lluvia Live. Eres su amigo y asistente. "
+        "Hablas de cualquier tema: noticias, consejos, chistes, tecnologia, vida, lo que sea. "
+        "Eres como Gemini o ChatGPT pero con personalidad amigable y en español. Tambien administras "
+        "Lluvia Live. Tu dueño te habla por voz y la app lee tus respuestas en voz alta, asi que responde "
+        "de forma natural y conversacional. NUNCA digas que no puedes hablar por voz porque SI PUEDES. "
+        "Si te piden una accion de la app, responde SOLO con el JSON de accion. Si es conversacion normal "
+        "o preguntas de cualquier tema, responde como amigo. Se conciso.\n\n" + context
+    )
     response = await gemini_chat(
-        system_message=f"Eres el Bot personal de Melvin, dueño de Lluvia Live. Eres su amigo y asistente. Hablas de cualquier tema: noticias, consejos, chistes, tecnologia, vida, lo que sea. Eres como Gemini o ChatGPT pero con personalidad amigable y en español. Tambien administras Lluvia Live. Tu dueño te habla por voz y la app lee tus respuestas en voz alta, asi que responde de forma natural y conversacional. NUNCA digas que no puedes hablar por voz porque SI PUEDES. Si te piden una accion de la app, responde SOLO con el JSON de accion. Si es conversacion normal o preguntas de cualquier tema, responde como amigo. Se conciso.\n\n{context}",
+        system_message=sys_msg,
         user_text=msg.message,
         session_id=f"admin_bot_{msg.admin_id}"
     )
-    
+
     # Check if response has action
     action_result = None
     try:
@@ -149,7 +157,7 @@ REGLAS:
             action_data = json_mod.loads(resp_text[start:end])
             action = action_data.get('action')
             params = action_data.get('params', {})
-            
+
             if action == 'ban_user':
                 target = await db.users.find_one({"username": params.get('username')})
                 if target:
@@ -216,7 +224,12 @@ REGLAS:
                             await db.users.update_one({"id": s['user_id']}, {"$inc": {"coins": per_user}})
                             names.append(s['username'])
                         action_result = f"Pagado {per_user:,} a cada uno en {room['name']}: {', '.join(names)} (Total: {total_paid:,})"
-                        await db.room_chat.insert_one({"id": str(uuid.uuid4()), "room_id": room['id'], "user_id": msg.admin_id, "username": "Bot Admin", "avatar": admin['avatar'], "text": f"🎁 El Dueño regaló {per_user:,} monedas a todos!", "type": "gift", "created_at": datetime.now(timezone.utc).isoformat()})
+                        await db.room_chat.insert_one({
+                            "id": str(uuid.uuid4()), "room_id": room['id'], "user_id": msg.admin_id,
+                            "username": "Bot Admin", "avatar": admin['avatar'],
+                            "text": f"🎁 El Dueño regaló {per_user:,} monedas a todos!",
+                            "type": "gift", "created_at": datetime.now(timezone.utc).isoformat()
+                        })
             elif action == 'pay_user':
                 target = await db.users.find_one({"username": params.get('username')})
                 if target:
@@ -353,7 +366,7 @@ REGLAS:
                 action_result = f"Nota '{title}' eliminada" if result.deleted_count else "Nota no encontrada"
     except Exception as e:
         action_result = f"Error: {str(e)}"
-    
+
     # Save to chat history
     await db.bot_history.insert_one({
         "id": str(uuid.uuid4()),
@@ -363,7 +376,7 @@ REGLAS:
         "action_result": action_result,
         "created_at": datetime.now(timezone.utc).isoformat()
     })
-    
+
     return {"response": response, "action_result": action_result}
 
 
@@ -408,14 +421,16 @@ async def bot_reply_in_room(admin_id: str, room_id: str, question: str):
     room = await db.rooms.find_one({"id": room_id})
     if not room:
         raise HTTPException(status_code=404, detail="Sala no encontrada")
-    
-    llm_key = os.environ.get('GEMINI_API_KEY') or os.environ.get('GOOGLE_API_KEY')
+
     response = await gemini_chat(
-        system_message="Eres el Bot oficial de Lluvia Live. Eres amigable, divertido y ayudas a todos en la sala. Respondes en español, de forma corta y natural. No reveles informacion privada del dueño.",
+        system_message=(
+            "Eres el Bot oficial de Lluvia Live. Eres amigable, divertido y ayudas a todos en la sala. "
+            "Respondes en español, de forma corta y natural. No reveles informacion privada del dueño."
+        ),
         user_text=question,
         session_id=f"bot_room_{room_id}"
     )
-    
+
     chat_doc = {
         "id": str(uuid.uuid4()), "room_id": room_id,
         "user_id": "bot", "username": "🤖 Bot Lluvia",
@@ -430,9 +445,6 @@ async def bot_reply_in_room(admin_id: str, room_id: str, question: str):
 # ==================== BOT WATCHDOG (VIGILANCIA) ====================
 
 # WatchMission imported from database
-    room_id: str
-    keywords: list
-    label: str = ""
 
 @router.post("/bot/missions")
 async def create_watch_mission(admin_id: str, mission: WatchMission):
@@ -443,7 +455,7 @@ async def create_watch_mission(admin_id: str, mission: WatchMission):
     room = await db.rooms.find_one({"id": mission.room_id})
     if not room:
         raise HTTPException(status_code=404, detail="Sala no encontrada")
-    
+
     mission_doc = {
         "id": str(uuid.uuid4()),
         "admin_id": admin_id,
@@ -526,7 +538,7 @@ async def activate_bot_in_room(admin_id: str, room_id: str):
     room = await db.rooms.find_one({"id": room_id})
     if not room:
         raise HTTPException(status_code=404, detail="Sala no encontrada")
-    
+
     await db.bot_active_rooms.update_one(
         {"room_id": room_id},
         {"$set": {"room_id": room_id, "room_name": room['name'], "admin_id": admin_id, "active": True, "paused": False, "created_at": datetime.now(timezone.utc).isoformat()}},
@@ -596,9 +608,9 @@ async def bot_auto_reply(room_id: str, username: str, text: str):
     active = await db.bot_active_rooms.find_one({"room_id": room_id, "active": True})
     if not active:
         return
-    
+
     text_lower = text.lower().strip()
-    
+
     # SILENCE COMMANDS - Bot shuts up immediately
     silence_words = ['callate', 'cállate', 'silencio', 'no hables', 'callese', 'cállese', 'shh', 'shut up', 'ya no hables', 'deja de hablar', 'para de hablar', 'bot callate', 'bot silencio']
     for sw in silence_words:
@@ -611,7 +623,7 @@ async def bot_auto_reply(room_id: str, username: str, text: str):
                 "type": "message", "created_at": datetime.now(timezone.utc).isoformat()
             })
             return
-    
+
     # RESUME COMMANDS - Bot starts talking again
     resume_words = ['bot habla', 'habla bot', 'vuelve bot', 'despierta', 'bot vuelve', 'ya puedes hablar', 'habla']
     for rw in resume_words:
@@ -624,7 +636,7 @@ async def bot_auto_reply(room_id: str, username: str, text: str):
                 "type": "message", "created_at": datetime.now(timezone.utc).isoformat()
             })
             return
-    
+
     # MODE COMMANDS
     mode_map = {'locutor': 'locutor', 'animador': 'animador', 'normal': 'normal', 'serio': 'serio', 'divertido': 'animador'}
     for key, mode in mode_map.items():
@@ -643,7 +655,7 @@ async def bot_auto_reply(room_id: str, username: str, text: str):
                 "type": "message", "created_at": datetime.now(timezone.utc).isoformat()
             })
             return
-    
+
     # ANIMATE COMMAND - Bot starts animating the room
     animate_words = ['anima', 'animanos', 'alegra', 'diviertenos', 'entretennos', 'pon ambiente', 'haz algo divertido']
     for aw in animate_words:
@@ -664,20 +676,20 @@ async def bot_auto_reply(room_id: str, username: str, text: str):
                 "type": "message", "created_at": datetime.now(timezone.utc).isoformat()
             })
             return
-    
+
     # If paused, don't reply
     if active.get('paused'):
         return
-    
+
     # Only reply when someone talks TO the bot or asks a question
     is_directed = ('bot' in text_lower or '🤖' in text_lower or 'lluvia' in text_lower)
     # ONLY respond if someone directly addresses the bot
     is_directed = ('bot' in text_lower or '🤖' in text_lower or 'lluvia' in text_lower or 'asistente' in text_lower)
-    
+
     # If NOT directed at bot, stay silent (even for questions/greetings)
     if not is_directed:
         return
-    
+
     # Get bot mode for personality
     bot_mode = active.get('mode', 'normal')
     mode_prompts = {
@@ -686,13 +698,12 @@ async def bot_auto_reply(room_id: str, username: str, text: str):
         'animador': "Eres el animador mas energico! Todo es INCREIBLE, ESPECTACULAR! Usas muchas exclamaciones, animas a la gente, creas emocion.",
         'serio': "Eres profesional y serio. Respondes de forma directa y educada sin bromas.",
     }
-    
+
     recent = await db.room_chat.find({"room_id": room_id}).sort("created_at", -1).limit(6).to_list(6)
     recent.reverse()
     chat_context = "\n".join([f"{m.get('username','')}: {m.get('text','')}" for m in recent if m.get('text')])
-    
+
     try:
-        llm_key = os.environ.get('GEMINI_API_KEY') or os.environ.get('GOOGLE_API_KEY')
         personality = mode_prompts.get(bot_mode, mode_prompts['normal'])
         system_msg = f"""Eres Bot Lluvia en una sala de chat en vivo de Lluvia Live.
 {personality}
@@ -710,7 +721,7 @@ Responde brevemente:"""
             user_text=f"{username}: {text}",
             session_id=f"bot_auto_{room_id}_{bot_mode}"
         )
-        
+
         if response and response.strip():
             await db.room_chat.insert_one({
                 "id": str(uuid.uuid4()), "room_id": room_id,

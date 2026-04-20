@@ -1,10 +1,10 @@
 """
 Lluvia Live - Shared database connection and helpers.
 =====================================================
-Central module for MongoDB connection, Pydantic models, 
+Central module for MongoDB connection, Pydantic models,
 security utilities, and shared helper functions.
 
-All route modules import from here to maintain a single 
+All route modules import from here to maintain a single
 source of truth for data access and validation.
 
 Collections:
@@ -23,13 +23,13 @@ Collections:
 """
 from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, List
 from pathlib import Path
 from dotenv import load_dotenv
 import os
 import uuid
 import bcrypt
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 
 ROOT_DIR = Path(__file__).parent
 UPLOAD_DIR = ROOT_DIR / "uploads"

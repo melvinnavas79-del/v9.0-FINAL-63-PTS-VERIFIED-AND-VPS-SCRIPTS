@@ -2,9 +2,8 @@
 Social routes: Clanes, Parejas (CP), Gifts, Sobres, Cofres.
 """
 from fastapi import APIRouter, HTTPException, UploadFile, File
-from database import db, ClanCreate, GiftSend, serialize_user, uuid, datetime, timezone, create_notification, UPLOAD_DIR
+from database import db, ClanCreate, GiftSend, uuid, datetime, timezone, create_notification, UPLOAD_DIR
 from pydantic import BaseModel
-import random
 from datetime import timedelta
 
 router = APIRouter()
@@ -184,7 +183,7 @@ async def create_cp(data: CPCreate):
     await db.parejas.insert_one(cp_doc)
     await db.users.update_one({"id": data.user1_id}, {"$set": {"cp_id": cp_id, "cp_partner": u2['username']}})
     await db.users.update_one({"id": data.user2_id}, {"$set": {"cp_id": cp_id, "cp_partner": u1['username']}})
-    
+
     # Notification hook: new CP
     await create_notification(
         "evento_cp",
@@ -192,7 +191,7 @@ async def create_cp(data: CPCreate):
         f"{u1['username']} y {u2['username']} son pareja oficial!",
         data={"cp_id": cp_id}
     )
-    
+
     cp_doc.pop('_id', None)
     return cp_doc
 
@@ -217,11 +216,11 @@ async def cp_level_up(cp_id: str):
     elif new_level == 7:
         bonus = 5000000
         ring = "V2"
-    
+
     updates = {"level": new_level}
     if ring:
         updates["ring"] = ring
-    
+
     await db.parejas.update_one({"id": cp_id}, {"$set": updates})
     if bonus > 0:
         await db.users.update_one({"id": cp['user1_id']}, {"$inc": {"coins": bonus}})
@@ -230,7 +229,7 @@ async def cp_level_up(cp_id: str):
         if ring:
             await db.users.update_one({"id": cp['user1_id']}, {"$push": {"badges": f"💍 Anillo {ring}"}})
             await db.users.update_one({"id": cp['user2_id']}, {"$push": {"badges": f"💍 Anillo {ring}"}})
-    
+
     # Notification hook: CP level up
     await create_notification(
         "evento_cp",
@@ -238,7 +237,7 @@ async def cp_level_up(cp_id: str):
         f"Pareja {cp.get('user1_name', '')} y {cp.get('user2_name', '')} llego a nivel {new_level}!" + (f" 💍 Anillo {ring}!" if ring else ""),
         data={"cp_id": cp_id, "new_level": new_level}
     )
-    
+
     return {"success": True, "new_level": new_level, "bonus": bonus, "ring": ring}
 
 # ==================== EVENTOS Y PREMIOS ====================
@@ -277,22 +276,22 @@ async def send_gift(gift: GiftSend):
     """Send Gift."""
     if gift.gift_type not in GIFTS:
         raise HTTPException(status_code=400, detail="Regalo no válido")
-    
+
     g = GIFTS[gift.gift_type]
     sender = await db.users.find_one({"id": gift.sender_id})
     if not sender:
         raise HTTPException(status_code=404, detail="Sender no encontrado")
     if sender['coins'] < g['cost']:
         raise HTTPException(status_code=400, detail="No tienes suficientes monedas")
-    
+
     receiver = await db.users.find_one({"id": gift.receiver_id})
     if not receiver:
         raise HTTPException(status_code=404, detail="Receiver no encontrado")
-    
+
     # Deduct from sender, add to receiver
     await db.users.update_one({"id": gift.sender_id}, {"$inc": {"coins": -g['cost'], "total_spent": g['cost'], "total_gifts_sent": 1}})
     await db.users.update_one({"id": gift.receiver_id}, {"$inc": {"coins": g['value'], "total_received": g['value'], "total_gifts_received": 1}})
-    
+
     # Log gift
     gift_doc = {
         "id": str(uuid.uuid4()),
@@ -317,7 +316,7 @@ async def send_gift(gift: GiftSend):
         await add_xp(gift.receiver_id, int(g['cost']) * 1, source="gift_received")
     except Exception:
         pass
-    
+
     # Add to chat if in room
     if gift.room_id:
         chat_doc = {
@@ -331,9 +330,9 @@ async def send_gift(gift: GiftSend):
             "created_at": datetime.now(timezone.utc).isoformat()
         }
         await db.room_chat.insert_one(chat_doc)
-    
+
     updated_sender = await db.users.find_one({"id": gift.sender_id})
-    
+
     # Notification hook: big gifts
     if gift.gift_type in BIG_GIFTS:
         await create_notification(
@@ -342,18 +341,18 @@ async def send_gift(gift: GiftSend):
             f"{sender['username']} envio {g['name']} {g['emoji']} a {receiver['username']}",
             data={"gift_type": gift.gift_type, "sender": sender['username'], "receiver": receiver['username']}
         )
-    
+
     gift_doc.pop('_id', None)
-    
+
     # Accumulate gifts toward room cofres
     if gift.room_id:
         await db.rooms.update_one({"id": gift.room_id}, {"$inc": {"cofre_progress": g['cost']}})
-    
+
     # Check badges for sender and receiver
     from routes.badges import check_and_award_badges
     sender_new = await check_and_award_badges(gift.sender_id)
-    receiver_new = await check_and_award_badges(gift.receiver_id)
-    
+    await check_and_award_badges(gift.receiver_id)
+
     return {"success": True, "gift": gift_doc, "new_balance": updated_sender['coins'], "new_badges": sender_new}
 
 # ==================== SOBRES (LLUVIA DE ORO) ====================

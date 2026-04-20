@@ -3,7 +3,6 @@ Event routes: King/CP events, cashback, weekly rewards, event requests.
 """
 from fastapi import APIRouter, HTTPException
 from database import db, EventRequest, uuid, datetime, timezone, create_notification
-import random
 
 router = APIRouter()
 
@@ -36,7 +35,7 @@ async def distribute_weekly_rewards(admin_id: str):
                 new_badges.append("🏆 Campeón Semanal")
                 new_badges.append("💍 Anillo de Campeón")
                 new_badges.append("🎖️ Placa de Oro")
-            
+
             await db.users.update_one({"id": u['id']}, {
                 "$inc": {"coins": rewards[i]},
                 "$set": {
@@ -49,7 +48,7 @@ async def distribute_weekly_rewards(admin_id: str):
                 "aristocracy": aristocracies[i],
                 "flash_fame": i == 0
             })
-    
+
     # Save flash fame (Top 1)
     if top_users:
         await db.system.update_one(
@@ -64,7 +63,7 @@ async def distribute_weekly_rewards(admin_id: str):
             }},
             upsert=True
         )
-    
+
     await db.events.insert_one({
         "id": str(uuid.uuid4()), "type": "weekly", "results": results,
         "created_at": datetime.now(timezone.utc).isoformat()
@@ -131,7 +130,7 @@ async def clan_rewards(admin_id: str, body: dict = None):
                  "$inc": {"coins": rewards[i]}}
             )
             results.append({"clan": clan['name'], "place": i+1, "total_reward": rewards[i], "aristocracy": aristocracies[i]})
-    
+
     await db.events.insert_one({
         "id": str(uuid.uuid4()), "type": "clan_weekly", "results": results,
         "created_at": datetime.now(timezone.utc).isoformat()
@@ -190,7 +189,7 @@ async def request_event(req: EventRequest):
     user = await db.users.find_one({"id": req.user_id})
     if not user:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
-    
+
     # Check monthly limit
     now = datetime.now(timezone.utc)
     month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
@@ -201,7 +200,7 @@ async def request_event(req: EventRequest):
     })
     if existing:
         raise HTTPException(status_code=400, detail="Solo puedes solicitar 1 evento al mes")
-    
+
     # Validate event type
     if req.event_type.startswith("king"):
         if req.event_type not in KING_LEVELS:
@@ -218,7 +217,7 @@ async def request_event(req: EventRequest):
         info = CP_LEVELS[cp_lvl]
     else:
         raise HTTPException(status_code=400, detail="Tipo de evento invalido")
-    
+
     request_doc = {
         "id": str(uuid.uuid4()),
         "user_id": req.user_id,
@@ -231,7 +230,7 @@ async def request_event(req: EventRequest):
     }
     await db.event_requests.insert_one(request_doc)
     request_doc.pop('_id', None)
-    
+
     # Notify admin (dueño)
     admins = await db.users.find({"role": "dueño"}).to_list(10)
     for admin in admins:
@@ -242,7 +241,7 @@ async def request_event(req: EventRequest):
             target_user_id=admin['id'],
             data={"request_id": request_doc['id'], "event_type": req.event_type}
         )
-    
+
     return {"success": True, "request": request_doc}
 
 @router.get("/events/requests")
@@ -263,18 +262,18 @@ async def approve_event(request_id: str, admin_id: str):
     admin = await db.users.find_one({"id": admin_id})
     if not admin or admin.get('role') != 'dueño':
         raise HTTPException(status_code=403, detail="Solo el dueño")
-    
+
     req = await db.event_requests.find_one({"id": request_id})
     if not req:
         raise HTTPException(status_code=404, detail="Solicitud no encontrada")
     if req['status'] != 'pending':
         raise HTTPException(status_code=400, detail=f"Solicitud ya esta en estado: {req['status']}")
-    
+
     await db.event_requests.update_one(
         {"id": request_id},
         {"$set": {"status": "approved", "approved_at": datetime.now(timezone.utc).isoformat()}}
     )
-    
+
     # Notify user
     event_type = req['event_type']
     if event_type.startswith("king"):
@@ -284,14 +283,14 @@ async def approve_event(request_id: str, admin_id: str):
         cp_lvl = int(event_type.split("_")[1])
         info = CP_LEVELS.get(cp_lvl, {})
         goal_text = f"Sube tu pareja a nivel {cp_lvl}"
-    
+
     await create_notification(
         "evento_aprobado",
         "Evento Aprobado!",
         f"Tu evento {info.get('label', event_type)} fue aprobado. {goal_text}",
         target_user_id=req['user_id']
     )
-    
+
     return {"success": True, "request_id": request_id}
 
 @router.post("/events/reject/{request_id}")
@@ -300,23 +299,23 @@ async def reject_event(request_id: str, admin_id: str):
     admin = await db.users.find_one({"id": admin_id})
     if not admin or admin.get('role') != 'dueño':
         raise HTTPException(status_code=403, detail="Solo el dueño")
-    
+
     req = await db.event_requests.find_one({"id": request_id})
     if not req:
         raise HTTPException(status_code=404, detail="Solicitud no encontrada")
-    
+
     await db.event_requests.update_one(
         {"id": request_id},
         {"$set": {"status": "rejected", "rejected_at": datetime.now(timezone.utc).isoformat()}}
     )
-    
+
     await create_notification(
         "evento_rechazado",
         "Evento Rechazado",
         "Tu solicitud de evento fue rechazada.",
         target_user_id=req['user_id']
     )
-    
+
     return {"success": True}
 
 @router.get("/events/my-events/{user_id}")
@@ -351,11 +350,11 @@ async def update_event_progress(user_id: str, amount: int):
     })
     if not req:
         return {"updated": False}
-    
+
     new_progress = req.get('game_progress', 0) + amount
     info = KING_LEVELS.get(req['event_type'], {})
     goal = info.get('goal', 0)
-    
+
     if new_progress >= goal:
         # Goal reached! Pay the reward
         reward = info.get('reward', 0)
@@ -388,16 +387,16 @@ async def cp_event_levelup(user_id: str, target_level: int):
     """Triggered when CP reaches level 6 or 7. Pays both partners."""
     if target_level not in CP_LEVELS:
         raise HTTPException(status_code=400, detail="Nivel CP invalido (6 o 7)")
-    
+
     # Find the user's CP
     cp = await db.parejas.find_one({"$or": [{"user1_id": user_id}, {"user2_id": user_id}]})
     if not cp:
         raise HTTPException(status_code=404, detail="No tienes pareja CP")
-    
+
     current_level = cp.get('level', 1)
     if current_level >= target_level:
         raise HTTPException(status_code=400, detail=f"La pareja ya alcanzo nivel {current_level}")
-    
+
     # Check there's an approved CP event request
     req = await db.event_requests.find_one({
         "user_id": user_id,
@@ -406,20 +405,20 @@ async def cp_event_levelup(user_id: str, target_level: int):
     })
     if not req:
         raise HTTPException(status_code=400, detail="No tienes evento CP aprobado para este nivel")
-    
+
     reward = CP_LEVELS[target_level]['reward']
     user1_id = cp['user1_id']
     user2_id = cp['user2_id']
-    
+
     await db.users.update_one({"id": user1_id}, {"$inc": {"coins": reward}})
     await db.users.update_one({"id": user2_id}, {"$inc": {"coins": reward}})
     await db.parejas.update_one({"id": cp['id']}, {"$set": {"level": target_level}})
-    
+
     await db.event_requests.update_one(
         {"id": req['id']},
         {"$set": {"status": "completed", "completed_at": datetime.now(timezone.utc).isoformat()}}
     )
-    
+
     for uid in [user1_id, user2_id]:
         await create_notification(
             "evento_cp",
@@ -427,11 +426,11 @@ async def cp_event_levelup(user_id: str, target_level: int):
             f"Tu pareja llego a nivel {target_level}! +{reward // 1000000}M monedas",
             target_user_id=uid
         )
-    
+
     await db.events.insert_one({
         "id": str(uuid.uuid4()), "type": f"cp_level_{target_level}",
         "cp_id": cp['id'], "reward_each": reward,
         "created_at": datetime.now(timezone.utc).isoformat()
     })
-    
+
     return {"success": True, "level": target_level, "reward_each": reward}

@@ -2,7 +2,8 @@
 Game routes: All mini-games, PK battles, slot machine, ruleta, etc.
 """
 from fastapi import APIRouter, HTTPException
-from database import db, GenericPlay, GameBet, PKBattleStart, RPSBet, TriviaBet, CardBet, uuid, datetime, timezone, timedelta, create_notification
+from database import db, GenericPlay, GameBet, PKBattleStart, RPSBet, TriviaBet, CardBet, uuid, datetime, timezone
+from datetime import timedelta
 import random
 
 router = APIRouter()
@@ -127,9 +128,9 @@ async def play_generic(play: GenericPlay):
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
     if user.get('coins', 0) < play.bet:
         raise HTTPException(status_code=400, detail="Monedas insuficientes")
-    
+
     import random
-    
+
     if play.game == 'cofre':
         # Cofres: 35% chance to win 1.5x-3x the cost
         await db.users.update_one({"id": play.user_id}, {"$inc": {"coins": -play.bet}})
@@ -142,14 +143,14 @@ async def play_generic(play: GenericPlay):
             return {"won": True, "prize": prize, "multiplier": multiplier, "new_balance": updated['coins']}
         updated = await db.users.find_one({"id": play.user_id})
         return {"won": False, "prize": 0, "new_balance": updated['coins']}
-    
+
     elif play.game in ('ruleta', 'dados', 'rps', 'slots', 'trivia', 'carta',
                        'ludo', 'yacaro', 'carreras', 'pool', 'domino', 'monster'):
         await db.users.update_one({"id": play.user_id}, {"$inc": {"coins": -play.bet}})
         import random
-        
+
         game_data = {}
-        
+
         if play.game == 'slots':
             won = random.random() < 0.25
             mult = random.choice([3, 5, 10]) if won else 0
@@ -226,7 +227,7 @@ async def play_generic(play: GenericPlay):
         else:
             won = random.random() < 0.4
             mult = random.choice([2, 3, 5]) if won else 0
-        
+
         if won and mult > 0:
             prize = play.bet * mult
             await db.users.update_one({"id": play.user_id}, {"$inc": {"coins": prize, "total_games_won": 1}})
@@ -248,7 +249,7 @@ async def play_generic(play: GenericPlay):
         )
         await record_daily_win(play.user_id, winnings=0, bet=play.bet)
         return {"won": False, "prize": 0, "new_balance": updated['coins'], "game_data": game_data}
-    
+
     raise HTTPException(status_code=400, detail="Juego no válido")
 
 # PKBattleStart imported from database
@@ -264,11 +265,11 @@ async def start_pk_battle(battle: PKBattleStart):
         raise HTTPException(status_code=400, detail="Monedas insuficientes (retador)")
     if opponent.get('coins', 0) < battle.bet_amount:
         raise HTTPException(status_code=400, detail="El oponente no tiene suficientes monedas")
-    
+
     # Deduct bets
     await db.users.update_one({"id": battle.challenger_id}, {"$inc": {"coins": -battle.bet_amount}})
     await db.users.update_one({"id": battle.opponent_id}, {"$inc": {"coins": -battle.bet_amount}})
-    
+
     battle_doc = {
         "id": str(uuid.uuid4()),
         "room_id": battle.room_id,
@@ -287,14 +288,14 @@ async def start_pk_battle(battle: PKBattleStart):
     }
     await db.pk_battles.insert_one(battle_doc)
     battle_doc.pop('_id', None)
-    
+
     await db.room_chats.insert_one({
         "id": str(uuid.uuid4()), "room_id": battle.room_id,
         "type": "event",
         "text": f"⚔️ BATALLA PK! {challenger['username']} vs {opponent['username']} - Apuesta: {battle.bet_amount:,} monedas!",
         "created_at": datetime.now(timezone.utc).isoformat()
     })
-    
+
     return {"success": True, "battle": battle_doc}
 
 @router.get("/games/pk-battle/{room_id}")
@@ -312,18 +313,18 @@ async def pk_gift(battle_id: str, user_id: str, amount: int):
     battle = await db.pk_battles.find_one({"id": battle_id, "status": "active"})
     if not battle:
         raise HTTPException(status_code=404, detail="Batalla no encontrada o ya termino")
-    
+
     user = await db.users.find_one({"id": user_id})
     if not user or user.get('coins', 0) < amount:
         raise HTTPException(status_code=400, detail="Monedas insuficientes")
-    
+
     await db.users.update_one({"id": user_id}, {"$inc": {"coins": -amount}})
-    
+
     if user_id == battle['challenger_id']:
         await db.pk_battles.update_one({"id": battle_id}, {"$inc": {"challenger_gifts": amount}})
     elif user_id == battle['opponent_id']:
         await db.pk_battles.update_one({"id": battle_id}, {"$inc": {"opponent_gifts": amount}})
-    
+
     updated = await db.pk_battles.find_one({"id": battle_id})
     updated.pop('_id', None)
     return {"success": True, "battle": updated}
@@ -334,11 +335,11 @@ async def end_pk_battle(battle_id: str):
     battle = await db.pk_battles.find_one({"id": battle_id, "status": "active"})
     if not battle:
         raise HTTPException(status_code=404, detail="Batalla no encontrada")
-    
+
     c_gifts = battle.get('challenger_gifts', 0)
     o_gifts = battle.get('opponent_gifts', 0)
     total_pot = battle['bet_amount'] * 2
-    
+
     if c_gifts > o_gifts:
         winner_id = battle['challenger_id']
         winner_name = battle['challenger_name']
@@ -351,19 +352,19 @@ async def end_pk_battle(battle_id: str):
         await db.users.update_one({"id": battle['opponent_id']}, {"$inc": {"coins": battle['bet_amount']}})
         await db.pk_battles.update_one({"id": battle_id}, {"$set": {"status": "tie"}})
         return {"success": True, "result": "tie", "returned": battle['bet_amount']}
-    
+
     await db.users.update_one({"id": winner_id}, {"$inc": {"coins": total_pot}})
     await db.pk_battles.update_one({"id": battle_id}, {"$set": {"status": "finished", "winner": winner_id}})
     # Daily ranking tracking for PK winner
     await record_daily_win(winner_id, winnings=total_pot - battle['bet_amount'], bet=battle['bet_amount'])
-    
+
     await db.room_chats.insert_one({
         "id": str(uuid.uuid4()), "room_id": battle['room_id'],
         "type": "event",
         "text": f"⚔️ {winner_name} GANA LA BATALLA PK! +{total_pot:,} monedas!",
         "created_at": datetime.now(timezone.utc).isoformat()
     })
-    
+
     return {"success": True, "winner": winner_name, "prize": total_pot}
 
 
@@ -386,7 +387,7 @@ async def play_ruleta(bet: GameBet):
         {"multiplier": 5, "label": "x5", "chance": 7},
         {"multiplier": 10, "label": "JACKPOT x10", "chance": 3},
     ]
-    
+
     roll = random.randint(1, 100)
     cumulative = 0
     selected = prizes[0]
@@ -395,18 +396,18 @@ async def play_ruleta(bet: GameBet):
         if roll <= cumulative:
             selected = p
             break
-    
+
     winnings = int(bet.bet_amount * selected["multiplier"])
     net = winnings - bet.bet_amount
-    
+
     await db.users.update_one(
         {"id": bet.user_id},
         {"$inc": {"coins": net}}
     )
     await record_daily_win(bet.user_id, winnings=max(0, net), bet=bet.bet_amount)
-    
+
     updated_user = await db.users.find_one({"id": bet.user_id})
-    
+
     return {
         "result": selected["label"],
         "multiplier": selected["multiplier"],
@@ -430,7 +431,7 @@ async def play_dados(bet: GameBet):
     dice1 = random.randint(1, 6)
     dice2 = random.randint(1, 6)
     total = dice1 + dice2
-    
+
     if total >= 10:
         multiplier = 3
         result = "GRAN VICTORIA"
@@ -443,18 +444,18 @@ async def play_dados(bet: GameBet):
     else:
         multiplier = 0
         result = "Perdiste"
-    
+
     winnings = int(bet.bet_amount * multiplier)
     net = winnings - bet.bet_amount
-    
+
     await db.users.update_one(
         {"id": bet.user_id},
         {"$inc": {"coins": net}}
     )
     await record_daily_win(bet.user_id, winnings=max(0, net), bet=bet.bet_amount)
-    
+
     updated_user = await db.users.find_one({"id": bet.user_id})
-    
+
     return {
         "dice1": dice1,
         "dice2": dice2,
@@ -481,9 +482,9 @@ async def play_rps(bet: RPSBet):
     choices = ["piedra", "papel", "tijera"]
     if bet.choice not in choices:
         raise HTTPException(status_code=400, detail="Opción inválida")
-    
+
     computer = random.choice(choices)
-    
+
     if bet.choice == computer:
         result = "empate"
         multiplier = 1
@@ -495,17 +496,17 @@ async def play_rps(bet: RPSBet):
     else:
         result = "perdiste"
         multiplier = 0
-    
+
     winnings = int(bet.bet_amount * multiplier)
     net = winnings - bet.bet_amount
-    
+
     await db.users.update_one(
         {"id": bet.user_id},
         {"$inc": {"coins": net}}
     )
-    
+
     updated_user = await db.users.find_one({"id": bet.user_id})
-    
+
     return {
         "player_choice": bet.choice,
         "computer_choice": computer,
@@ -540,18 +541,18 @@ async def play_trivia(bet: TriviaBet):
 
     q = random.choice(TRIVIA_QUESTIONS)
     correct = q["correct"] == bet.answer_index
-    
+
     multiplier = 3 if correct else 0
     winnings = int(bet.bet_amount * multiplier)
     net = winnings - bet.bet_amount
-    
+
     await db.users.update_one(
         {"id": bet.user_id},
         {"$inc": {"coins": net}}
     )
-    
+
     updated_user = await db.users.find_one({"id": bet.user_id})
-    
+
     return {
         "correct": correct,
         "correct_answer": q["options"][q["correct"]],
@@ -578,32 +579,31 @@ async def play_carta_mayor(bet: CardBet):
 
     cards = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"]
     card_values = {"A": 1, "2": 2, "3": 3, "4": 4, "5": 5, "6": 6, "7": 7, "8": 8, "9": 9, "10": 10, "J": 11, "Q": 12, "K": 13}
-    
+
     card1 = random.choice(cards)
     card2 = random.choice(cards)
-    
+
     val1 = card_values[card1]
     val2 = card_values[card2]
-    
+
     if val1 == val2:
         correct = False
-        result = "Empate - Pierdes"
     elif bet.guess == "mayor":
         correct = val2 > val1
     else:
         correct = val2 < val1
-    
+
     multiplier = 2 if correct else 0
     winnings = int(bet.bet_amount * multiplier)
     net = winnings - bet.bet_amount
-    
+
     await db.users.update_one(
         {"id": bet.user_id},
         {"$inc": {"coins": net}}
     )
-    
+
     updated_user = await db.users.find_one({"id": bet.user_id})
-    
+
     return {
         "card1": card1,
         "card2": card2,
@@ -632,13 +632,13 @@ async def play_slot_machine(bet: GameBet):
 
     symbols = ['7️⃣', '💎', '🍒', '🔔', '⭐', '🍋', '🍊', '🃏']
     weights = [5, 8, 15, 12, 10, 20, 20, 10]
-    
+
     reel1 = random.choices(symbols, weights=weights, k=1)[0]
     reel2 = random.choices(symbols, weights=weights, k=1)[0]
     reel3 = random.choices(symbols, weights=weights, k=1)[0]
-    
+
     combo = f"{reel1}{reel2}{reel3}"
-    
+
     payouts = {
         '7️⃣7️⃣7️⃣': (50, 'MEGA JACKPOT 777'),
         '💎💎💎': (25, 'DIAMOND RUSH'),
@@ -649,23 +649,23 @@ async def play_slot_machine(bet: GameBet):
         '🍊🍊🍊': (5, 'ORANGE CRUSH'),
         '🃏🃏🃏': (20, 'WILD CARD'),
     }
-    
+
     multiplier = 0
     jackpot_name = None
-    
+
     if combo in payouts:
         multiplier, jackpot_name = payouts[combo]
     elif reel1 == reel2 or reel2 == reel3 or reel1 == reel3:
         multiplier = 2
         jackpot_name = "PAR"
-    
+
     winnings = int(bet.bet_amount * multiplier)
     net = winnings - bet.bet_amount
-    
+
     await db.users.update_one({"id": bet.user_id}, {"$inc": {"coins": net}})
     await record_daily_win(bet.user_id, winnings=max(0, net), bet=bet.bet_amount)
     updated_user = await db.users.find_one({"id": bet.user_id})
-    
+
     return {
         "reels": [reel1, reel2, reel3],
         "multiplier": multiplier,

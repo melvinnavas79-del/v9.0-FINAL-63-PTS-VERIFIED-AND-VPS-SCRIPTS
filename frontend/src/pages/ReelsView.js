@@ -27,29 +27,40 @@ const ReelsView = ({ onBack }) => {
     if (!title.trim()) return alert('Escribe un título');
     const file = fileRef.current?.files[0];
     let videoUrl = '';
+    let imageUrl = '';
 
-    if (file) {
-      setUploading(true);
-      try {
-        const form = new FormData();
-        form.append('file', file);
-        const upRes = await axios.post(`${API}/upload`, form);
-        videoUrl = `${BASE}${upRes.data.url}`;
-      } catch (err) {
-        alert('Error subiendo archivo');
-        setUploading(false);
-        return;
+    if (!file) {
+      return alert('Selecciona un video o imagen para publicar');
+    }
+
+    setUploading(true);
+    try {
+      const form = new FormData();
+      form.append('file', file);
+      const upRes = await axios.post(`${API}/reels/upload`, form, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      const absUrl = `${BASE}${upRes.data.url}`;
+      if (upRes.data.is_video) {
+        videoUrl = absUrl;
+      } else {
+        imageUrl = absUrl;
       }
+    } catch (err) {
+      alert(err.response?.data?.detail || 'Error subiendo archivo');
+      setUploading(false);
+      return;
     }
 
     try {
       await axios.post(`${API}/reels`, {
-        user_id: user.id, title, description, video_url: videoUrl
+        user_id: user.id, title, description,
+        video_url: videoUrl, image_url: imageUrl,
       });
       setTitle(''); setDescription(''); setShowCreate(false);
       if (fileRef.current) fileRef.current.value = '';
       loadReels();
-    } catch (err) { alert('Error creando reel'); }
+    } catch (err) { alert(err.response?.data?.detail || 'Error creando reel'); }
     setUploading(false);
   };
 
@@ -92,12 +103,13 @@ const ReelsView = ({ onBack }) => {
           </div>
         )}
 
-        <div className="space-y-4">
+        <div className="space-y-4" data-testid="reels-feed">
           {reels.map((reel, i) => (
-            <div key={reel.id} className="bg-white rounded-2xl overflow-hidden shadow-sm border">
+            <div key={reel.id} data-testid={`reel-card-${reel.id}`} className="bg-white rounded-2xl overflow-hidden shadow-sm border">
               {reel.video_url ? (
-                <video src={reel.video_url} controls className="w-full h-64 object-cover bg-black"
-                  poster={`https://picsum.photos/seed/${reel.id}/400/300`} />
+                <video data-testid={`reel-video-${reel.id}`} src={reel.video_url} controls playsInline className="w-full h-64 object-cover bg-black" />
+              ) : reel.image_url ? (
+                <img data-testid={`reel-image-${reel.id}`} src={reel.image_url} alt={reel.title} className="w-full h-64 object-cover bg-black" />
               ) : (
                 <div className={`bg-gradient-to-br ${colors[i % colors.length]} h-64 flex items-center justify-center`}>
                   <div className="text-center">
@@ -113,10 +125,10 @@ const ReelsView = ({ onBack }) => {
                     <span className="font-bold text-gray-800 text-sm">{reel.username}</span>
                   </div>
                   <div className="flex gap-3">
-                    <button onClick={() => likeReel(reel.id)} className="text-sm">
+                    <button data-testid={`reel-like-${reel.id}`} onClick={() => likeReel(reel.id)} className="text-sm">
                       {reel.liked_by?.includes(user.id) ? '❤️' : '🤍'} {reel.likes || 0}
                     </button>
-                    <span className="text-sm text-gray-400">💬 {reel.comments?.length || 0}</span>
+                    <span className="text-sm text-gray-400">💬 {reel.comments_count || 0}</span>
                   </div>
                 </div>
                 <h4 className="font-bold text-gray-800">{reel.title}</h4>
@@ -125,7 +137,7 @@ const ReelsView = ({ onBack }) => {
             </div>
           ))}
           {reels.length === 0 && (
-            <div className="text-center py-16 text-gray-400">
+            <div data-testid="reels-empty" className="text-center py-16 text-gray-400">
               <div className="text-6xl mb-3">🎬</div>
               <p>No hay reels. ¡Crea el primero!</p>
             </div>

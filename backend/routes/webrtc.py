@@ -15,7 +15,7 @@ Topología: Full mesh (hasta ~10 hablantes simultáneos). Para más escalabilida
 a futuro se puede cambiar a SFU (mediasoup) sin tocar el frontend.
 """
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
-from typing import Dict, Set
+from typing import Dict
 import json
 import asyncio
 import logging

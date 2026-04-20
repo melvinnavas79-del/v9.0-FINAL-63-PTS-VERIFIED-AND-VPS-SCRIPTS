@@ -3,8 +3,7 @@ Room routes: CRUD, join/leave, seats, chat, music, photos.
 """
 from fastapi import APIRouter, HTTPException, UploadFile, File
 from database import (
-    db, RoomCreate, ChatMessage, serialize_room, serialize_user,
-    uuid, datetime, timezone, UPLOAD_DIR, create_notification
+    db, RoomCreate, ChatMessage, serialize_room, uuid, datetime, timezone, UPLOAD_DIR, create_notification
 )
 import os
 import shutil

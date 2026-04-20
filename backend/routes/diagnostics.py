@@ -14,7 +14,6 @@ from fastapi import APIRouter, HTTPException
 from database import db, UPLOAD_DIR
 import os
 import shutil
-import tempfile
 import requests
 import time
 

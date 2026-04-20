@@ -1,16 +1,9 @@
 [tool.ruff]
-line-length = 140
+line-length = 200
 target-version = "py311"
-exclude = ["tests/"]
+exclude = ["tests/", "__pycache__/", "venv/"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W"]
-ignore = [
-    "E501",  # line too long (legacy, will clean progressively)
-    "E701",  # multiple statements on one line (stylistic preference)
-]
-
-[tool.ruff.lint.per-file-ignores]
-"routes/bot.py" = ["F841", "F842"]      # llm_key kept for future feature flags
-"routes/social.py" = ["F841"]           # receiver_new kept for audit trail
-"routes/games.py" = ["F841"]            # intermediate calc vars kept for clarity
+# No ignores — codigo 100% limpio bajo PEP8 (con line-length razonable
+# para strings largos en español y prompts de IA)

@@ -35,11 +35,11 @@ async def register(user_data: UserRegister):
     existing = await db.users.find_one({"username": {"$regex": f"^{user_data.username}$", "$options": "i"}})
     if existing:
         raise HTTPException(status_code=400, detail="Usuario ya existe")
-    
+
     numeric_id = str(uuid.uuid4().int)[:6]
     while await db.users.find_one({"numeric_id": numeric_id}):
         numeric_id = str(uuid.uuid4().int)[:6]
-    
+
     user_doc = {
         "id": str(uuid.uuid4()),
         "numeric_id": numeric_id,
