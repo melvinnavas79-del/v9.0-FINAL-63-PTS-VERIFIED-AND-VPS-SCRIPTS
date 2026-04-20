@@ -231,6 +231,18 @@ async def send_chat(room_id: str, msg: ChatMessage):
         "avatar": user.get('avatar', ''), "text": msg.text,
         "type": "message", "created_at": datetime.now(timezone.utc).isoformat()
     }
+    # Bot Super Admin: detección de inyección (BLOQUEA si match) + moderación
+    try:
+        from routes.bot_super import process_chat_for_bot, BOT_USER_ID, log_suspicious_input
+        # Scan input for injection attempts (XSS/NoSQL/SQL). Si detecta, reemplaza
+        # el texto por un marcador seguro antes de persistir. Alerta al dueño.
+        blocked = await log_suspicious_input(source="routes/rooms.py:send_chat", text=msg.text, user_id=msg.user_id)
+        if blocked:
+            msg.text = "[mensaje bloqueado por el sistema de seguridad]"
+            chat_doc["text"] = msg.text
+    except Exception:
+        pass
+    # Persist chat only after security scan
     await db.room_chat.insert_one(chat_doc)
     # Check missions and bot auto-reply
     from routes.bot import check_chat_against_missions, bot_auto_reply
@@ -239,13 +251,10 @@ async def send_chat(room_id: str, msg: ChatMessage):
         await bot_auto_reply(room_id, user['username'], msg.text)
     # Bot Super Admin: moderación automática + comandos del dueño
     try:
-        from routes.bot_super import process_chat_for_bot, BOT_USER_ID, log_suspicious_input
-        # Scan input for injection attempts (XSS/NoSQL/SQL)
-        await log_suspicious_input(source="routes/rooms.py:send_chat", text=msg.text, user_id=msg.user_id)
+        from routes.bot_super import process_chat_for_bot, BOT_USER_ID
         if msg.user_id != BOT_USER_ID:
             await process_chat_for_bot(room_id, {"user_id": msg.user_id, "username": user['username']}, msg.text)
     except Exception:
-        # Nunca bloquear chat por fallo del bot
         pass
     chat_doc.pop('_id', None)
     return chat_doc

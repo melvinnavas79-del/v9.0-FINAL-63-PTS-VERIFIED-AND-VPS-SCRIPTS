@@ -665,7 +665,7 @@ async def log_suspicious_input(source: str, text: str, user_id: str = None):
         "line": 0,
         "function": "input_validation",
         "source_role": "security_scanner",
-        "hint": "Revisar sanitización de input. El bot bloqueó antes de tocar la DB.",
+        "hint": "Input bloqueado y reemplazado por marcador seguro antes de persistir. El bot alertó al dueño.",
         "context": {"user_id": user_id, "raw_excerpt": text[:200]},
         "traceback": [],
         "created_at": datetime.now(timezone.utc).isoformat(),

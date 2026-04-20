@@ -3,6 +3,58 @@
 ## Product
 Red social de audio en vivo con gamificación (monedas/diamantes), salas con **WebRTC self-hosted** (zero dependencia externa, zero costo variable), eventos (King/CP/PK), minijuegos, bot AI moderador y pagos reales PayPal Live. 100% white-label para deploy independiente en VPS.
 
+## Implementado en esta sesión (Abr 2026) — Iteración 15 (FINAL antes del push)
+
+### P0 — Panel de Salud Visual ✅
+- `/app/frontend/src/components/SystemHealthPanel.js` (nuevo, 194 líneas)
+- Nueva pestaña "🩺 Salud" en ControlPanel (`ctrl-tab-health`)
+- Semáforo verde/rojo con banner explícito:
+  - Verde: "✅ Sistema Saludable — Integridad 100% · 0 errores · Bot vigilando"
+  - Rojo: pulsing, con conteo de issues + errores sin resolver
+- 3 sub-tabs: **Integridad** (totales economía + lista issues con severity color-coded) / **Errores** (con botón "✓ Resuelto" por error) / **Estadísticas** (errores 24h, top archivos, top tipos)
+- Auto-refresh cada 20s
+
+### P0 — Alertas Push de Seguridad al Dueño ✅
+- `_alert_owners()` en bot_super.py crea notificación `category="system_alert"` al dueño
+- Dispara automáticamente:
+  - Al detectar intento de inyección (dedupe 2 min por key `injection:<source>:<user_id>`)
+  - Al capturar Exception no-HTTP (500+) o excepción genérica (dedupe 5 min por key `err:<type>:<file>:<line>`)
+  - NO dispara por 422 validation (evita spam)
+- Dedupe via collection `system_error_alerts` (idempotente)
+- Notificación llega al bell del dueño con formato `"🚨 Intento de inyección detectado — Origen: X. Extracto: Y"`
+
+### P0 — Bloqueo Real de Inyección en send_chat ✅
+- **Antes**: se logueaba pero el `<script>` se guardaba en DB
+- **Ahora**: al detectar patrón INJECTION_RE, el texto se reemplaza por `[mensaje bloqueado por el sistema de seguridad]` antes del `insert_one`
+- Testeado con `<script>alert(1)</script>` → DB persiste solo el marcador
+- Chat normal intacto
+
+### P0 — Follow / Unfollow en Sala ✅
+- UserProfileModal: nuevo botón `modal-follow-btn` visible cuando `targetId !== currentUser.id`
+- Carga estado inicial via `/api/social/follow-status`
+- Click toggle: POST `/api/social/follow` / DELETE `/api/social/follow`
+- Notificación automática al seguido (category `social_follow`)
+
+### P0 — Notificaciones categorías extendidas ✅
+- `routes/notifications.py` `active_cats` ahora incluye SIEMPRE: `invitacion`, `social_follow`, `social_friend_active`, `system_alert`, `badge`
+- Las categorías del usuario (`regalo_global`, `evento_cp`, `alerta_conexion`) siguen respetando sus preferencias
+
+### P0 — Visibilidad Total Salas Popular ✅
+- Confirmado: `/api/rooms` ya retorna TODAS las salas (incluyendo `active_users=0`)
+- Orden: `owner_svip DESC, active_users DESC` → las VIP primero, luego por tráfico
+
+### ✅ Testing iter 15 (Testing Agent v3)
+- **Backend 100% (18/18 pytest)**
+- **Frontend 100% smoke** (Panel Salud renderiza, tabs funcionan, Resolve remueve errores, semáforo cambia)
+- Regresión iter 10-14: todo verde
+- Lint: backend 0, frontend 0
+
+### 🔒 White-label confirmado
+- `grep -i "emergent" /app/frontend/src/` → 0 matches (solo REACT_APP_BACKEND_URL que es env var)
+- `manifest.json`: "Lluvia Live"
+- HTML title/meta: "Lluvia Live — Conecta, Chatea, Vive"
+- Control Panel header: "CONTROL MAESTRO" + badge "☔ Lluvia Live"
+
 ## Implementado en esta sesión (Abr 2026) — Iteración 14
 
 ### P0 — OJO TÉCNICO del Bot (Auditoría del Sistema) ✅

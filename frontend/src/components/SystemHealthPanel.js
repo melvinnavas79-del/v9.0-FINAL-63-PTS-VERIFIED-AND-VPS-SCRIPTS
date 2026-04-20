@@ -56,17 +56,20 @@ const SystemHealthPanel = ({ userId }) => {
   return (
     <div className="p-4 space-y-4" data-testid="system-health-panel">
       {/* Semáforo */}
-      <div className={`rounded-2xl p-4 border-2 ${isHealthy ? 'bg-green-900/30 border-green-500' : 'bg-red-900/30 border-red-500'}`}>
+      <div className={`rounded-2xl p-4 border-2 ${isHealthy ? 'bg-green-900/30 border-green-500' : 'bg-red-900/30 border-red-500 animate-pulse'}`}
+        data-testid={isHealthy ? 'health-status-ok' : 'health-status-alert'}>
         <div className="flex items-center gap-3">
-          <div className={`w-14 h-14 rounded-full flex items-center justify-center text-3xl ${isHealthy ? 'bg-green-500' : 'bg-red-500 animate-pulse'}`}>
+          <div className={`w-14 h-14 rounded-full flex items-center justify-center text-3xl ${isHealthy ? 'bg-green-500' : 'bg-red-500'}`}>
             {isHealthy ? '✅' : '⚠️'}
           </div>
           <div className="flex-1">
             <h3 className={`font-bold text-lg ${isHealthy ? 'text-green-300' : 'text-red-300'}`}>
-              {isHealthy ? 'Sistema Operativo' : 'Atención requerida'}
+              {isHealthy ? '✅ Sistema Saludable' : '⚠️ Atención Requerida'}
             </h3>
-            <p className="text-gray-300 text-sm">
-              {integrity?.issues_count || 0} problemas de integridad · {stats?.unresolved || 0} errores sin resolver
+            <p className={`text-sm ${isHealthy ? 'text-green-200/80' : 'text-gray-300'}`}>
+              {isHealthy
+                ? 'Integridad 100% · 0 errores sin resolver · Bot vigilando'
+                : `${integrity?.issues_count || 0} problemas de integridad · ${stats?.unresolved || 0} errores sin resolver`}
             </p>
           </div>
           <button data-testid="health-refresh-btn" onClick={loadAll} disabled={loading}
