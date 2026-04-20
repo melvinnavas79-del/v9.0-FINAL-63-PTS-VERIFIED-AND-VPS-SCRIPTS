@@ -1,0 +1,95 @@
+{
+  "version": "2.0.0",
+  "description": "Mapa estático de la arquitectura de Lluvia Live. Usado por el Bot Super Admin para contextualizar errores técnicos reportados al dueño.",
+  "files": {
+    "server.py": {
+      "path": "backend/server.py",
+      "role": "Punto de entrada FastAPI. Monta todos los routers, CORS, static files, global exception handler, startup hooks."
+    },
+    "database.py": {
+      "path": "backend/database.py",
+      "role": "Conexión Mongo (motor), modelos Pydantic, helpers serialize_*, create_notification, ROLE_HIERARCHY, UPLOAD_DIR."
+    },
+    "routes/auth.py": {
+      "path": "backend/routes/auth.py",
+      "role": "Registro, login (usuario/contraseña), Firebase auth, perfil de usuario, búsqueda por username, modo fantasma, rankings.",
+      "endpoints": ["/register", "/login", "/auth/firebase", "/users/{id}", "/users/search/{q}", "/rankings/*"]
+    },
+    "routes/rooms.py": {
+      "path": "backend/routes/rooms.py",
+      "role": "CRUD salas, join/leave, asientos, chat, música, fotos, moderación de sala (lock-seat/kick/ban-user).",
+      "endpoints": ["/rooms", "/rooms/{id}/join", "/rooms/{id}/seats/*", "/rooms/{id}/chat", "/rooms/{id}/kick-from-seat", "/rooms/{id}/ban-user", "/rooms/{id}/authority/{uid}"]
+    },
+    "routes/games.py": {
+      "path": "backend/routes/games.py",
+      "role": "Minijuegos: ruleta, dados, RPS, trivia, ludo, carreras, pool, domino, monster, slot 777, lion vs tiger, PK battles.",
+      "endpoints": ["/games/*", "/games/pk-battle"]
+    },
+    "routes/bot.py": {
+      "path": "backend/routes/bot.py",
+      "role": "Bot AI conversacional (Gemini), auto-reply en salas, misiones de vigilancia, alertas.",
+      "endpoints": ["/bot/command", "/bot/missions", "/bot/alerts", "/bot/activate-room"]
+    },
+    "routes/bot_super.py": {
+      "path": "backend/routes/bot_super.py",
+      "role": "Bot Super Admin (Ojo Técnico + moderación). Auto-kick/ban, comandos del dueño, error logger, integrity checks.",
+      "endpoints": ["/bot/super/init", "/bot/super/patrol/{id}", "/bot/super/actions", "/bot/super/errors", "/bot/super/integrity"]
+    },
+    "routes/events.py": {
+      "path": "backend/routes/events.py",
+      "role": "Eventos King/CP, cashback, recompensas semanales, flash events."
+    },
+    "routes/admin.py": {
+      "path": "backend/routes/admin.py",
+      "role": "Consola del dueño: give-coins, give-diamonds, set-level, set-aristocracy, verify, ban, unban, broadcast, traffic monitor, device/IP ban.",
+      "endpoints": ["/admin/console/*", "/admin/ban-ip", "/admin/banned-devices", "/admin/traffic-monitor"]
+    },
+    "routes/social.py": {
+      "path": "backend/routes/social.py",
+      "role": "Clanes, parejas, regalos, sobres, cofres."
+    },
+    "routes/friends.py": {
+      "path": "backend/routes/friends.py",
+      "role": "Sistema follow/unfollow, amigos activos en sala, búsqueda por ID numérico, firebase-status.",
+      "endpoints": ["/social/follow", "/social/friends-active/{id}", "/social/search-by-id/{id}", "/auth/firebase/status"]
+    },
+    "routes/store.py": {
+      "path": "backend/routes/store.py",
+      "role": "Tienda: aristocracia, marcos, entradas, anillos. PayPal LIVE integration.",
+      "endpoints": ["/store/items", "/store/paypal/*"]
+    },
+    "routes/notifications.py": {
+      "path": "backend/routes/notifications.py",
+      "role": "CRUD notificaciones, preferencias de aviso."
+    },
+    "routes/badges.py": {
+      "path": "backend/routes/badges.py",
+      "role": "Sistema de badges automáticos y manual."
+    },
+    "routes/levels.py": {
+      "path": "backend/routes/levels.py",
+      "role": "XP heartbeat, sistema de niveles 1-500."
+    },
+    "routes/webrtc.py": {
+      "path": "backend/routes/webrtc.py",
+      "role": "Signaling WebSocket para audio WebRTC self-hosted. Reemplaza Agora.",
+      "endpoints": ["/ws/audio/{room_id}", "/webrtc/config", "/webrtc/rooms/{id}/peers"]
+    },
+    "routes/diagnostics.py": {
+      "path": "backend/routes/diagnostics.py",
+      "role": "Diagnóstico operacional: PayPal OAuth, uploads, disco, Mongo. Solo dueño.",
+      "endpoints": ["/diagnostics", "/diagnostics/paypal/test-order"]
+    }
+  },
+  "common_errors": {
+    "ValidationError": "Pydantic — el cliente envió JSON con tipos incorrectos o campos faltantes. Revisar el modelo del endpoint.",
+    "HTTPException 403": "Autorización denegada. Revisar roles/role_hierarchy/_get_authority.",
+    "HTTPException 404": "Documento no existe en Mongo. Validar que el id/user_id sea correcto.",
+    "HTTPException 422": "FastAPI Pydantic — query/body no cumple esquema.",
+    "KeyError": "Diccionario Mongo sin ese campo. Usar .get(key, default) en lugar de [key].",
+    "bson.errors.InvalidId": "Intento de usar _id de Mongo como string. Siempre usar campo 'id' (uuid string) en las queries.",
+    "motor.MotorClientClosedError": "Conexión Mongo cerrada. Verificar MONGO_URL y que mongod esté corriendo.",
+    "google.api_core.exceptions": "Error de Gemini API. Verificar GEMINI_API_KEY y cuota en Google AI Studio.",
+    "requests.exceptions.HTTPError": "Llamada a PayPal/externo falló. Revisar credenciales y conectividad."
+  }
+}

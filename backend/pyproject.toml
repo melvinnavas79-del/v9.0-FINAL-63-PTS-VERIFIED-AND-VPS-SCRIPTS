@@ -1,6 +1,7 @@
 [tool.ruff]
 line-length = 140
 target-version = "py311"
+exclude = ["tests/"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W"]

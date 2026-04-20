@@ -18,8 +18,11 @@ Architecture:
     store.py         - Store packages, Stripe checkout
     notifications.py - Notification CRUD, preferences
 """
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import JSONResponse
+from fastapi.exceptions import RequestValidationError
+from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.cors import CORSMiddleware
 import os
 import logging
@@ -69,6 +72,59 @@ async def startup_ensure_bot():
         await _ensure_bot_user()
     except Exception as e:
         logging.getLogger("bot").warning(f"No se pudo inicializar el bot super admin: {e}")
+
+
+# ==================== GLOBAL ERROR HANDLER (Ojo Técnico del Bot) ====================
+
+@app.exception_handler(Exception)
+async def _global_exception_handler(request: Request, exc: Exception):
+    """
+    Captura TODA excepción no controlada, la registra en system_errors vía
+    el Bot Super Admin y devuelve 500 al cliente. HTTPException y errores de
+    validación tienen su handler dedicado (abajo) para no inflar el log.
+    """
+    try:
+        from routes.bot_super import log_system_error
+        await log_system_error(exc, context={
+            "method": request.method,
+            "path": str(request.url.path),
+            "query": str(request.url.query)[:300],
+        })
+    except Exception:
+        pass
+    logging.getLogger("uvicorn.error").exception(f"Unhandled error in {request.method} {request.url.path}")
+    return JSONResponse(status_code=500, content={"detail": "Error interno. El bot ya notificó al administrador."})
+
+
+@app.exception_handler(RequestValidationError)
+async def _validation_handler(request: Request, exc: RequestValidationError):
+    """Registra errores de validación del cliente (no spam: solo si son repetitivos podría ser ataque)."""
+    try:
+        from routes.bot_super import log_system_error
+        await log_system_error(exc, context={
+            "method": request.method,
+            "path": str(request.url.path),
+            "kind": "validation",
+        })
+    except Exception:
+        pass
+    return JSONResponse(status_code=422, content={"detail": exc.errors()})
+
+
+@app.exception_handler(StarletteHTTPException)
+async def _http_exception_handler(request: Request, exc: StarletteHTTPException):
+    """HTTPException: NO se registran 403/404 (normales), sí 500+."""
+    if exc.status_code >= 500:
+        try:
+            from routes.bot_super import log_system_error
+            await log_system_error(exc, context={
+                "method": request.method,
+                "path": str(request.url.path),
+                "status_code": exc.status_code,
+            })
+        except Exception:
+            pass
+    return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
 
 
 @app.on_event("shutdown")

@@ -1,0 +1,56 @@
+{
+  "summary": "Iter 14 (Ojo Técnico) — 20/20 backend pytest PASS. Validated: /api/bot/super/errors (list + 403 auth + required fields {type,message,file,line,function,source_role,hint,bot_report,traceback,created_at,resolved}), /errors/stats (last_24h,unresolved,by_file,by_type), /errors/{id}/resolve (idempotent + persistence via resolved=True|False filter), /integrity (healthy/issues/totals shape), /code-map (files + common_errors). Global exception handlers verified: RequestValidationError IS logged (422); HTTPException 403 is NOT logged (confirmed by counting system_errors before/after 3x 403 calls). Regression iter 10-13 OK (/bot/super/init, /bot/super/actions, /diagnostics, /auth/firebase/status, /webrtc/config, /login).",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {
+        "endpoint": "GET /api/bot/super/errors/stats",
+        "issue": "For RequestValidationError, _extract_error_location reports file='/root/.venv/.../fastapi/routing.py' (site-packages). Logic in bot_super.py._extract_error_location filters to backend_root AND excludes site-packages, but Pydantic RequestValidationError has no traceback pointing to /app/backend/ — so it falls back to tb[-1] which IS site-packages. Consider: if no backend frame found for RequestValidationError, extract endpoint from request context (already passed via context.path) and use it as file. Not a regression — feature edge case."
+      },
+      {
+        "endpoint": "GET /api/bot/super/integrity",
+        "issue": "Reports healthy=true, but totals.coins_in_economy = 500,135,795,400,910 (~500 trillion). Likely pre-existing test data from give-coins inflation rather than an iter 14 bug. Integrity endpoint does not flag 'economy inflation' as an issue kind — could be a future enhancement (compare against a ceiling). Per agent note this is feature output, not regression."
+      }
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration_14.py",
+    "/app/test_reports/pytest/iter14_results.xml"
+  ],
+  "action_items": [
+    "(optional) Improve _extract_error_location fallback for RequestValidationError so 'file' points to the endpoint module (via request.url.path→router map) instead of site-packages/fastapi/routing.py.",
+    "(optional) Integrity check could flag extreme totals (coins_in_economy above a configurable ceiling) as a 'low' severity issue so the dueño sees it in the /integrity panel."
+  ],
+  "critical_code_review_comments": [
+    "bot_super.log_system_error: correctly wraps errors, uses traceback tail (last 6 lines) to keep docs small, and purges oldest when count > 500. Good.",
+    "bot_super._extract_error_location: iterates traceback in reverse and filters to backend_root + not site-packages. Edge case: RequestValidationError has empty/foreign traceback → falls back to tb[-1] which is site-packages. Consider using context.path to derive the file for these.",
+    "server.py _global_exception_handler wraps log_system_error in try/except — good, prevents cascading failures inside the handler.",
+    "server.py _http_exception_handler correctly logs only status_code>=500 (403/404 excluded). Verified empirically (3x 403 did not add rows).",
+    "bot_super /errors endpoint adds 'bot_report' as computed field — human-readable format 'Jefe, error en X, línea Y...' matches spec.",
+    "bot_super /errors/stats uses MongoDB aggregation pipeline correctly with $match on since_date, $group, $sort, $limit 10. Efficient.",
+    "bot_super /integrity: five checks (negative balances, duplicate numeric_ids, malformed rooms, invalid roles, totals) cover the spec. severity levels (high/medium/low) consistent.",
+    "bot_super INJECTION_RE + log_suspicious_input helper is defined but NOT WIRED into any endpoint. Auxiliary function only — no endpoint currently invokes it. Consider hooking into chat/register/room-create if real detection is desired (per spec '(4) Detección de inyección básica'). Currently it's dead code.",
+    "bot_super imports are consolidated; file is 594 lines — approaching the 700-line soft-limit from code_review_guidelines. Consider splitting moderation vs. audit into two submodules.",
+    "All endpoints use {'_id': 0} projection correctly — no ObjectId leak in responses. Verified via list_system_errors and list_bot_actions."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iteration_14.py",
+    "/app/test_reports/iteration_14.json",
+    "/app/test_reports/pytest/iter14_results.xml"
+  ],
+  "success_rate": {
+    "backend": "100% (20/20)",
+    "frontend": "N/A (backend-only per review_request.testing_type)"
+  },
+  "test_credentials": "Melvin_Live / test123 (dueño, id b45958bc-2c6b-49ea-8102-a11197001e53). Non-owner used for 403: 4bea36c7-5c7f-48b0-ae68-97af4ac8890b.",
+  "seed_data_creation": "Triggered 1-2 RequestValidationError entries in system_errors via invalid POST /api/register bodies, then resolved one via /errors/{id}/resolve. Safe to leave — purge logic keeps collection <=500 docs.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Iter 14 Ojo Técnico complete. Error logger, integrity, code-map all working. Global exception handlers correctly log 422/500+ and skip 403/404. System is healthy per /integrity (0 issues). NOTE: for RequestValidationError, the reported 'file' is site-packages/fastapi/routing.py — a fallback edge case in _extract_error_location, not a regression. INJECTION_RE / log_suspicious_input helpers exist in bot_super.py but are not wired into any endpoint yet — if feature (4) 'detección de inyección' requires active wiring, main agent needs to hook it into chat/register inputs.",
+  "rca of the issue": "N/A — no blocking bugs."
+}

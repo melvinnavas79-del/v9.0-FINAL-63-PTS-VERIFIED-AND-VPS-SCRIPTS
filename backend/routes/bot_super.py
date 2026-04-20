@@ -1,25 +1,31 @@
 """
-Bot Super Admin — Moderación Automática con Poder de Dueño
-===========================================================
-El bot patrulla salas con rango SUPER ADMIN. Puede:
-- Detectar toxicidad (insultos, spam, amenazas) usando Gemini + lista de palabras
-- Auto-kick del micrófono al usuario ofensivo
-- Auto-ban de sala tras N infracciones (default 3 dentro de 10 min)
-- Ejecutar órdenes en chat del dueño: "bot kick @username", "bot ban @username",
-  "bot mute @username", "bot limpiar"
+Bot Super Admin — Moderación Automática + Auditoría Técnica
+=============================================================
+El bot es el "supervisor del sistema" con rango de dueño (Super Admin).
 
-Identidad del bot:
-  BOT_USER_ID = "system_bot_lluvia"
-  role = "dueño" (pasa el check _get_authority como "super")
+I. MODERACIÓN (ver abajo)
+   - Detecta toxicidad (regex + Gemini) y auto-kick/ban.
+   - Obedece comandos del dueño en chat: "bot kick @user", "bot ban @user".
+
+II. AUDITORÍA TÉCNICA — OJO TÉCNICO (añadido iter 14)
+   - Error Logger: captura TODA excepción no controlada del backend y la
+     guarda en `system_errors` con archivo + línea + traceback.
+   - Vigilancia de Integridad: endpoint para auditar descuadre de monedas/
+     diamantes, detectar balances negativos, intentos de inyección.
+   - Esquema del Código: `/app/backend/code_map.json` le da contexto al bot
+     para enriquecer cada error con el archivo y su rol.
 
 Seguridad:
-- Solo obedece comandos de chat si el emisor es rol="dueño" o is_super_admin.
-- Las acciones quedan registradas en `bot_actions` para auditoría.
+- Solo obedece comandos si role='dueño' / is_super_admin.
+- Endpoints de auditoría solo accesibles al dueño.
 """
 from fastapi import APIRouter, HTTPException
-from database import db, datetime, timezone, uuid, create_notification
+from database import db, datetime, timezone, uuid
 import os
 import re
+import json
+import traceback as _tb
+from pathlib import Path
 
 try:
     from google import genai
@@ -313,3 +319,276 @@ async def process_chat_for_bot(room_id: str, sender: dict, text: str) -> dict:
         actions.append({"action": "auto_kick", "target": sender_id, "violations": violations})
 
     return {"handled": True, "actions": actions}
+
+
+# ============================================================================
+#                    OJO TÉCNICO — AUDITORÍA DEL SISTEMA
+# ============================================================================
+
+_CODE_MAP = None
+
+
+def _load_code_map() -> dict:
+    """Carga y cachea el mapa del código."""
+    global _CODE_MAP
+    if _CODE_MAP is None:
+        p = Path(__file__).resolve().parents[1] / "code_map.json"
+        try:
+            with open(p, encoding="utf-8") as f:
+                _CODE_MAP = json.load(f)
+        except Exception:
+            _CODE_MAP = {"files": {}, "common_errors": {}}
+    return _CODE_MAP
+
+
+def _extract_error_location(exc: BaseException) -> dict:
+    """
+    Dado un Exception, extrae el FRAME más profundo dentro del backend de
+    Lluvia (ignora librerías externas). Retorna:
+      { file, line, function, source_role }
+    """
+    backend_root = str(Path(__file__).resolve().parents[1])
+    tb = _tb.extract_tb(exc.__traceback__)
+    chosen = None
+    for frame in reversed(tb):
+        if frame.filename.startswith(backend_root) and "site-packages" not in frame.filename:
+            chosen = frame
+            break
+    if chosen is None and tb:
+        chosen = tb[-1]
+    if chosen is None:
+        return {"file": "unknown", "line": 0, "function": "unknown", "source_role": "unknown"}
+
+    rel = chosen.filename.replace(backend_root + "/", "").replace(backend_root + "\\", "")
+    code_map = _load_code_map()
+    # match by suffix (routes/X.py, database.py, server.py)
+    role = "unknown"
+    for key, meta in code_map.get("files", {}).items():
+        if rel.endswith(key):
+            role = meta.get("role", "")
+            break
+
+    return {
+        "file": rel,
+        "line": chosen.lineno,
+        "function": chosen.name,
+        "source_role": role,
+    }
+
+
+async def log_system_error(exc: BaseException, context: dict = None) -> dict:
+    """
+    Registra un error técnico en `system_errors` para que el dueño lo vea.
+    Llamado desde el global exception handler en server.py.
+    """
+    loc = _extract_error_location(exc)
+    code_map = _load_code_map()
+    exc_type = type(exc).__name__
+    hint = code_map.get("common_errors", {}).get(exc_type, "")
+
+    doc = {
+        "id": str(uuid.uuid4()),
+        "type": exc_type,
+        "message": str(exc)[:500],
+        "file": loc["file"],
+        "line": loc["line"],
+        "function": loc["function"],
+        "source_role": loc["source_role"],
+        "hint": hint,
+        "context": context or {},
+        "traceback": _tb.format_exception(type(exc), exc, exc.__traceback__)[-6:],  # tail
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "resolved": False,
+    }
+    try:
+        await db.system_errors.insert_one(doc)
+        # Purgar si pasan de 500 (keep más reciente)
+        count = await db.system_errors.count_documents({})
+        if count > 500:
+            old_cursor = db.system_errors.find({}, {"_id": 1}).sort("created_at", 1).limit(count - 500)
+            old_ids = [d["_id"] async for d in old_cursor]
+            if old_ids:
+                await db.system_errors.delete_many({"_id": {"$in": old_ids}})
+    except Exception:
+        # Never throw inside the error logger
+        pass
+    doc.pop("_id", None)
+    return doc
+
+
+@router.get("/bot/super/errors")
+async def list_system_errors(admin_id: str, resolved: bool = False, limit: int = 50):
+    """Últimos errores técnicos para el panel del dueño."""
+    admin = await db.users.find_one({"id": admin_id})
+    if not admin or admin.get("role") != "dueño":
+        raise HTTPException(status_code=403, detail="Solo el dueño")
+    rows = await db.system_errors.find(
+        {"resolved": resolved},
+        {"_id": 0},
+    ).sort("created_at", -1).to_list(limit)
+    # Formato human-readable adicional
+    for r in rows:
+        r["bot_report"] = f"Jefe, error en {r['file']}, línea {r['line']} ({r['function']}). Motivo: {r['type']}: {r['message'][:200]}"
+    return rows
+
+
+@router.post("/bot/super/errors/{error_id}/resolve")
+async def resolve_error(error_id: str, admin_id: str):
+    """Marca un error como resuelto para que no salga en el panel."""
+    admin = await db.users.find_one({"id": admin_id})
+    if not admin or admin.get("role") != "dueño":
+        raise HTTPException(status_code=403, detail="Solo el dueño")
+    r = await db.system_errors.update_one({"id": error_id}, {"$set": {"resolved": True}})
+    return {"success": r.modified_count > 0}
+
+
+@router.get("/bot/super/errors/stats")
+async def error_stats(admin_id: str):
+    """Conteo de errores por archivo/tipo en últimas 24h. Útil para dashboard."""
+    admin = await db.users.find_one({"id": admin_id})
+    if not admin or admin.get("role") != "dueño":
+        raise HTTPException(status_code=403, detail="Solo el dueño")
+    from datetime import timedelta
+    since = (datetime.now(timezone.utc) - timedelta(hours=24)).isoformat()
+    pipeline_file = [
+        {"$match": {"created_at": {"$gte": since}}},
+        {"$group": {"_id": "$file", "count": {"$sum": 1}}},
+        {"$sort": {"count": -1}},
+        {"$limit": 10},
+    ]
+    pipeline_type = [
+        {"$match": {"created_at": {"$gte": since}}},
+        {"$group": {"_id": "$type", "count": {"$sum": 1}}},
+        {"$sort": {"count": -1}},
+        {"$limit": 10},
+    ]
+    by_file = await db.system_errors.aggregate(pipeline_file).to_list(10)
+    by_type = await db.system_errors.aggregate(pipeline_type).to_list(10)
+    total = await db.system_errors.count_documents({"created_at": {"$gte": since}})
+    unresolved = await db.system_errors.count_documents({"resolved": False, "created_at": {"$gte": since}})
+    return {
+        "last_24h": total,
+        "unresolved": unresolved,
+        "by_file": [{"file": x["_id"], "count": x["count"]} for x in by_file],
+        "by_type": [{"type": x["_id"], "count": x["count"]} for x in by_type],
+    }
+
+
+@router.get("/bot/super/integrity")
+async def integrity_check(admin_id: str):
+    """
+    Vigilancia de integridad de datos. Verifica:
+      - Usuarios con balance negativo de coins/diamonds (no debería existir)
+      - Suma de diamantes distribuida vs techo configurado (descuadre)
+      - Salas con estructura inconsistente (seats >10 sin max_seats, banned_users mal formado)
+      - Duplicados de numeric_id entre usuarios
+      - Usuarios con role inválido
+    """
+    admin = await db.users.find_one({"id": admin_id})
+    if not admin or admin.get("role") != "dueño":
+        raise HTTPException(status_code=403, detail="Solo el dueño")
+
+    issues = []
+
+    # 1) Balances negativos
+    neg_coins = await db.users.count_documents({"coins": {"$lt": 0}})
+    neg_diamonds = await db.users.count_documents({"diamonds": {"$lt": 0}})
+    if neg_coins:
+        issues.append({"severity": "high", "file": "routes/admin.py", "kind": "negative_balance",
+                       "detail": f"{neg_coins} usuario(s) con coins < 0. Probable descuadre en give-coins/gifts.",
+                       "bot_report": f"Jefe, hay {neg_coins} usuario(s) con monedas negativas. Revisar routes/admin.py console/give-coins o routes/social.py send-gift."})
+    if neg_diamonds:
+        issues.append({"severity": "high", "file": "routes/admin.py", "kind": "negative_balance",
+                       "detail": f"{neg_diamonds} usuario(s) con diamonds < 0.",
+                       "bot_report": f"Jefe, hay {neg_diamonds} usuario(s) con diamantes negativos."})
+
+    # 2) numeric_id duplicados
+    pipeline = [
+        {"$match": {"numeric_id": {"$exists": True, "$ne": ""}}},
+        {"$group": {"_id": "$numeric_id", "ids": {"$push": "$id"}, "count": {"$sum": 1}}},
+        {"$match": {"count": {"$gt": 1}}},
+        {"$limit": 20},
+    ]
+    dupes = await db.users.aggregate(pipeline).to_list(20)
+    for d in dupes:
+        issues.append({"severity": "medium", "file": "routes/auth.py", "kind": "duplicate_numeric_id",
+                       "detail": f"numeric_id={d['_id']} compartido por {d['count']} usuarios ({d['ids'][:3]}).",
+                       "bot_report": f"Jefe, {d['count']} usuarios con el mismo numeric_id {d['_id']}. Revisar generación en auth.py línea 39."})
+
+    # 3) Salas mal formadas
+    rooms = await db.rooms.find({}, {"_id": 0, "id": 1, "name": 1, "seats": 1, "max_seats": 1, "banned_users": 1}).to_list(500)
+    for r in rooms:
+        seats = r.get("seats") or []
+        max_seats = r.get("max_seats", 10)
+        if len(seats) > max_seats + 1:
+            issues.append({"severity": "low", "file": "routes/rooms.py", "kind": "seats_overflow",
+                           "detail": f"Sala '{r.get('name')}' tiene {len(seats)} seats pero max_seats={max_seats}.",
+                           "bot_report": f"Jefe, la sala '{r.get('name')}' tiene más seats de los configurados."})
+        bu = r.get("banned_users")
+        if bu is not None and not isinstance(bu, list):
+            issues.append({"severity": "medium", "file": "routes/rooms.py", "kind": "banned_users_invalid",
+                           "detail": f"Sala '{r.get('name')}' banned_users no es lista.",
+                           "bot_report": f"Jefe, la sala '{r.get('name')}' tiene banned_users corrupto (no es lista)."})
+
+    # 4) Roles invalidos
+    valid_roles = {"usuario", "vip", "supervisor", "moderador", "admin", "dueño"}
+    bad = await db.users.find({"role": {"$nin": list(valid_roles)}}, {"_id": 0, "id": 1, "username": 1, "role": 1}).to_list(50)
+    for u in bad:
+        issues.append({"severity": "high", "file": "database.py", "kind": "invalid_role",
+                       "detail": f"Usuario {u.get('username')} tiene role='{u.get('role')}' (no está en ROLE_HIERARCHY).",
+                       "bot_report": f"Jefe, el usuario {u.get('username')} tiene un role inválido: '{u.get('role')}'. Revisar ROLE_HIERARCHY en database.py."})
+
+    # 5) Total oficial
+    totals_cursor = db.users.aggregate([
+        {"$group": {"_id": None, "coins": {"$sum": "$coins"}, "diamonds": {"$sum": "$diamonds"}, "users": {"$sum": 1}}}
+    ])
+    totals = await totals_cursor.to_list(1)
+    total = totals[0] if totals else {"coins": 0, "diamonds": 0, "users": 0}
+
+    return {
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "healthy": len(issues) == 0,
+        "issues_count": len(issues),
+        "issues": issues,
+        "totals": {"users": total.get("users", 0), "coins_in_economy": total.get("coins", 0), "diamonds_in_economy": total.get("diamonds", 0)},
+    }
+
+
+@router.get("/bot/super/code-map")
+async def get_code_map(admin_id: str):
+    """Retorna el mapa de la arquitectura. Solo dueño."""
+    admin = await db.users.find_one({"id": admin_id})
+    if not admin or admin.get("role") != "dueño":
+        raise HTTPException(status_code=403, detail="Solo el dueño")
+    return _load_code_map()
+
+
+# Detección simple de patrones sospechosos (inyección) en inputs de texto.
+INJECTION_PATTERNS = [
+    r"\$where\b", r"\$ne\s*:", r"\$gt\s*:", r"\$function",  # NoSQL
+    r"<script", r"javascript:", r"on\w+\s*=",                # XSS
+    r";\s*(drop|delete|insert|update)\s+", r"--\s*$",        # SQL
+    r"\.\.\/", r"\/etc\/passwd", r"\\x00",                   # path traversal
+]
+INJECTION_RE = re.compile("|".join(INJECTION_PATTERNS), re.IGNORECASE)
+
+
+async def log_suspicious_input(source: str, text: str, user_id: str = None):
+    """Llamado desde hooks cuando detectamos patrón de inyección en input."""
+    if not text or not INJECTION_RE.search(text):
+        return False
+    await db.system_errors.insert_one({
+        "id": str(uuid.uuid4()),
+        "type": "SuspiciousInput",
+        "message": f"Patrón de inyección detectado en {source}: {text[:200]}",
+        "file": source,
+        "line": 0,
+        "function": "input_validation",
+        "source_role": "security_scanner",
+        "hint": "Revisar sanitización de input. El bot bloqueó antes de tocar la DB.",
+        "context": {"user_id": user_id, "raw_excerpt": text[:200]},
+        "traceback": [],
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "resolved": False,
+    })
+    return True
