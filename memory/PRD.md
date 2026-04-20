@@ -3,7 +3,45 @@
 ## Product
 Red social de audio en vivo con gamificación (monedas/diamantes), salas con **WebRTC self-hosted** (zero dependencia externa, zero costo variable), eventos (King/CP/PK), minijuegos, bot AI moderador y pagos reales PayPal Live. 100% white-label para deploy independiente en VPS.
 
-## Implementado en esta sesión (Abr 2026) — Iteración 11
+## Implementado en esta sesión (Abr 2026) — Iteración 12
+
+### P0 — Firebase Web App ID correcto ✅
+- `frontend/.env` actualizado con credenciales Web reales dadas por el dueño:
+  - `REACT_APP_FIREBASE_APP_ID=1:909704512499:web:a8f0d658fb6dbd3f610886`
+  - `REACT_APP_FIREBASE_API_KEY=AIzaSyA9sdOfg7f55DX7Ej_TK_BJHrNFTmtr5J4`
+- `/api/auth/firebase/status` retorna `project_id=lluvia-live-69a05`, `web_api_key_configured=true`
+- Login Google y Phone ahora pueden conectar contra Firebase Web real
+
+### P0 — Super Admin global en cualquier sala ✅
+- Backend helper `_get_authority(user_id, room)` retorna `"super" | "owner" | "moderator" | "none"`
+- `lock-seat`, `lock-all`, `unlock-all` → permiten `level in (super, owner)`
+- **Dueño de plataforma (role="dueño" o is_super_admin) puede gestionar CUALQUIER sala**, por encima del dueño de sala
+- Nuevos endpoints:
+  - `POST /rooms/{id}/kick-from-seat?admin_id=X&target_user_id=Y` — baja del micro + chat marker
+  - `POST /rooms/{id}/ban-user?admin_id=X&target_user_id=Y` — agrega a banned_users + kick
+  - `POST /rooms/{id}/unban-user` — quita de banned_users
+  - `GET /rooms/{id}/authority/{user_id}` — frontend helper para renderizar UI según nivel
+- `POST /rooms/{id}/join` ahora valida `banned_users` → 403 si baneado (salvo super admin)
+- Jerarquía respetada: moderator no puede kickear al dueño de la sala; solo super puede tocar a otro dueño de plataforma
+- `serialize_room` ahora expone `banned_users` al frontend
+
+### P0 — Admin Console: Give Diamonds + Confirmaciones ✅
+- Nuevo endpoint `POST /admin/console/give-diamonds` con **404 si target no existe** + **clamp a ≥0** para evitar balances negativos
+- Botón `console-give-diamonds` en ControlPanel
+- Confirmaciones agregadas en frontend:
+  - Aristocracia ≥ 6: confirm obligatorio
+  - give-diamonds |amount| > 100,000: confirm obligatorio
+  - Ban global: confirm obligatorio
+
+### P0 — Frontend super-admin visible ✅
+- RoomView: botones `room-lock-all-btn` / `room-unlock-all-btn` + lock-seat toggle ahora visibles para `role="dueño"` / `is_super_admin` incluso en salas ajenas
+- Badge "👑 Super Admin" indica cuando estás gestionando una sala que NO es tuya
+
+### 🧪 Testing (iter 12)
+- **Backend: 100% (15/15)** — super override, kick, ban, unban, give-diamonds, authority endpoint, firebase-status
+- Pruebas regresión iter 10+11 siguen pasando
+
+## Implementado en sesión (Abr 2026) — Iteración 11
 
 ### P0 — Sistema de Amigos + Búsqueda por ID + Dashboard Vivo ✅
 - **Backend** `/app/backend/routes/friends.py` (nuevo):
