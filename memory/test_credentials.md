@@ -9,3 +9,5 @@
 ## Notes
 - Login endpoint: `POST /api/login` con `{ username, password }` (NO `/api/auth/login`)
 - Firebase login endpoint: `POST /api/auth/firebase` con token Firebase
+- Melvin_Live user_id: `b45958bc-2c6b-49ea-8102-a11197001e53`
+- Diagnostics URL (producción): `https://<tu-dominio>/api/diagnostics?user_id=b45958bc-2c6b-49ea-8102-a11197001e53`

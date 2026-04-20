@@ -1,7 +1,45 @@
 # Lluvia Live — PRD
 
 ## Product
-Red social de audio en vivo con gamificación (monedas/diamantes), salas con Agora WebRTC, eventos (King/CP/PK), minijuegos, bot AI moderador y pagos reales PayPal Live. 100% white-label para deploy independiente en VPS.
+Red social de audio en vivo con gamificación (monedas/diamantes), salas con **WebRTC self-hosted** (zero dependencia externa, zero costo variable), eventos (King/CP/PK), minijuegos, bot AI moderador y pagos reales PayPal Live. 100% white-label para deploy independiente en VPS.
+
+## Implementado en esta sesión (Abr 2026)
+
+### P0 — Agora eliminado → WebRTC self-hosted ✅
+- **Dueño decidió**: eliminar Agora para no depender de tarifa por minuto. Implementado WebRTC nativo del navegador + signaling via WebSocket en el mismo FastAPI (zero servicios extra).
+- **Backend** `/app/backend/routes/webrtc.py`:
+  - `GET /api/webrtc/config` → retorna ICE servers (STUN Google por defecto; permite TURN propio vía TURN_URL/TURN_USER/TURN_PASS en .env).
+  - `WebSocket /api/ws/audio/{room_id}?user_id=<uid>` → relay de mensajes `offer/answer/ice/peer-joined/peer-left/peers`. Diccionario `ROOMS` en memoria por sala.
+  - `GET /api/webrtc/rooms/{room_id}/peers` → lista peers conectados (útil para debug).
+- **Frontend** `/app/frontend/src/contexts/AudioContext.js`: reescrito completamente con RTCPeerConnection nativo + "perfect negotiation" pattern (maneja glare con polite/impolite). `agora-rtc-sdk-ng` removido de package.json.
+- **Topología**: mesh P2P. Viable hasta ~10 hablantes simultáneos. Audio NUNCA pasa por el servidor → zero costo de bandwidth de audio.
+- **Testing**: 100% pass — 2-peer signaling validado end-to-end (offer/answer/ICE relay), WebSocket conecta al entrar a sala, audio persiste con MiniPlayer al navegar fuera.
+
+### P0 — /api/diagnostics (sin acceso SSH) ✅
+- **Motivación**: el dueño reportó bugs en producción (VPS) pero el agente no puede SSH a su servidor. Endpoint de diagnóstico solo-para-dueño que expone el estado real del backend.
+- **`GET /api/diagnostics?user_id=<dueño_id>`**:
+  - PayPal: ejecuta OAuth real contra `api-m.paypal.com` (LIVE) → retorna app_id, scopes, latencia.
+  - Uploads: verifica permisos (mode 777), escribe/lee archivo de prueba, lista sample.
+  - Disco: espacio libre.
+  - Env: qué variables críticas están set (solo booleano + longitud, sin exponer valores).
+  - Mongo: conteo de users/rooms.
+- **`POST /api/diagnostics/paypal/test-order?user_id=<dueño_id>&amount=1.00`**: crea una orden PayPal LIVE real (intent=CAPTURE, no se aprueba → no genera cargo) para validar end-to-end que la cuenta está activa.
+- **Testing**: HTTP 200 para dueño, 403 para no-dueño, 404 para usuario inexistente. PayPal test-order devolvió HTTP 201 CREATED con orden real.
+
+### P0 — Reorganización UI RoomView ✅
+- **Fila superior** (top toolbar): Tienda / Juegos / Cofres / Sobres / Regalos / **Rankings 👑 (nuevo, movido desde el floating lateral)** → `data-testid="top-rankings-btn"` abre `GiftRanking` modal (diario/semanal/mensual).
+- **Header top-right**: botón de Eventos (👑) REMOVIDO.
+- **Barra inferior**: Eventos (👑 naranja nuevo, primer elemento) + Regalos + Música + Mic + Altavoz + Salir + Tools.
+- **Floating lateral derecho**: solo `floating-fondo-btn` (🖼, solo dueños/admin). El antiguo `floating-top-btn` fue eliminado.
+- **Testing**: 15/15 data-testid checks pass.
+
+## Core
+- Auth: Firebase (Google + Phone) + usuario/contraseña legacy
+- **Rooms: WebRTC self-hosted**, 10↔24 micros, PK battles, cofres, sobres (lluvia de oro), backgrounds con filtro AI
+- Gamification: SVIP 1-10, Aristocracia, badges automáticos, rankings (monedas, nivel, clanes, diario)
+- Economy: PayPal LIVE + Hot Recharge dentro de la sala
+- Mini-games: Ruleta, Dados, RPS, Trivia, Ludo, Yacaro, Carreras, Pool, Domino, Monster, Slot Machine 777, Lion vs Tiger
+- Admin: Event Control Panel, Device ID banning, kick/mute con jerarquía SVIP, **/api/diagnostics**
 
 ## Core
 - Auth: Firebase (Google + Phone) + usuario/contraseña legacy
