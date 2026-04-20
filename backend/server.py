@@ -53,12 +53,23 @@ from routes.levels import router as levels_router
 from routes.webrtc import router as webrtc_router
 from routes.diagnostics import router as diagnostics_router
 from routes.friends import router as friends_router
+from routes.bot_super import router as bot_super_router
 
-for r in [auth_router, rooms_router, games_router, bot_router, events_router, admin_router, social_router, store_router, notif_router, badges_router, levels_router, webrtc_router, diagnostics_router, friends_router]:
+for r in [auth_router, rooms_router, games_router, bot_router, events_router, admin_router, social_router, store_router, notif_router, badges_router, levels_router, webrtc_router, diagnostics_router, friends_router, bot_super_router]:
     app.include_router(r, prefix="/api")
 
 # ==================== STATIC FILES ====================
 app.mount("/api/uploads", StaticFiles(directory=str(UPLOAD_DIR)), name="uploads")
+
+@app.on_event("startup")
+async def startup_ensure_bot():
+    """Garantiza que el usuario del Bot Super Admin exista al arrancar."""
+    try:
+        from routes.bot_super import _ensure_bot_user
+        await _ensure_bot_user()
+    except Exception as e:
+        logging.getLogger("bot").warning(f"No se pudo inicializar el bot super admin: {e}")
+
 
 @app.on_event("shutdown")
 async def shutdown_db_client():

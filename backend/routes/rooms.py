@@ -237,6 +237,14 @@ async def send_chat(room_id: str, msg: ChatMessage):
     await check_chat_against_missions(room_id, user['username'], msg.text)
     if msg.user_id != "bot":
         await bot_auto_reply(room_id, user['username'], msg.text)
+    # Bot Super Admin: moderación automática + comandos del dueño
+    try:
+        from routes.bot_super import process_chat_for_bot, BOT_USER_ID
+        if msg.user_id != BOT_USER_ID:
+            await process_chat_for_bot(room_id, {"user_id": msg.user_id, "username": user['username']}, msg.text)
+    except Exception:
+        # Nunca bloquear chat por fallo del bot
+        pass
     chat_doc.pop('_id', None)
     return chat_doc
 
