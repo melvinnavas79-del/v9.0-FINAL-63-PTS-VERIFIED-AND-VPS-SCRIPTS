@@ -1,7 +1,7 @@
 """
 WebRTC Signaling Server - 100% self-hosted, zero cost.
 =======================================================
-Reemplaza Agora con WebRTC nativo del navegador + señalización via WebSocket.
+Audio WebRTC nativo del navegador + señalización via WebSocket.
 
 Arquitectura:
 - Cada sala tiene un "room" de señalización en memoria

@@ -1,8 +1,8 @@
 /**
  * AudioContext — 100% self-hosted WebRTC audio rooms.
  * ====================================================
- * Reemplaza Agora.io con WebRTC nativo del navegador + signaling via WebSocket
- * al backend FastAPI de Melvin. Zero costo variable, zero dependencia externa.
+ * Audio WebRTC nativo del navegador + signaling via WebSocket
+ * al backend FastAPI. Zero costo variable, zero dependencia externa.
  *
  * Topología: mesh P2P. Viable hasta ~10 hablantes activos por sala.
  * Usa "perfect negotiation" (https://w3c.github.io/webrtc-pc/#perfect-negotiation-example)

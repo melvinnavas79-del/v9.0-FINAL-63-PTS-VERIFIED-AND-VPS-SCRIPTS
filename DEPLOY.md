@@ -234,7 +234,7 @@ POST /api/diagnostics/paypal/test-order?user_id=<id>&amount=1.00  → crea orden
 | PayPal | https://developer.paypal.com (Live mode) | `PAYPAL_CLIENT_ID` + `PAYPAL_CLIENT_SECRET` |
 | Firebase | https://console.firebase.google.com | Auth Google + Phone (Web App ID) |
 
-> Ya NO necesitas Agora.io — el audio corre 100% en tu servidor con WebRTC nativo.
+> El audio corre 100% en tu servidor con WebRTC nativo. Cero servicios externos.
 
 ---
 

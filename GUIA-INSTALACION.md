@@ -173,7 +173,7 @@ sudo certbot --nginx -d tu-dominio.com -d www.tu-dominio.com
 - `firebase-admin` (validación tokens Google/Phone)
 - `websockets` (signaling WebRTC interno de FastAPI)
 
-**Sin Agora.io, sin Twilio, sin Pusher, sin servicios externos de audio.** WebRTC corre peer-to-peer en el navegador de tus usuarios; tu servidor solo relaya el "handshake" inicial (<1KB por conexión).
+**Sistema de audio 100% self-hosted.** WebRTC corre peer-to-peer en el navegador de tus usuarios; tu servidor solo relaya el "handshake" inicial (<1KB por conexión). Cero servicios externos de audio, cero costos variables.
 
 ## 9. Verificación post-deploy
 
