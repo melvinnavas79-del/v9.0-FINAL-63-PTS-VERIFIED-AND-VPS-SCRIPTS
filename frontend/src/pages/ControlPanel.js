@@ -218,6 +218,7 @@ const ControlPanel = ({ onBack }) => {
     { id: 'salas', label: 'Salas', icon: '🏠' },
     { id: 'config', label: 'Config', icon: '⚙️' },
     { id: 'console', label: 'Consola', icon: '💻' },
+    { id: 'techconsole', label: 'Script Runner', icon: '⚡' },
     { id: 'bot', label: 'Bot IA', icon: '🤖' },
     { id: 'security', label: 'Seguridad', icon: '🛡️' },
     { id: 'health', label: 'Salud', icon: '🩺' },
@@ -630,6 +631,11 @@ const ControlPanel = ({ onBack }) => {
           <BotTab userId={user.id} />
         )}
 
+        {/* SCRIPT RUNNER — Consola Técnica con Master Key */}
+        {activeTab === 'techconsole' && (
+          <TechConsoleTab userId={user.id} />
+        )}
+
         {/* SEGURIDAD - Super Admin Tools (Device/IP ban + fake accounts) */}
         {activeTab === 'security' && (
           <SuperAdminTools adminId={user.id} />
@@ -893,5 +899,239 @@ const PrizesConfig = ({ userId }) => {
   );
 };
 
+const TechConsoleTab = ({ userId }) => {
+  const [masterKey, setMasterKey] = useState(() => sessionStorage.getItem('ll_master_key') || '');
+  const [rememberKey, setRememberKey] = useState(() => !!sessionStorage.getItem('ll_master_key'));
+  const [mode, setMode] = useState('python');
+  const [code, setCode] = useState('');
+  const [output, setOutput] = useState(null);
+  const [running, setRunning] = useState(false);
+  const [status, setStatus] = useState({ configured: false, min_length: 20, current_length: 0 });
+  const [history, setHistory] = useState([]);
+  const [showHistory, setShowHistory] = useState(false);
+
+  useEffect(() => {
+    loadStatus();
+    loadHistory();
+  }, []);
+
+  const loadStatus = async () => {
+    try {
+      const r = await axios.get(`${API}/admin/script-runner/status?admin_id=${userId}`);
+      setStatus(r.data);
+    } catch (_) {}
+  };
+
+  const loadHistory = async () => {
+    try {
+      const r = await axios.get(`${API}/admin/script-runner/history?admin_id=${userId}`);
+      setHistory(r.data || []);
+    } catch (_) {}
+  };
+
+  const persistKey = (val) => {
+    setMasterKey(val);
+    if (rememberKey) sessionStorage.setItem('ll_master_key', val);
+  };
+
+  const toggleRemember = (checked) => {
+    setRememberKey(checked);
+    if (checked) sessionStorage.setItem('ll_master_key', masterKey);
+    else sessionStorage.removeItem('ll_master_key');
+  };
+
+  const run = async () => {
+    if (!masterKey || masterKey.length < 20) {
+      alert(`La Master Key debe tener al menos 20 caracteres. Actual: ${masterKey.length}`);
+      return;
+    }
+    if (!code.trim()) { alert('Escribe código para ejecutar'); return; }
+    const danger = mode === 'shell' && /\brm\s+-rf\s+\/(?!\S)/.test(code);
+    if (danger && !window.confirm('⚠️ Detectamos "rm -rf /". ¿Confirmas ejecutar este comando destructivo?')) return;
+    setRunning(true);
+    setOutput(null);
+    try {
+      const res = await axios.post(
+        `${API}/admin/script-runner/execute?admin_id=${userId}`,
+        { mode, code },
+        { headers: { 'X-Master-Key': masterKey } }
+      );
+      setOutput(res.data);
+      loadHistory();
+    } catch (err) {
+      setOutput({
+        ok: false,
+        error: err.response?.data?.detail || err.message || 'Error desconocido',
+      });
+    }
+    setRunning(false);
+  };
+
+  const snippets = mode === 'python'
+    ? [
+        { label: 'Contar usuarios', code: 'import asyncio\nprint(asyncio.get_event_loop().run_until_complete(db.users.count_documents({})))' },
+        { label: 'Listar colecciones', code: 'import asyncio\nprint(asyncio.get_event_loop().run_until_complete(db.list_collection_names()))' },
+        { label: 'ENV del backend', code: 'import os\nfor k in sorted(os.environ):\n    if any(s in k.lower() for s in ["secret","key","pass","token"]):\n        continue\n    print(k, "=", os.environ[k][:80])' },
+      ]
+    : [
+        { label: 'Uso de disco', code: 'df -h' },
+        { label: 'Procesos Python', code: 'ps aux | grep -i python | head -20' },
+        { label: 'Logs backend (50)', code: 'tail -n 50 /var/log/supervisor/backend.err.log 2>/dev/null || tail -n 50 /var/log/supervisor/backend.*.log 2>/dev/null' },
+        { label: 'MongoDB status', code: 'mongosh --eval "db.adminCommand({ ping: 1 })" 2>/dev/null || echo "mongosh no disponible"' },
+      ];
+
+  return (
+    <div data-testid="tech-console-panel">
+      <div className="bg-gradient-to-r from-red-900 via-orange-800 to-amber-800 rounded-2xl p-4 mb-4 border-2 border-red-500/40">
+        <div className="flex items-start gap-3">
+          <div className="text-4xl">⚡</div>
+          <div className="flex-1">
+            <h3 className="text-xl font-black text-white">Consola Técnica · Script Runner</h3>
+            <p className="text-orange-100 text-xs mt-1">
+              Ejecución directa de Python y Shell en el servidor. Protegido por Master Key (mínimo 20 caracteres).
+              Cada ejecución queda registrada en auditoría.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* STATUS */}
+      <div className={`rounded-xl p-3 mb-4 text-sm font-medium border ${status.configured ? 'bg-green-900/30 border-green-700 text-green-300' : 'bg-yellow-900/30 border-yellow-700 text-yellow-300'}`}>
+        {status.configured ? (
+          <>✅ MASTER_KEY configurada en el servidor ({status.current_length} caracteres).</>
+        ) : (
+          <>⚠️ MASTER_KEY aún no configurada o tiene menos de {status.min_length} caracteres.
+            Define <code className="bg-black/40 px-1 rounded">MASTER_KEY</code> en <code className="bg-black/40 px-1 rounded">/app/backend/.env</code> y reinicia el backend.
+          </>
+        )}
+      </div>
+
+      {/* MASTER KEY */}
+      <div className="bg-gray-900 rounded-xl p-4 border border-gray-800 mb-4">
+        <label className="text-yellow-400 text-sm font-bold block mb-2">🔑 Master Key (no se guarda en DB):</label>
+        <input
+          type="password"
+          autoComplete="off"
+          value={masterKey}
+          onChange={e => persistKey(e.target.value)}
+          placeholder="Introduce tu Master Key de 20+ caracteres"
+          data-testid="tech-master-key-input"
+          className="w-full bg-black border border-gray-700 rounded-lg px-3 py-2 text-white font-mono tracking-wider outline-none focus:border-yellow-500"
+        />
+        <label className="flex items-center gap-2 mt-2 text-xs text-gray-400">
+          <input type="checkbox" checked={rememberKey} onChange={e => toggleRemember(e.target.checked)} />
+          Recordar durante esta sesión del navegador
+        </label>
+      </div>
+
+      {/* MODE */}
+      <div className="grid grid-cols-2 gap-2 mb-3">
+        <button
+          data-testid="tech-mode-python"
+          onClick={() => setMode('python')}
+          className={`py-3 rounded-xl font-bold text-sm transition-all ${mode === 'python' ? 'bg-blue-600 text-white shadow-lg' : 'bg-gray-800 text-gray-400'}`}>
+          🐍 Python
+        </button>
+        <button
+          data-testid="tech-mode-shell"
+          onClick={() => setMode('shell')}
+          className={`py-3 rounded-xl font-bold text-sm transition-all ${mode === 'shell' ? 'bg-green-700 text-white shadow-lg' : 'bg-gray-800 text-gray-400'}`}>
+          💠 Shell (bash)
+        </button>
+      </div>
+
+      {/* SNIPPETS */}
+      <div className="flex gap-2 overflow-x-auto pb-2 mb-3">
+        {snippets.map((s, i) => (
+          <button key={i} onClick={() => setCode(s.code)}
+            className="bg-gray-800 text-gray-300 px-3 py-1.5 rounded-full text-xs whitespace-nowrap border border-gray-700 hover:border-yellow-500">
+            {s.label}
+          </button>
+        ))}
+      </div>
+
+      {/* CODE */}
+      <textarea
+        value={code}
+        onChange={e => setCode(e.target.value)}
+        placeholder={mode === 'python' ? '# Python. Variables disponibles: db, os\nprint("Hola desde Lluvia Live")' : '# Bash\nuptime'}
+        data-testid="tech-code-input"
+        className="w-full bg-black border border-gray-700 rounded-xl px-3 py-3 text-green-400 font-mono text-sm h-56 resize-none outline-none focus:border-yellow-500"
+      />
+
+      <div className="flex gap-2 mt-3 mb-4">
+        <button
+          onClick={run}
+          disabled={running}
+          data-testid="tech-execute-btn"
+          className="flex-1 bg-gradient-to-r from-red-600 via-orange-600 to-amber-600 py-3 rounded-xl font-black text-white disabled:opacity-50">
+          {running ? '⏳ Ejecutando...' : '⚡ EJECUTAR'}
+        </button>
+        <button onClick={() => { setCode(''); setOutput(null); }}
+          className="bg-gray-800 text-gray-300 px-4 py-3 rounded-xl font-bold text-sm">
+          Limpiar
+        </button>
+        <button onClick={() => { setShowHistory(v => !v); if (!showHistory) loadHistory(); }}
+          className="bg-gray-800 text-gray-300 px-4 py-3 rounded-xl font-bold text-sm">
+          📜 {showHistory ? 'Ocultar' : 'Historial'}
+        </button>
+      </div>
+
+      {/* OUTPUT */}
+      {output && (
+        <div data-testid="tech-output" className={`rounded-xl p-4 border mb-4 ${output.ok ? 'bg-green-950/40 border-green-700' : 'bg-red-950/40 border-red-700'}`}>
+          <div className="flex items-center justify-between mb-2">
+            <span className={`font-bold text-sm ${output.ok ? 'text-green-400' : 'text-red-400'}`}>
+              {output.ok ? '✅ OK' : '❌ ERROR'}
+            </span>
+            {output.duration_ms !== undefined && <span className="text-gray-500 text-xs">⏱ {output.duration_ms} ms</span>}
+            {output.exit_code !== undefined && output.exit_code !== null && (
+              <span className="text-gray-500 text-xs">exit: {output.exit_code}</span>
+            )}
+          </div>
+          {output.stdout && (
+            <>
+              <div className="text-gray-400 text-xs font-bold mb-1">STDOUT</div>
+              <pre className="bg-black rounded-lg p-3 text-green-300 text-xs overflow-x-auto whitespace-pre-wrap mb-2">{output.stdout}</pre>
+            </>
+          )}
+          {output.stderr && (
+            <>
+              <div className="text-gray-400 text-xs font-bold mb-1">STDERR</div>
+              <pre className="bg-black rounded-lg p-3 text-yellow-300 text-xs overflow-x-auto whitespace-pre-wrap mb-2">{output.stderr}</pre>
+            </>
+          )}
+          {output.error && (
+            <>
+              <div className="text-gray-400 text-xs font-bold mb-1">ERROR</div>
+              <pre className="bg-black rounded-lg p-3 text-red-300 text-xs overflow-x-auto whitespace-pre-wrap">{output.error}</pre>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* HISTORY */}
+      {showHistory && (
+        <div className="bg-gray-900 rounded-xl p-4 border border-gray-800">
+          <h4 className="text-yellow-400 font-bold mb-3 text-sm">📜 Últimas 20 ejecuciones</h4>
+          {history.length === 0 && <p className="text-gray-500 text-sm">Sin ejecuciones aún.</p>}
+          <div className="space-y-2 max-h-96 overflow-y-auto">
+            {history.map(h => (
+              <div key={h.id} className={`p-2 rounded-lg border text-xs ${h.ok ? 'border-green-800 bg-green-950/30' : 'border-red-800 bg-red-950/30'}`}>
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-gray-400">
+                    {h.started_at?.replace('T', ' ').split('.')[0]} · <span className="uppercase">{h.mode}</span> · {h.duration_ms}ms
+                  </span>
+                  <span className={h.ok ? 'text-green-400' : 'text-red-400'}>{h.ok ? 'OK' : 'ERR'}</span>
+                </div>
+                <pre className="text-gray-300 bg-black/40 p-2 rounded whitespace-pre-wrap truncate max-h-16 overflow-hidden">{h.code}</pre>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
 
 export default ControlPanel;

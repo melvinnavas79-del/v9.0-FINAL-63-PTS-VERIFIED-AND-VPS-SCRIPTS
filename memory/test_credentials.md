@@ -4,7 +4,14 @@
 - Username: `Melvin_Live`
 - Password: `test123`
 - Role: `dueño`
-- Permissions: full admin, bot control, event approvals, device banning
+- Permissions: full admin, bot control, event approvals, device banning, **Script Runner (Consola Técnica)**
+
+## Script Runner (Consola Técnica)
+- Endpoint: `POST /api/admin/script-runner/execute`
+- Header requerido: `X-Master-Key: <valor definido en /app/backend/.env MASTER_KEY>`
+- Mínimo 20 caracteres. **El dueño lo define manualmente** (nunca en DB ni en repo).
+- Estado actual: `MASTER_KEY=` vacío en `.env` — Melvin lo completa antes de usar la consola.
+- Tras editar el .env: `sudo supervisorctl restart backend`
 
 ## Notes
 - Login endpoint: `POST /api/login` con `{ username, password }` (NO `/api/auth/login`)

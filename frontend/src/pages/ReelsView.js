@@ -8,7 +8,15 @@ const BASE = process.env.REACT_APP_BACKEND_URL;
 const ReelsView = ({ onBack }) => {
   const { user } = useUser();
   const [reels, setReels] = useState([]);
-  const [showCreate, setShowCreate] = useState(false);
+  const [showCreate, setShowCreate] = useState(() => {
+    try {
+      if (sessionStorage.getItem('ll_reels_open_create') === '1') {
+        sessionStorage.removeItem('ll_reels_open_create');
+        return true;
+      }
+    } catch (_) {}
+    return false;
+  });
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [uploading, setUploading] = useState(false);
@@ -75,6 +83,17 @@ const ReelsView = ({ onBack }) => {
 
   return (
     <div className="min-h-screen bg-gray-50 pb-24">
+      {/* Floating create button — respeta safe-area iPhone */}
+      <button
+        data-testid="reels-create-fab"
+        onClick={() => setShowCreate(true)}
+        aria-label="Crear Reel"
+        className="fixed right-4 z-40 w-14 h-14 rounded-full bg-gradient-to-br from-pink-500 via-rose-500 to-purple-600 text-white shadow-xl flex items-center justify-center active:scale-95 transition-transform border-2 border-white/30"
+        style={{ bottom: 'calc(env(safe-area-inset-bottom, 14px) + 24px)' }}
+      >
+        <span className="text-3xl leading-none font-thin">+</span>
+      </button>
+
       <div className="max-w-2xl mx-auto p-4">
         <div className="flex items-center justify-between mb-6">
           <button onClick={onBack} className="bg-pink-500 text-white px-5 py-2 rounded-full text-sm">← Volver</button>

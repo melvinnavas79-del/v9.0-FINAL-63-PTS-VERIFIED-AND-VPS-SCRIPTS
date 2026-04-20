@@ -3,6 +3,41 @@
 ## Product
 Red social de audio en vivo con gamificación (monedas/diamantes), salas con **WebRTC self-hosted** (zero dependencia externa, zero costo variable), eventos (King/CP/PK), minijuegos, bot AI moderador y pagos reales PayPal Live. 100% white-label para deploy independiente en VPS.
 
+
+## Implementado en esta sesión (Abr 2026) — Iteración 18 (SCRIPT RUNNER + REELS UI)
+
+### P0 — Consola Técnica / Script Runner (Master Key) ✅
+- Backend nuevo `/app/backend/routes/script_runner.py`:
+  - `POST /api/admin/script-runner/execute` → ejecuta Python (exec con stdout/stderr captured) o Shell (asyncio.subprocess). Mínimo 20 chars en MASTER_KEY. Timeouts: 15s python / 30s shell. Truncado a 20 000 chars.
+  - `GET /api/admin/script-runner/history` → últimas 20 ejecuciones (auditoría)
+  - `GET /api/admin/script-runner/status` → confirma que `MASTER_KEY` está presente en `.env` (no expone el valor)
+- Seguridad en capas:
+  1. Rol `dueño` obligatorio
+  2. Header `X-Master-Key` debe coincidir con `MASTER_KEY` en `/app/backend/.env` (≥ 20 chars, nunca en DB)
+  3. Cada ejecución se registra en colección `script_runner_log` (admin_id, código, stdout, stderr, ip, duración)
+- UI en `ControlPanel.js` (tab "Script Runner"):
+  - Input Master Key (password, opcional "recordar en sessionStorage")
+  - Selector Python / Shell
+  - Snippets rápidos: contar usuarios, listar colecciones, ENV backend, uso de disco, procesos, logs backend, mongosh ping
+  - Editor estilo IDE (negro + verde mono), botones Ejecutar / Limpiar / Historial
+  - Panel de salida con STDOUT / STDERR / error separados + exit code + duración en ms
+- Variable `MASTER_KEY=` añadida vacía a `/app/backend/.env` — el dueño la define manualmente y reinicia backend (`sudo supervisorctl restart backend`)
+- Tests e2e (curl) pasados: status, python OK, shell OK, key inválida → 403, no-dueño → 403, error runtime capturado, historial persistido
+
+### P0 — Integración UI de Reels en Dashboard ✅
+- Botón flotante **🎬+** en Dashboard (esquina inferior derecha, z-40, safe-area iPhone respetada mediante `bottom: calc(env(safe-area-inset-bottom, 14px) + 104px)` para no tapar la nav)
+- Botón flotante **+** en ReelsView con misma safe-area pero 24px de margen
+- Flag `sessionStorage.ll_reels_open_create` — al pulsar el FAB del Dashboard, ReelsView abre automáticamente el modal "Nuevo Reel"
+- Panel de tracking en pestaña **Descubrir**: stats (Reels / Vistas / Likes) + carrusel horizontal con las 6 últimas publicaciones (click → abre ReelsView)
+- Auto-refresh stats cada 30s (`loadReelsStats`)
+
+### Testing & Lint
+- `ruff check routes/script_runner.py` → All checks passed!
+- ESLint `ControlPanel.js` y `Dashboard.js` → No issues found
+- Screenshot validados del panel Script Runner y del Dashboard con FAB visible
+
+---
+
 ## Implementado en esta sesión (Abr 2026) — Iteración 17 (CÓDIGO IMPECABLE + REELS)
 
 ### P0 — Código 100% limpio (ruff 0 errores con y sin config) ✅

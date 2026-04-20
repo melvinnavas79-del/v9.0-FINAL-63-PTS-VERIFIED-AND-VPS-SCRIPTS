@@ -20,6 +20,7 @@ const Dashboard = ({ onNavigate }) => {
   const [showEventPanel, setShowEventPanel] = useState(false);
   const [flashEvent, setFlashEvent] = useState(null);
   const [dailyRanking, setDailyRanking] = useState({ leaderboard: [], rewards: [3000000, 2000000, 1000000] });
+  const [reelsStats, setReelsStats] = useState({ total: 0, views: 0, likes: 0, recent: [] });
   // Animación de contador "vivo": el valor mostrado es el previo; al cambiar se aplica flash
   const prevActiveUsersRef = useRef({});
 
@@ -30,18 +31,31 @@ const Dashboard = ({ onNavigate }) => {
     loadClansRankings();
     loadFlashEvents();
     loadDailyRanking();
+    loadReelsStats();
     const n = setInterval(loadUnreadCount, 10000);
     const s = setInterval(() => setStarIndex(p => p + 1), 3000);
     const f = setInterval(loadFlashEvents, 8000);
     const d = setInterval(loadDailyRanking, 30000);
     const rms = setInterval(loadRooms, 8000);   // Dashboard "vivo": refresh rooms cada 8s
-    return () => { clearInterval(n); clearInterval(s); clearInterval(f); clearInterval(d); clearInterval(rms); };
+    const rs = setInterval(loadReelsStats, 30000);
+    return () => { clearInterval(n); clearInterval(s); clearInterval(f); clearInterval(d); clearInterval(rms); clearInterval(rs); };
   }, []);
 
   const loadDailyRanking = async () => {
     try {
       const r = await axios.get(`${API}/rankings/daily-games`);
       setDailyRanking(r.data);
+    } catch (e) {}
+  };
+
+  const loadReelsStats = async () => {
+    try {
+      const r = await axios.get(`${API}/reels?limit=30`);
+      const list = Array.isArray(r.data) ? r.data : [];
+      const total = list.length;
+      const views = list.reduce((acc, x) => acc + (x.views || 0), 0);
+      const likes = list.reduce((acc, x) => acc + (x.likes || 0), 0);
+      setReelsStats({ total, views, likes, recent: list.slice(0, 6) });
     } catch (e) {}
   };
 
@@ -421,6 +435,7 @@ const Dashboard = ({ onNavigate }) => {
       <div className="grid grid-cols-2 gap-3 mb-6">
         <button
           onClick={() => onNavigate('reels')}
+          data-testid="discover-reels-btn"
           className="bg-gradient-to-br from-pink-500 to-rose-600 rounded-2xl p-6 text-center hover:scale-105 transition-all"
         >
           <div className="text-5xl mb-2">🎬</div>
@@ -436,6 +451,55 @@ const Dashboard = ({ onNavigate }) => {
           <p className="text-white/80 text-sm">Galería</p>
         </button>
       </div>
+
+      {/* REELS TRACKING PANEL */}
+      <div data-testid="reels-tracking-panel" className="bg-gradient-to-br from-pink-50 to-rose-50 rounded-2xl p-4 mb-4 border border-pink-100">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-sm font-black text-gray-800 flex items-center gap-2">🎬 Panel de Reels</h3>
+          <button onClick={() => onNavigate('reels')} className="text-pink-600 text-xs font-bold">Ver todos →</button>
+        </div>
+        <div className="grid grid-cols-3 gap-2 mb-3">
+          <div className="bg-white rounded-xl p-2 text-center">
+            <div className="text-lg font-black text-pink-600">{reelsStats.total}</div>
+            <div className="text-[10px] text-gray-500">Reels</div>
+          </div>
+          <div className="bg-white rounded-xl p-2 text-center">
+            <div className="text-lg font-black text-purple-600">{(reelsStats.views || 0).toLocaleString()}</div>
+            <div className="text-[10px] text-gray-500">Vistas</div>
+          </div>
+          <div className="bg-white rounded-xl p-2 text-center">
+            <div className="text-lg font-black text-rose-600">{(reelsStats.likes || 0).toLocaleString()}</div>
+            <div className="text-[10px] text-gray-500">Likes</div>
+          </div>
+        </div>
+        {reelsStats.recent && reelsStats.recent.length > 0 ? (
+          <div className="flex gap-2 overflow-x-auto pb-1">
+            {reelsStats.recent.map(r => (
+              <button
+                key={r.id}
+                onClick={() => onNavigate('reels')}
+                data-testid={`reel-recent-${r.id}`}
+                className="flex-shrink-0 w-20 h-28 rounded-xl bg-black overflow-hidden relative border border-pink-200 active:scale-95 transition-transform"
+              >
+                {r.video_url ? (
+                  <video src={r.video_url} muted playsInline className="w-full h-full object-cover" />
+                ) : r.image_url ? (
+                  <img src={r.image_url} alt={r.title} className="w-full h-full object-cover" />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-pink-500 to-purple-600 text-2xl">🎬</div>
+                )}
+                <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/80 to-transparent p-1">
+                  <div className="text-white text-[9px] font-bold truncate">{r.title}</div>
+                  <div className="text-white/70 text-[9px]">❤️ {r.likes || 0} · 👁 {r.views || 0}</div>
+                </div>
+              </button>
+            ))}
+          </div>
+        ) : (
+          <p className="text-gray-400 text-xs text-center py-2">Aún no hay reels. Toca el botón flotante para crear el primero.</p>
+        )}
+      </div>
+
       <h3 className="text-lg font-bold text-gray-800 mb-3">✨ Tendencias</h3>
       <div className="text-center py-8 text-gray-400">
         <div className="text-5xl mb-3">🔍</div>
@@ -597,6 +661,18 @@ const Dashboard = ({ onNavigate }) => {
         {activeTab === 'descubrir' && renderDescubrir()}
         {activeTab === 'event' && renderEvent()}
       </div>
+
+      {/* Floating "Crear Reel" button — respeta safe-area del iPhone y no tapa la nav inferior */}
+      <button
+        data-testid="dashboard-create-reel-fab"
+        onClick={() => { sessionStorage.setItem('ll_reels_open_create', '1'); onNavigate('reels'); }}
+        aria-label="Crear Reel"
+        className="fixed right-4 z-40 w-14 h-14 rounded-full bg-gradient-to-br from-pink-500 via-rose-500 to-purple-600 text-white shadow-xl flex items-center justify-center active:scale-95 transition-transform border-2 border-white/30"
+        style={{ bottom: 'calc(env(safe-area-inset-bottom, 14px) + 104px)' }}
+      >
+        <span className="text-2xl leading-none">🎬</span>
+        <span className="absolute -top-1 -right-1 bg-white text-pink-600 text-[10px] font-black rounded-full w-5 h-5 flex items-center justify-center shadow">+</span>
+      </button>
 
       {/* Bottom Navigation */}
       <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-2 z-50" style={{paddingTop: '10px', paddingBottom: 'max(14px, env(safe-area-inset-bottom, 14px))'}}>
