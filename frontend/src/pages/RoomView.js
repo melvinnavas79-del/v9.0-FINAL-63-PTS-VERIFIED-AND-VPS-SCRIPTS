@@ -81,7 +81,7 @@ const RoomView = ({ roomId, onBack }) => {
   const joinedOnceRef = useRef(false); // eslint-disable-line no-unused-vars
 
   useEffect(() => {
-    loadRoom(); markJoinAndLoadChat(); loadGifts(); loadSobres(); loadCofres(); checkBotActive(); loadMyEvents(); loadPendingRequests(); loadPK();
+    loadRoom(); markJoinAndLoadChat(); loadGifts(); loadSobres(); loadCofres(); if (user.role === 'dueño') checkBotActive(); loadMyEvents(); loadPendingRequests(); loadPK();
     // Join WebRTC signaling via global context (persists across navigation).
     // Trigger welcome/entry animation once per room join.
     (async () => {
