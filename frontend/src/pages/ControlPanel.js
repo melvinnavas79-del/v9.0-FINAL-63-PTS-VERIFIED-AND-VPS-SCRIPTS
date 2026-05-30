@@ -224,6 +224,7 @@ const ControlPanel = ({ onBack }) => {
     { id: 'bot', label: 'Bot IA', icon: '🤖' },
     { id: 'security', label: 'Seguridad', icon: '🛡️' },
     { id: 'health', label: 'Salud', icon: '🩺' },
+    { id: 'diagnostics', label: 'Diagnósticos', icon: '🔬' },
   ];
 
   return (
@@ -657,7 +658,48 @@ const ControlPanel = ({ onBack }) => {
         {activeTab === 'health' && (
           <SystemHealthPanel userId={user.id} />
         )}
+
+        {/* DIAGNÓSTICOS - PayPal, MongoDB, disco, env vars */}
+        {activeTab === 'diagnostics' && (
+          <DiagnosticsTab userId={user.id} />
+        )}
       </div>
+    </div>
+  );
+};
+
+const BotGhostToggle = () => {
+  const BOT_ID = 'system_bot_lluvia';
+  const [ghost, setGhost] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    axios.get(`${API}/users/${BOT_ID}`).then(r => setGhost(!!r.data?.ghost_mode)).catch(() => {});
+  }, []);
+
+  const toggle = async () => {
+    setLoading(true);
+    try {
+      const r = await axios.post(`${API}/users/${BOT_ID}/ghost-mode`);
+      setGhost(r.data.ghost_mode);
+    } catch (e) { alert(e.response?.data?.detail || 'Error'); }
+    setLoading(false);
+  };
+
+  return (
+    <div className="flex items-center justify-between bg-black/40 rounded-lg p-2 border border-purple-700/40">
+      <div>
+        <p className="text-purple-300 text-xs font-bold">👻 Modo Fantasma del Bot</p>
+        <p className="text-white/40 text-[10px]">Bot invisible en salas · supervisión silenciosa</p>
+      </div>
+      <button
+        onClick={toggle}
+        disabled={loading}
+        data-testid="bot-ghost-toggle"
+        className={`px-3 py-1.5 rounded-lg text-xs font-bold ${ghost ? 'bg-purple-600 text-white' : 'bg-gray-700 text-gray-400'}`}
+      >
+        {loading ? '…' : ghost ? 'ACTIVO' : 'INACTIVO'}
+      </button>
     </div>
   );
 };
@@ -910,43 +952,6 @@ const PrizesConfig = ({ userId }) => {
       </button>
     </div>
   );
-
-// Toggle para activar/desactivar el Modo Fantasma del BOT (invisible en salas)
-const BotGhostToggle = () => {
-  const BOT_ID = 'system_bot_lluvia';
-  const [ghost, setGhost] = useState(false);
-  const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    axios.get(`${API}/users/${BOT_ID}`).then(r => setGhost(!!r.data?.ghost_mode)).catch(() => {});
-  }, []);
-
-  const toggle = async () => {
-    setLoading(true);
-    try {
-      const r = await axios.post(`${API}/users/${BOT_ID}/ghost-mode`);
-      setGhost(r.data.ghost_mode);
-    } catch (e) { alert(e.response?.data?.detail || 'Error'); }
-    setLoading(false);
-  };
-
-  return (
-    <div className="flex items-center justify-between bg-black/40 rounded-lg p-2 border border-purple-700/40">
-      <div>
-        <p className="text-purple-300 text-xs font-bold">👻 Modo Fantasma del Bot</p>
-        <p className="text-white/40 text-[10px]">Bot invisible en salas · supervisión silenciosa</p>
-      </div>
-      <button
-        onClick={toggle}
-        disabled={loading}
-        data-testid="bot-ghost-toggle"
-        className={`px-3 py-1.5 rounded-lg text-xs font-bold ${ghost ? 'bg-purple-600 text-white' : 'bg-gray-700 text-gray-400'}`}
-      >
-        {loading ? '…' : ghost ? 'ACTIVO' : 'INACTIVO'}
-      </button>
-    </div>
-  );
-};
 
 };
 
@@ -1516,6 +1521,189 @@ const AgentsTab = ({ userId }) => {
               className="bg-gray-700 py-2 px-3 rounded text-white text-sm">Cancelar</button>
           </div>
         </div>
+      )}
+    </div>
+  );
+};
+
+// ========== DIAGNOSTICS TAB ==========
+const DiagnosticsTab = ({ userId }) => {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [testResult, setTestResult] = useState(null);
+
+  const run = async () => {
+    setLoading(true);
+    setTestResult(null);
+    try {
+      const r = await axios.get(`${API}/diagnostics?user_id=${userId}`);
+      setData(r.data);
+    } catch (e) {
+      setData({ error: e.response?.data?.detail || e.message });
+    }
+    setLoading(false);
+  };
+
+  const testPaypal = async () => {
+    try {
+      const r = await axios.post(`${API}/diagnostics/paypal/test-order?user_id=${userId}`);
+      setTestResult({ ok: true, msg: JSON.stringify(r.data, null, 2) });
+    } catch (e) {
+      setTestResult({ ok: false, msg: e.response?.data?.detail || e.message });
+    }
+  };
+
+  useEffect(() => { run(); }, []);
+
+  const StatusBadge = ({ status }) => (
+    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${status === 'ok' ? 'bg-green-700 text-green-200' : 'bg-red-700 text-red-200'}`}>
+      {status === 'ok' ? '✅ OK' : '❌ ERROR'}
+    </span>
+  );
+
+  return (
+    <div className="space-y-4" data-testid="diagnostics-tab">
+      <div className="bg-gradient-to-r from-cyan-900 to-teal-900 rounded-2xl p-4 border border-cyan-500/30 flex items-center justify-between">
+        <div>
+          <h3 className="text-white font-black text-lg">🔬 Diagnósticos del Sistema</h3>
+          <p className="text-white/70 text-xs mt-1">PayPal · MongoDB · Disco · Variables de entorno · Servidor</p>
+        </div>
+        <button onClick={run} disabled={loading}
+          className="bg-cyan-600 hover:bg-cyan-500 text-white px-4 py-2 rounded-xl font-bold text-sm disabled:opacity-50">
+          {loading ? '⏳' : '↻ Actualizar'}
+        </button>
+      </div>
+
+      {!data && loading && (
+        <div className="text-white/50 text-center py-10">Ejecutando diagnósticos...</div>
+      )}
+
+      {data?.error && (
+        <div className="bg-red-900/40 border border-red-600 rounded-xl p-4 text-red-300 text-sm">{data.error}</div>
+      )}
+
+      {data && !data.error && (
+        <>
+          {/* Server */}
+          {data.server && (
+            <div className="bg-gray-900 rounded-xl p-4 border border-gray-800">
+              <h4 className="text-white font-bold text-sm mb-2">🖥️ Servidor</h4>
+              <div className="text-xs space-y-1 text-white/70">
+                <div>Host: <span className="text-white font-mono">{data.server.hostname}</span></div>
+                <div>Python: <span className="text-white font-mono">{data.server.python_version}</span></div>
+                <div>Root: <span className="text-white font-mono">{data.server.backend_root}</span></div>
+                <div className="text-white/40">Consultado: {new Date(data.timestamp * 1000).toLocaleString()}</div>
+              </div>
+            </div>
+          )}
+
+          {/* MongoDB */}
+          {data.mongo && (
+            <div className="bg-gray-900 rounded-xl p-4 border border-gray-800">
+              <div className="flex items-center justify-between mb-2">
+                <h4 className="text-white font-bold text-sm">🍃 MongoDB</h4>
+                <StatusBadge status={data.mongo.status} />
+              </div>
+              {data.mongo.status === 'ok' ? (
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div className="bg-black/40 rounded-lg p-2 text-center">
+                    <div className="text-2xl font-black text-green-400">{data.mongo.users}</div>
+                    <div className="text-white/50">Usuarios</div>
+                  </div>
+                  <div className="bg-black/40 rounded-lg p-2 text-center">
+                    <div className="text-2xl font-black text-blue-400">{data.mongo.rooms}</div>
+                    <div className="text-white/50">Salas</div>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-red-300 text-xs font-mono">{data.mongo.error}</p>
+              )}
+            </div>
+          )}
+
+          {/* PayPal */}
+          {data.paypal && (
+            <div className="bg-gray-900 rounded-xl p-4 border border-gray-800">
+              <div className="flex items-center justify-between mb-2">
+                <h4 className="text-white font-bold text-sm">💳 PayPal</h4>
+                <StatusBadge status={data.paypal.status} />
+              </div>
+              <div className="text-xs space-y-1 text-white/70">
+                <div>Modo: <span className={`font-bold ${data.paypal.mode === 'live' ? 'text-green-400' : 'text-yellow-400'}`}>{(data.paypal.mode || '').toUpperCase()}</span></div>
+                {data.paypal.client_id_prefix && <div>Client ID: <span className="font-mono text-white">{data.paypal.client_id_prefix}</span></div>}
+                {data.paypal.latency_ms && <div>Latencia OAuth: <span className="text-white">{data.paypal.latency_ms} ms</span></div>}
+                {data.paypal.error && <div className="text-red-300 font-mono">{data.paypal.error}</div>}
+              </div>
+              <button onClick={testPaypal}
+                className="mt-3 bg-blue-700 hover:bg-blue-600 text-white text-xs font-bold px-3 py-1.5 rounded-lg">
+                🧪 Test: crear orden $1
+              </button>
+              {testResult && (
+                <pre className={`mt-2 text-xs p-2 rounded-lg overflow-x-auto ${testResult.ok ? 'bg-green-950/50 text-green-300' : 'bg-red-950/50 text-red-300'}`}>
+                  {testResult.msg}
+                </pre>
+              )}
+            </div>
+          )}
+
+          {/* Disk */}
+          {data.disk && (
+            <div className="bg-gray-900 rounded-xl p-4 border border-gray-800">
+              <div className="flex items-center justify-between mb-2">
+                <h4 className="text-white font-bold text-sm">💾 Disco</h4>
+                <StatusBadge status={data.disk.status} />
+              </div>
+              {data.disk.status === 'ok' && (
+                <>
+                  <div className="flex justify-between text-xs text-white/70 mb-1">
+                    <span>Usado: {data.disk.used_gb} GB / {data.disk.total_gb} GB</span>
+                    <span className={data.disk.used_pct > 85 ? 'text-red-400 font-bold' : 'text-white'}>{data.disk.used_pct}%</span>
+                  </div>
+                  <div className="w-full bg-gray-700 rounded-full h-2">
+                    <div
+                      className={`h-2 rounded-full ${data.disk.used_pct > 85 ? 'bg-red-500' : data.disk.used_pct > 70 ? 'bg-yellow-500' : 'bg-green-500'}`}
+                      style={{ width: `${Math.min(data.disk.used_pct, 100)}%` }}
+                    />
+                  </div>
+                  <div className="text-xs text-white/50 mt-1">Libre: {data.disk.free_gb} GB</div>
+                </>
+              )}
+            </div>
+          )}
+
+          {/* Env vars */}
+          {data.env && (
+            <div className="bg-gray-900 rounded-xl p-4 border border-gray-800">
+              <h4 className="text-white font-bold text-sm mb-2">🔑 Variables de Entorno</h4>
+              <div className="space-y-1">
+                {Object.entries(data.env).map(([key, val]) => (
+                  <div key={key} className="flex items-center justify-between text-xs">
+                    <span className="text-white/70 font-mono">{key}</span>
+                    <span className={`font-bold ${val.set ? 'text-green-400' : 'text-red-400'}`}>
+                      {val.set ? `✅ configurada (${val.length} chars)` : '❌ no configurada'}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Uploads */}
+          {data.uploads && (
+            <div className="bg-gray-900 rounded-xl p-4 border border-gray-800">
+              <div className="flex items-center justify-between mb-2">
+                <h4 className="text-white font-bold text-sm">📁 Uploads</h4>
+                <StatusBadge status={data.uploads.status} />
+              </div>
+              <div className="text-xs space-y-1 text-white/70">
+                <div>Directorio: <span className="font-mono text-white">{data.uploads.upload_dir}</span></div>
+                {data.uploads.file_count !== undefined && <div>Archivos: <span className="text-white">{data.uploads.file_count}</span></div>}
+                {data.uploads.mode_octal && <div>Permisos: <span className="font-mono text-white">{data.uploads.mode_octal}</span></div>}
+                {data.uploads.error && <div className="text-red-300">{data.uploads.error}</div>}
+              </div>
+            </div>
+          )}
+        </>
       )}
     </div>
   );
