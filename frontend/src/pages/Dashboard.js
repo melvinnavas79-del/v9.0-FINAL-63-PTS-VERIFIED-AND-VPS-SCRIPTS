@@ -146,11 +146,12 @@ const Dashboard = ({ onNavigate }) => {
 
   const renderMio = () => (
     <div className="p-4">
-      <div className="grid grid-cols-4 gap-3 mb-6">
+      <div className="grid grid-cols-5 gap-2 mb-6">
         {[
           { icon: '🏠', label: 'My Room', action: createRoom },
           { icon: '💬', label: 'Quick Join', action: () => { if (rooms.length > 0) enterRoom(rooms[0]); } },
           { icon: '🎬', label: 'Reels', action: () => onNavigate('reels') },
+          { icon: '🤖', label: 'Agentes', action: () => onNavigate('agents') },
           { icon: '💰', label: 'Tienda', action: () => onNavigate('store') }
         ].map((item, i) => (
           <button

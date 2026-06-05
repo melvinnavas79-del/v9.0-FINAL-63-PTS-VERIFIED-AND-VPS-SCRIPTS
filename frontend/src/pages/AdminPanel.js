@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import axios from 'axios';
 import { useUser } from '../contexts/UserContext';
 
@@ -20,6 +20,239 @@ const ROLE_ICONS = {
   'usuario': '👤'
 };
 
+// ==================== ADMIN AGENT CHAT ====================
+const PROVIDER_OPTS = [
+  { value: 'auto',   label: '🤖 Auto',   title: 'El backend elige (Gemini por defecto)' },
+  { value: 'gemini', label: '🔵 Gemini', title: 'Forzar Google Gemini' },
+  { value: 'openai', label: '🟢 GPT',    title: 'Forzar OpenAI GPT-4o' },
+];
+
+const AdminAgentChat = ({ userId }) => {
+  const [agents, setAgents]         = useState([]);
+  const [agent, setAgent]           = useState(null);
+  const [provider, setProvider]     = useState('auto');
+  const [messages, setMessages]     = useState([]);
+  const [input, setInput]           = useState('');
+  const [loading, setLoading]       = useState(false);
+  const [error, setError]           = useState('');
+  const [threadId, setThreadId]     = useState(null);
+  const bottomRef = useRef(null);
+  const textRef   = useRef(null);
+
+  useEffect(() => {
+    axios.get(`${API}/console/agents`, { params: { user_id: userId, is_admin: true } })
+      .then(r => {
+        const list = r.data.agents || [];
+        setAgents(list);
+        if (list.length) setAgent(list[0]);
+      })
+      .catch(() => {});
+  }, [userId]);
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  const resetChat = () => {
+    setMessages([]);
+    setThreadId(null);
+    setError('');
+    setInput('');
+  };
+
+  const handleSend = useCallback(async () => {
+    const text = input.trim();
+    if (!text || loading || !agent) return;
+    setInput('');
+    setError('');
+
+    const userMsg = { role: 'user', content: text };
+    const typing  = { role: 'assistant', typing: true, agent_name: agent.name, agent_emoji: agent.emoji };
+    setMessages(prev => [...prev, userMsg, typing]);
+    setLoading(true);
+
+    try {
+      const body = { agent_id: agent.id, message: text, user_id: userId };
+      if (threadId)        body.thread_id = threadId;
+      if (provider !== 'auto') body.provider = provider;
+
+      const res = await axios.post(`${API}/console/chat`, body);
+      const d   = res.data;
+
+      const reply = {
+        role: 'assistant',
+        content: d.text || '',
+        tool_calls: d.tool_calls || [],
+        provider: d.provider,
+        agent_name: agent.name,
+        agent_emoji: agent.emoji,
+      };
+
+      setMessages(prev => prev.filter(m => !m.typing).concat(reply));
+      if (d.thread_id && !threadId) setThreadId(d.thread_id);
+    } catch (e) {
+      setMessages(prev => prev.filter(m => !m.typing));
+      setError(e.response?.data?.detail || e.message || 'Error');
+    } finally {
+      setLoading(false);
+    }
+  }, [input, loading, agent, provider, threadId, userId]);
+
+  const onKey = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }
+  };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', height: 520, background: '#0f172a', borderRadius: 20, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.08)' }}>
+
+      {/* Toolbar */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', background: 'rgba(255,255,255,0.04)', borderBottom: '1px solid rgba(255,255,255,0.07)', flexShrink: 0 }}>
+
+        {/* Agent picker */}
+        <select
+          value={agent?.id || ''}
+          onChange={e => { const a = agents.find(x => x.id === e.target.value); setAgent(a); resetChat(); }}
+          style={selectStyle}
+          title="Agente"
+        >
+          {agents.map(a => (
+            <option key={a.id} value={a.id}>{a.emoji} {a.name}</option>
+          ))}
+        </select>
+
+        {/* Provider picker */}
+        <select
+          value={provider}
+          onChange={e => setProvider(e.target.value)}
+          style={{ ...selectStyle, minWidth: 110 }}
+          title="Proveedor LLM"
+        >
+          {PROVIDER_OPTS.map(o => (
+            <option key={o.value} value={o.value} title={o.title}>{o.label}</option>
+          ))}
+        </select>
+
+        {/* Clear */}
+        <button
+          onClick={resetChat}
+          title="Nueva conversación"
+          style={{ marginLeft: 'auto', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, color: '#94a3b8', padding: '5px 10px', cursor: 'pointer', fontSize: 13 }}
+        >
+          🗑️ Nuevo
+        </button>
+      </div>
+
+      {/* Messages */}
+      <div style={{ flex: 1, overflowY: 'auto', padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {messages.length === 0 && (
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#475569', fontSize: 14, gap: 8 }}>
+            <span style={{ fontSize: 40 }}>{agent?.emoji || '🤖'}</span>
+            <span>{agent ? `Habla con ${agent.name}` : 'Selecciona un agente'}</span>
+          </div>
+        )}
+        {messages.map((m, i) => {
+          if (m.role === 'user') return (
+            <div key={i} style={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <div style={{ background: '#2563eb', color: '#fff', borderRadius: '16px 16px 4px 16px', padding: '9px 14px', maxWidth: '78%', fontSize: 13, lineHeight: 1.5 }}>
+                {m.content}
+              </div>
+            </div>
+          );
+          if (m.typing) return (
+            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: 20 }}>{m.agent_emoji || '🤖'}</span>
+              <div style={{ background: 'rgba(255,255,255,0.06)', borderRadius: '4px 16px 16px 16px', padding: '9px 14px' }}>
+                <span style={{ display: 'flex', gap: 4 }}>
+                  {[0,150,300].map(d => <span key={d} style={{ width:7,height:7,background:'#60a5fa',borderRadius:'50%',display:'inline-block',animation:'bounce 1s infinite',animationDelay:`${d}ms` }} />)}
+                </span>
+              </div>
+            </div>
+          );
+          return (
+            <div key={i} style={{ display: 'flex', gap: 8, maxWidth: '95%' }}>
+              <span style={{ fontSize: 20, flexShrink: 0 }}>{m.agent_emoji || '🤖'}</span>
+              <div style={{ flex: 1 }}>
+                {(m.tool_calls || []).length > 0 && (
+                  <div style={{ marginBottom: 6, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    {(m.tool_calls).map((tc, ti) => (
+                      <ToolBadge key={ti} call={tc} />
+                    ))}
+                  </div>
+                )}
+                {m.content && (
+                  <div style={{ background: 'rgba(255,255,255,0.06)', borderRadius: '4px 16px 16px 16px', padding: '9px 14px', fontSize: 13, color: '#e2e8f0', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
+                    {m.content}
+                    {m.provider && <span style={{ display: 'block', fontSize: 10, color: '#475569', marginTop: 4, textAlign: 'right' }}>via {m.provider}</span>}
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })}
+        {error && <div style={{ color: '#f87171', fontSize: 12, padding: '6px 10px', background: 'rgba(239,68,68,0.1)', borderRadius: 8 }}>⚠ {error}</div>}
+        <div ref={bottomRef} />
+      </div>
+
+      {/* Composer */}
+      <div style={{ padding: '10px 12px', borderTop: '1px solid rgba(255,255,255,0.07)', background: 'rgba(255,255,255,0.03)', flexShrink: 0, display: 'flex', gap: 8, alignItems: 'flex-end' }}>
+        <textarea
+          ref={textRef}
+          rows={1}
+          value={input}
+          onChange={e => { setInput(e.target.value); e.target.style.height='auto'; e.target.style.height=Math.min(e.target.scrollHeight,120)+'px'; }}
+          onKeyDown={onKey}
+          placeholder={agent ? `Orden para ${agent.name}…` : 'Selecciona un agente…'}
+          disabled={loading || !agent}
+          style={{ flex: 1, background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12, color: '#f1f5f9', padding: '9px 12px', fontSize: 13, resize: 'none', outline: 'none', minHeight: 40, maxHeight: 120, overflowY: 'auto' }}
+        />
+        <button
+          onClick={handleSend}
+          disabled={loading || !input.trim() || !agent}
+          style={{ background: input.trim() && !loading ? '#2563eb' : 'rgba(255,255,255,0.08)', border: 'none', borderRadius: 12, color: '#fff', padding: '0 18px', height: 42, fontSize: 15, cursor: loading || !input.trim() ? 'default' : 'pointer', transition: 'background .2s', flexShrink: 0 }}
+        >
+          {loading ? '…' : '↑'}
+        </button>
+      </div>
+    </div>
+  );
+};
+
+const ToolBadge = ({ call }) => {
+  const [open, setOpen] = useState(false);
+  const isErr = call.result?.error;
+  return (
+    <div style={{ background: isErr ? 'rgba(239,68,68,0.12)' : 'rgba(139,92,246,0.12)', border: `1px solid ${isErr ? 'rgba(239,68,68,0.3)' : 'rgba(139,92,246,0.3)'}`, borderRadius: 8, overflow: 'hidden', fontSize: 11 }}>
+      <button onClick={() => setOpen(o => !o)} style={{ width:'100%', display:'flex', alignItems:'center', gap:6, padding:'5px 10px', background:'none', border:'none', cursor:'pointer', color: isErr ? '#f87171' : '#a78bfa', textAlign:'left' }}>
+        <span>{isErr ? '❌' : '🔧'}</span>
+        <span style={{ fontFamily:'monospace', flex:1 }}>{call.tool || call.name}</span>
+        {call.cost > 0 && <span style={{ background:'rgba(234,179,8,0.2)', color:'#fbbf24', padding:'1px 6px', borderRadius:10 }}>-{call.cost}💰</span>}
+        <span style={{ color:'#64748b', transform: open?'rotate(180deg)':'none', transition:'.2s' }}>▼</span>
+      </button>
+      {open && (
+        <div style={{ padding:'0 10px 8px', borderTop:'1px solid rgba(255,255,255,0.05)' }}>
+          {call.args && Object.keys(call.args).length > 0 && (
+            <pre style={{ color:'#86efac', fontSize:10, margin:'6px 0 4px', overflowX:'auto', whiteSpace:'pre-wrap', wordBreak:'break-all' }}>{JSON.stringify(call.args, null, 2)}</pre>
+          )}
+          <pre style={{ color: isErr ? '#f87171' : '#67e8f9', fontSize:10, margin:0, overflowX:'auto', whiteSpace:'pre-wrap', wordBreak:'break-all' }}>{JSON.stringify(call.result, null, 2)}</pre>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const selectStyle = {
+  background: 'rgba(255,255,255,0.07)',
+  border: '1px solid rgba(255,255,255,0.12)',
+  borderRadius: 8,
+  color: '#e2e8f0',
+  padding: '6px 10px',
+  fontSize: 13,
+  outline: 'none',
+  cursor: 'pointer',
+  minWidth: 140,
+};
+
+// ==================== MAIN PANEL ====================
 const AdminPanel = ({ onBack }) => {
   const { user, updateUser } = useUser();
   const [users, setUsers] = useState([]);
@@ -210,7 +443,7 @@ const AdminPanel = ({ onBack }) => {
 
         {/* Tabs */}
         <div className="flex gap-2 mb-4 overflow-x-auto">
-          {['staff', 'users', 'rooms'].map(tab => (
+          {['staff', 'users', 'rooms', 'agents'].map(tab => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -218,7 +451,7 @@ const AdminPanel = ({ onBack }) => {
                 activeTab === tab ? 'bg-pink-500 text-white' : 'bg-white text-gray-600 border'
               }`}
             >
-              {tab === 'staff' ? '👥 Staff' : tab === 'users' ? '🧑 Usuarios' : '🏠 Salas'}
+              {tab === 'staff' ? '👥 Staff' : tab === 'users' ? '🧑 Usuarios' : tab === 'rooms' ? '🏠 Salas' : '🤖 Agentes IA'}
             </button>
           ))}
         </div>
@@ -298,6 +531,20 @@ const AdminPanel = ({ onBack }) => {
                 </div>
               </div>
             ))}
+          </div>
+        )}
+
+        {/* Agents Tab */}
+        {activeTab === 'agents' && (
+          <div>
+            <div className="flex items-center gap-2 mb-3">
+              <h3 className="text-lg font-bold text-gray-800">🤖 Consola de Agentes IA</h3>
+            </div>
+            <p className="text-gray-500 text-xs mb-4">
+              Envía órdenes a cualquier agente y elige entre Gemini o GPT como proveedor LLM.
+              Los agentes admin (⚡) tienen acceso a herramientas del sistema.
+            </p>
+            <AdminAgentChat userId={user.id} />
           </div>
         )}
 

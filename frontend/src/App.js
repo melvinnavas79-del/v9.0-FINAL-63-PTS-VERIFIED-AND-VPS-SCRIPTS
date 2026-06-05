@@ -15,6 +15,7 @@ import StorePage from './pages/StorePage';
 import ClanesView from './pages/ClanesView';
 import ParejasView from './pages/ParejasView';
 import NotificationsView from './pages/NotificationsView';
+import EmergentChat from './components/EmergentChat';
 import BotFloating from './components/BotFloating';
 import MiniPlayer from './components/MiniPlayer';
 
@@ -81,6 +82,13 @@ function AppContent() {
     }
     if (currentView === 'notifications') {
       return <NotificationsView onBack={() => setCurrentView('dashboard')} onNavigate={handleNavigate} />;
+    }
+    if (currentView === 'agents') {
+      return (
+        <div style={{ height: '100vh', overflow: 'hidden' }}>
+          <EmergentChat user={user} />
+        </div>
+      );
     }
     return <Dashboard onNavigate={handleNavigate} />;
   })();
