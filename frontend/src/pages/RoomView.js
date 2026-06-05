@@ -2,21 +2,26 @@ import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { useUser } from '../contexts/UserContext';
 import { useAudio } from '../contexts/AudioContext';
-import { EntryAnimation, ProfileFrame } from '../components/Animations';
+import { EntryAnimation } from '../components/Animations';
 import RoomGames from '../components/RoomGames';
 import LionTigerGame from '../components/LionTigerGame';
 import UserProfileModal from '../components/UserProfileModal';
 import PKBattle from '../components/PKBattle';
 import PremiumGiftAnimation from '../components/PremiumGiftAnimation';
 import ToolsPanel from '../components/ToolsPanel';
-import SeatsGrid from '../components/SeatsGrid';
-import ChatArea from '../components/ChatArea';
 import GameResultToast from '../components/GameResultToast';
-import LevelBadge from '../components/LevelBadge';
 import useLevelHeartbeat from '../hooks/useLevelHeartbeat';
 import useTTS from '../hooks/useTTS';
 import GiftRanking from '../components/GiftRanking';
-import CrownBadge from '../components/CrownBadge';
+// ── Premium Room Components ─────────────────────────────
+import '../styles/room.css';
+import RoomBackground from '../components/room/RoomBackground';
+import RoomHeader from '../components/room/RoomHeader';
+import PremiumSeatsGrid from '../components/room/SeatsGrid';
+import FloatingChat from '../components/room/FloatingChat';
+import BottomBar from '../components/room/BottomBar';
+import RightSidePanel from '../components/room/RightSidePanel';
+import GiftButton from '../components/room/GiftButton';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -67,6 +72,9 @@ const RoomView = ({ roomId, onBack }) => {
   const [toolsOpen, setToolsOpen] = useState(false);
   const [effectBurst, setEffectBurst] = useState(null);
   const [giftRankOpen, setGiftRankOpen] = useState(false);
+  const [showChatInput, setShowChatInput] = useState(false);
+  const [speakingSeats, setSpeakingSeats] = useState(new Set());
+  const [showHostBar, setShowHostBar] = useState(false);
 
   // Level-up: heartbeat cuando hay mic activo
   useLevelHeartbeat({ userId: user?.id, isInRoomMicActive: mySeat !== null && !isMuted });
@@ -476,27 +484,69 @@ const RoomView = ({ roomId, onBack }) => {
     }
   };
 
-  if (!room) return <div className="h-screen bg-gradient-to-b from-indigo-950 via-slate-900 to-gray-950 flex items-center justify-center"><div className="text-white">Cargando...</div></div>;
+  // ── Seat press handler ──────────────────────────────────
+  const handleSeatPress = (seatIndex, seat) => {
+    if (!seat || !seat.user_id) {
+      if (!seat?.is_locked) joinSeat(seatIndex);
+      return;
+    }
+    if (seat.user_id === user.id) {
+      leaveSeat();
+      return;
+    }
+    setGiftTarget(seat);
+    setPanel('gifts');
+  };
 
-  const opened = cofresData?.cofres_opened || 0;
-  const progress = cofresData?.cofre_progress || 0;
-  const thresholds = cofresData?.thresholds || [];
-  const nextThreshold = opened < 10 ? thresholds[opened]?.threshold || 0 : 0;
-  const accumulated = thresholds.slice(0, opened).reduce((a, c) => a + c.threshold, 0);
-  const currentProgress = Math.max(0, progress - accumulated);
-  const progressPct = nextThreshold > 0 ? Math.min(100, (currentProgress / nextThreshold) * 100) : 100;
+  // ── Right side quick actions ─────────────────────────
+  const handleQuickAction = (id) => {
+    if (id === 'events')     { setEventPanel(true);      return; }
+    if (id === 'ranking')    { setGiftRankOpen(true);    return; }
+    if (id === 'games')      { setPanel('games');        return; }
+    if (id === 'activities') { setPanel('cofres');       return; }
+    if (id === 'vip')        { setPanel('tienda');       return; }
+  };
 
-  const bgStyle = room.background ? {
-    backgroundImage: `url(${room.background.startsWith('/api') ? process.env.REACT_APP_BACKEND_URL + room.background : room.background})`,
-    backgroundSize: 'cover', backgroundPosition: 'center'
-  } : {};
+  if (!room) return (
+    <div className="fixed inset-0 flex items-center justify-center"
+      style={{ background: 'linear-gradient(160deg, #1a0533 0%, #0d1117 45%, #0a1628 100%)' }}>
+      <div className="flex flex-col items-center gap-3">
+        <div className="w-12 h-12 rounded-full border-2 border-purple-500/50 border-t-purple-400"
+          style={{ animation: 'spin 1s linear infinite' }} />
+        <span className="text-white/60 text-sm">Cargando sala…</span>
+      </div>
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+    </div>
+  );
+
+  const opened          = cofresData?.cofres_opened || 0;
+  const cofreProgress   = cofresData?.cofre_progress || 0;
+  const thresholds      = cofresData?.thresholds || [];
+  const nextThreshold   = opened < 10 ? (thresholds[opened]?.threshold || 0) : 0;
+  const accumulated     = thresholds.slice(0, opened).reduce((a, c) => a + c.threshold, 0);
+  const currentProgress = Math.max(0, cofreProgress - accumulated);
+  const progressPct     = nextThreshold > 0 ? Math.min(100, (currentProgress / nextThreshold) * 100) : 100;
+  const isHost          = room.owner_id === user.id || user.role === 'dueño' || user.is_super_admin;
+  const userCount   = (room.seats?.filter(s => s?.user_id)?.length || 0) + (room.active_users || 0);
+  const roomPhoto   = room.background
+    ? (room.background.startsWith('/api') ? `${process.env.REACT_APP_BACKEND_URL}${room.background}` : room.background)
+    : null;
+
+  // Chat messages enriched for FloatingChat
+  const enrichedMessages = chatMessages.map(m => ({
+    ...m,
+    type: m.type || 'text',
+  }));
 
   return (
-    <div className="h-screen flex flex-col overflow-hidden relative" style={{background: 'linear-gradient(to bottom, #1e1b4b, #0f172a, #111827)', ...bgStyle}}>
-      <style>{`
-        @keyframes fadeInUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        @keyframes giftBubble { 0% { opacity: 0; transform: translateY(20px) scale(0.8); } 50% { opacity: 1; transform: translateY(-5px) scale(1.05); } 100% { opacity: 1; transform: translateY(0) scale(1); } }
-      `}</style>
+    <div
+      className="fixed inset-0 flex flex-col overflow-hidden"
+      style={{ touchAction: 'pan-y', WebkitTapHighlightColor: 'transparent' }}
+    >
+      {/* ── Layer 0: Premium Background ──────────────────── */}
+      <RoomBackground photo={roomPhoto} />
+
+      {/* ── Overlays (z ≥ 40) ────────────────────────────── */}
       {entryAnim && <EntryAnimation animation={entryAnim.animation} username={entryAnim.username} onComplete={() => setEntryAnim(null)} />}
       {premiumAnim && <PremiumGiftAnimation giftType={premiumAnim.type} senderName={premiumAnim.sender} onComplete={() => setPremiumAnim(null)} />}
 
@@ -832,363 +882,258 @@ const RoomView = ({ roomId, onBack }) => {
         </div>
       )}
 
-      {/* HEADER */}
-      <div className="flex-shrink-0 px-3 pb-1" style={{paddingTop: 'calc(env(safe-area-inset-top, 20px) + 20px)'}}>
-        <div className="flex items-center justify-between">
-          <button data-testid="room-back-btn" onClick={() => { onBack(); }} className="bg-white/15 text-white px-5 py-2.5 rounded-full text-sm font-bold min-h-[44px] min-w-[80px] active:scale-95 transition-transform" style={{WebkitTapHighlightColor: 'transparent'}} title="Minimizar (audio sigue conectado)">← Salir</button>
-          <div className="text-center flex-1 mx-2">
-            <h2 className="text-white text-sm font-bold truncate">{room.name}</h2>
-          </div>
-          <div className="flex items-center gap-2">
-            {/* Minimize - keeps audio alive via global MiniPlayer */}
-            <button data-testid="minimize-btn" onClick={() => onBack()} className="bg-white/15 min-w-[44px] min-h-[44px] rounded-full flex items-center justify-center text-base font-bold active:scale-95 transition-transform" title="Minimizar sala (audio sigue)">⬇️</button>
-            {/* Bot ON/OFF */}
-            {user.role === 'dueño' && (
-              <button data-testid="bot-toggle-room" onClick={toggleBot} className={`min-w-[44px] min-h-[44px] rounded-full flex items-center justify-center text-base ${botOn ? 'bg-green-500' : 'bg-gray-600'}`}>🤖</button>
-            )}
-            <span className={`w-2.5 h-2.5 rounded-full ${audioStatus === 'on' ? 'bg-green-400' : 'bg-red-400'}`} />
-            <span className="text-white/50 text-xs">{room.active_users}</span>
-          </div>
-        </div>
-      </div>
-
-      {/* COFRE PROGRESS BAR */}
-      {opened < 10 && (
-        <div className="flex-shrink-0 px-3 mb-1">
-          <div className="flex items-center gap-2">
-            <span className="text-[10px] text-yellow-400">📦 #{opened + 1}</span>
-            <div className="flex-1 h-2 bg-white/10 rounded-full overflow-hidden">
-              <div className="h-full rounded-full transition-all" style={{ width: `${progressPct}%`, background: COFRE_COLORS[opened] || '#eab308' }} />
-            </div>
-            <span className="text-[10px] text-white/40">{thresholds[opened]?.label}</span>
-          </div>
-        </div>
-      )}
-
-      {/* TOP TOOLBAR - accesos rápidos al negocio (Tienda / Juegos / Regalos / Cofres / Sobres / Ranking) */}
-      <div className="flex-shrink-0 px-3 mb-2">
-        <div className="flex items-center gap-2 overflow-x-auto scrollbar-none" style={{scrollbarWidth:'none'}}>
-          <button data-testid="top-tienda-btn" onClick={() => setPanel('tienda')}
-            className="flex-shrink-0 bg-gradient-to-br from-pink-500/30 to-purple-500/30 border border-pink-400/40 rounded-full px-3 py-2 flex items-center gap-1 min-h-[40px] active:scale-95 transition-transform"
-            title="Supermercado — Aristocracia, Marcos, SVIP">
-            <span className="text-base">🛒</span>
-            <span className="text-pink-200 text-[10px] font-bold">Tienda</span>
-          </button>
-          <button data-testid="top-juegos-btn" onClick={() => setPanel('games')}
-            className="flex-shrink-0 bg-gradient-to-br from-green-500/30 to-emerald-500/30 border border-green-400/40 rounded-full px-3 py-2 flex items-center gap-1 min-h-[40px] active:scale-95 transition-transform"
-            title="Juegos en sala">
-            <span className="text-base">🎮</span>
-            <span className="text-green-200 text-[10px] font-bold">Juegos</span>
-          </button>
-          <button data-testid="top-cofres-btn" onClick={() => setPanel('cofres')}
-            className="flex-shrink-0 bg-gradient-to-br from-yellow-500/30 to-amber-500/30 border border-yellow-400/40 rounded-full px-3 py-2 flex items-center gap-1 min-h-[40px] active:scale-95 transition-transform"
-            title="Cofres">
-            <span className="text-base">📦</span>
-            <span className="text-yellow-200 text-[10px] font-bold">Cofres</span>
-          </button>
-          <button data-testid="top-sobres-btn" onClick={() => setPanel('sobres')}
-            className="flex-shrink-0 bg-gradient-to-br from-red-500/30 to-orange-500/30 border border-red-400/40 rounded-full px-3 py-2 flex items-center gap-1 min-h-[40px] active:scale-95 transition-transform"
-            title="Lluvia de oro / Sobres rojos">
-            <span className="text-base">🧧</span>
-            <span className="text-red-200 text-[10px] font-bold">Sobres</span>
-          </button>
-          <button data-testid="top-regalos-btn" onClick={() => setPanel('gifts-all')}
-            className="flex-shrink-0 bg-gradient-to-br from-fuchsia-500/30 to-rose-500/30 border border-fuchsia-400/40 rounded-full px-3 py-2 flex items-center gap-1 min-h-[40px] active:scale-95 transition-transform"
-            title="Enviar regalos">
-            <span className="text-base">🎁</span>
-            <span className="text-fuchsia-200 text-[10px] font-bold">Regalos</span>
-          </button>
-          {/* Rankings (Diario/Semanal/Mensual) — movido a la fila de arriba */}
-          <button data-testid="top-rankings-btn" onClick={() => setGiftRankOpen(true)}
-            className="flex-shrink-0 bg-gradient-to-br from-yellow-400/30 to-orange-500/30 border border-yellow-400/40 rounded-full px-3 py-2 flex items-center gap-1 min-h-[40px] active:scale-95 transition-transform"
-            title="Ranking Diario / Semanal / Mensual">
-            <span className="text-base">👑</span>
-            <span className="text-yellow-200 text-[10px] font-bold">Rankings</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Second row: user-status indicators (level, coins) */}
-      <div className="flex-shrink-0 px-3 mb-2">
-        <div className="flex items-center gap-2">
-          <LevelBadge userId={user.id} />
-          <div className="ml-auto bg-white/5 rounded-full px-3 py-2 flex items-center min-h-[40px]">
-            <span className="text-yellow-400 text-xs font-bold">💰 {formatCoins(user.coins)}</span>
-          </div>
-        </div>
-      </div>
-
-      {/* PK BATTLE BANNER */}
-      {pkBattle && pkBattle.status === 'active' && (
-        <div className="flex-shrink-0 px-3 mb-1">
-          <div className="bg-gradient-to-r from-red-600/30 to-orange-600/30 border border-red-500/30 rounded-xl p-2 flex items-center justify-between" style={{animation: 'pulse 1.5s infinite'}}>
-            <div className="flex items-center gap-2">
-              <span className="text-lg">⚔️</span>
-              <div>
-                <div className="text-white text-[10px] font-bold">PK BATTLE</div>
-                <div className="text-white/60 text-[8px]">{pkBattle.challenger_name} vs {pkBattle.opponent_name}</div>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="text-yellow-400 text-[10px] font-bold">{pkBattle.challenger_gifts?.toLocaleString()} vs {pkBattle.opponent_gifts?.toLocaleString()}</div>
-              {user.role === 'dueño' && (
-                <button onClick={endPK} className="bg-red-600 text-white px-2 py-1 rounded-lg text-[9px] font-bold">Finalizar</button>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* PROFILE MODAL */}
+      {/* ── Profile Modal ──────────────────────────────── */}
       {profileTarget && (
         <UserProfileModal
           targetUser={profileTarget}
           currentUser={user}
           roomId={roomId}
           onClose={() => setProfileTarget(null)}
-          onRefresh={() => { loadRoom(); }}
+          onRefresh={loadRoom}
         />
       )}
 
-      {/* PK BATTLE BAR */}
+      {/* ── PK Battle ─────────────────────────────────── */}
       <PKBattle roomId={roomId} userId={user.id} />
 
-      {/* SEATS - Circular design with neon glow */}
-      <div className="flex-shrink-0 px-3 mb-1 overflow-y-auto" style={{maxHeight: '40vh'}}>
-        {/* Owner / Super Admin controls */}
-        {(room.owner_id === user.id || user.role === 'dueño' || user.is_super_admin) && (
-          <div className="flex gap-1 mb-2 justify-between">
-            <div className="flex gap-1">
-              <button data-testid="room-lock-all-btn" onClick={async () => { await axios.post(`${API}/rooms/${roomId}/lock-all?owner_id=${user.id}`); loadRoom(); }}
-                className="text-[9px] bg-red-500/20 text-red-300 px-2 py-1 rounded-lg active:scale-95">Cerrar</button>
-              <button data-testid="room-unlock-all-btn" onClick={async () => { await axios.post(`${API}/rooms/${roomId}/unlock-all?owner_id=${user.id}`); loadRoom(); }}
-                className="text-[9px] bg-green-500/20 text-green-300 px-2 py-1 rounded-lg active:scale-95">Abrir</button>
-              {user.role === 'dueño' && room.owner_id !== user.id && (
-                <span className="text-[9px] bg-gradient-to-r from-purple-500/20 to-pink-500/20 text-purple-200 px-2 py-1 rounded-lg border border-purple-500/30">👑 Super Admin</span>
-              )}
+      {/* ── Floating gift animation ────────────────────── */}
+      {floatingGift && (
+        <div key={floatingGift.key} className="fixed inset-0 pointer-events-none flex items-center justify-center" style={{zIndex: 55}}>
+          <div className="text-6xl" style={{ animation: 'gift-float 2s ease-out forwards' }}>
+            {floatingGift.emoji}
+          </div>
+        </div>
+      )}
+
+      {/* ── PK Battle banner ──────────────────────────── */}
+      {pkBattle?.status === 'active' && (
+        <div className="absolute top-16 left-3 right-3 rounded-xl p-2 flex items-center justify-between"
+          style={{ zIndex: 25, background: 'rgba(239,68,68,0.2)', border: '1px solid rgba(239,68,68,0.4)' }}>
+          <div className="flex items-center gap-2">
+            <span className="text-lg">⚔️</span>
+            <div>
+              <div className="text-white text-[10px] font-bold">PK BATTLE</div>
+              <div className="text-white/60 text-[8px]">{pkBattle.challenger_name} vs {pkBattle.opponent_name}</div>
             </div>
-            {user.role === 'dueño' && (
-              <button onClick={async () => {
-                const newSize = (room.max_seats || 10) === 10 ? 24 : 10;
-                await axios.post(`${API}/rooms/${roomId}/expand-seats?admin_id=${user.id}&max_seats=${newSize}`);
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-yellow-400 text-[10px] font-bold">
+              {pkBattle.challenger_gifts?.toLocaleString()} vs {pkBattle.opponent_gifts?.toLocaleString()}
+            </span>
+            {isHost && (
+              <button onClick={endPK} className="bg-red-600 text-white px-2 py-1 rounded-lg text-[9px] font-bold">
+                Finalizar
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ────────────────────────────────────────────────────
+       *  PREMIUM ROOM HEADER
+       * ────────────────────────────────────────────────── */}
+      <RoomHeader
+        room={room}
+        userCount={userCount}
+        onBack={() => onBack()}
+        onShare={() => {
+          if (navigator.share) {
+            navigator.share({ title: room.name, url: window.location.href }).catch(() => {});
+          } else {
+            navigator.clipboard?.writeText(window.location.href);
+          }
+        }}
+        onInvite={() => setPanel('gifts-all')}
+        onSettings={() => setToolsOpen(true)}
+      />
+
+      {/* ────────────────────────────────────────────────────
+       *  MAIN SCROLLABLE ROOM AREA
+       * ────────────────────────────────────────────────── */}
+      <div
+        className="flex-1 overflow-y-auto no-scrollbar relative"
+        style={{ paddingBottom: 8 }}
+      >
+        {/* Music bar (if active) */}
+        {room.music_url && (
+          <div className="flex items-center gap-2 px-4 py-2 mx-3 mt-2 rounded-xl room-glass-dark">
+            <span className="text-sm">🎵</span>
+            <div className="flex-1 h-1 bg-white/10 rounded-full overflow-hidden">
+              <div className={`h-full bg-purple-400 rounded-full ${musicPlaying ? 'animate-pulse' : ''}`}
+                style={{ width: musicPlaying ? '60%' : '0%' }} />
+            </div>
+            <button onClick={toggleMusic} data-testid="music-play-pause"
+              className="text-white/70 text-xs active:scale-90">{musicPlaying ? '⏸' : '▶'}</button>
+            <button onClick={stopMusic} data-testid="music-stop"
+              className="text-red-400 text-xs active:scale-90">⏹</button>
+          </div>
+        )}
+
+        {/* Host quick controls — colapsable */}
+        {isHost && showHostBar && (
+          <div className="flex items-center gap-1.5 px-4 py-1.5 mx-3 mt-2 rounded-xl overflow-x-auto no-scrollbar room-glass">
+            <button data-testid="room-lock-all-btn"
+              onClick={async () => { await axios.post(`${API}/rooms/${roomId}/lock-all?owner_id=${user.id}`); loadRoom(); }}
+              className="flex-shrink-0 text-[9px] bg-red-500/20 text-red-300 px-2.5 py-1 rounded-lg active:scale-95 border border-red-500/20">
+              🔒 Cerrar
+            </button>
+            <button data-testid="room-unlock-all-btn"
+              onClick={async () => { await axios.post(`${API}/rooms/${roomId}/unlock-all?owner_id=${user.id}`); loadRoom(); }}
+              className="flex-shrink-0 text-[9px] bg-green-500/20 text-green-300 px-2.5 py-1 rounded-lg active:scale-95 border border-green-500/20">
+              🔓 Abrir
+            </button>
+            <button
+              onClick={() => bgRef.current?.click()}
+              className="flex-shrink-0 text-[9px] bg-blue-500/20 text-blue-300 px-2.5 py-1 rounded-lg active:scale-95 border border-blue-500/20">
+              🖼 Fondo
+            </button>
+            <button
+              onClick={async () => {
+                const current = room.max_seats || 9;
+                const opts = user.role === 'dueño' ? [6, 9, 12, 16, 20] : [6, 9, 12, 16];
+                const pick = window.prompt(`Micros (actual: ${current}). Opciones: ${opts.join(', ')}`, String(current));
+                if (!pick) return;
+                const n = parseInt(pick, 10);
+                if (!opts.includes(n)) { alert(`Opciones válidas: ${opts.join(', ')}`); return; }
+                try {
+                  await axios.post(`${API}/admin/console/expand-room?admin_id=${user.id}&room_id=${room.id}&max_seats=${n}`);
+                  loadRoom();
+                } catch (e) { alert(e.response?.data?.detail || 'Error'); }
+              }}
+              className="flex-shrink-0 text-[9px] bg-purple-500/20 text-purple-300 px-2.5 py-1 rounded-lg active:scale-95 border border-purple-500/20">
+              🎤 {room.max_seats || 9}
+            </button>
+            <button
+              onClick={async () => {
+                const isPriv = room.is_private || room.has_password;
+                if (isPriv) {
+                  if (!window.confirm('¿Hacer sala pública?')) return;
+                  await axios.put(`${API}/rooms/${room.id}/privacy?user_id=${user.id}&is_private=false&password=`).catch(() => {});
+                } else {
+                  const pwd = window.prompt('Contraseña para sala privada (mín. 3 chars):');
+                  if (!pwd || pwd.length < 3) return;
+                  await axios.put(`${API}/rooms/${room.id}/privacy?user_id=${user.id}&is_private=true&password=${encodeURIComponent(pwd)}`).catch(() => {});
+                }
                 loadRoom();
-              }} data-testid="toggle-event-mode"
-                className={`text-[9px] px-3 py-1 rounded-lg font-bold active:scale-95 ${(room.max_seats || 10) === 24 ? 'bg-yellow-500/30 text-yellow-300 border border-yellow-500/30' : 'bg-blue-500/20 text-blue-300'}`}>
-                {(room.max_seats || 10) === 24 ? '24 Mics' : '10→24'}
+              }}
+              className={`flex-shrink-0 text-[9px] px-2.5 py-1 rounded-lg active:scale-95 border ${
+                (room.is_private || room.has_password)
+                  ? 'bg-purple-500/20 text-purple-300 border-purple-500/20'
+                  : 'bg-gray-500/20 text-gray-300 border-gray-500/20'
+              }`}>
+              {(room.is_private || room.has_password) ? '🔒 Privada' : '🔓 Pública'}
+            </button>
+            {user.role === 'dueño' && (
+              <button onClick={toggleBot}
+                className={`flex-shrink-0 text-[9px] px-2.5 py-1 rounded-lg active:scale-95 border ${
+                  botOn ? 'bg-green-500/20 text-green-300 border-green-500/20' : 'bg-gray-500/20 text-gray-300 border-gray-500/20'
+                }`}>
+                🤖 Bot {botOn ? 'ON' : 'OFF'}
               </button>
             )}
           </div>
         )}
-        <div className="text-white/30 text-[10px] text-center mb-2 font-medium tracking-wider">Micro</div>
-        <SeatsGrid
-          room={room}
-          currentUserId={user.id}
-          isMuted={isMuted}
-          onSeatClick={(i, seat, isLocked) => {
-            const canManageLocks = room.owner_id === user.id || user.role === 'dueño' || user.is_super_admin;
-            if (isLocked && canManageLocks) {
-              axios.post(`${API}/rooms/${roomId}/lock-seat?owner_id=${user.id}&seat_index=${i}`).then(() => loadRoom());
-              return;
-            }
-            if (isLocked) return;
-            if (seat?.user_id === user.id) leaveSeat();
-            else if (seat) openGiftPanel(seat);
-            else joinSeat(i);
-          }}
-          onSeatLongPress={(seat) => setProfileTarget(seat)}
-        />
-      </div>
 
-      {/* CHAT */}
-      <div className="flex-1 min-h-0 px-3 pb-1">
-        <ChatArea
-          messages={chatMessages}
-          input={chatInput}
-          onInputChange={setChatInput}
-          onSend={sendChat}
-          onPhotoUpload={sendPhoto}
-          onZoomImage={setZoomImg}
-        />
-      </div>
-
-      {/* FLOATING GIFT ANIMATION */}
-      {floatingGift && (
-        <div key={floatingGift.key} className="fixed inset-0 z-[55] pointer-events-none flex items-center justify-center">
-          <div className="text-6xl" style={{
-            animation: 'giftFloat 2s ease-out forwards',
-          }}>{floatingGift.emoji}</div>
-          <style>{`
-            @keyframes giftFloat {
-              0% { opacity: 1; transform: translateY(0) scale(1); }
-              50% { opacity: 1; transform: translateY(-120px) scale(1.5); }
-              100% { opacity: 0; transform: translateY(-250px) scale(0.5); }
-            }
-          `}</style>
-        </div>
-      )}
-
-      {/* FLOATING RIGHT SIDE BUTTONS - Fondo (solo dueño/admin) */}
-      {(room.owner_id === user.id || user.role === 'dueño' || user.role === 'admin') && (
-        <div
-          className="fixed right-3 z-[55] flex flex-col gap-2 pointer-events-auto"
-          style={{ bottom: 'calc(env(safe-area-inset-bottom, 14px) + 96px)' }}
-        >
-          <button
-            data-testid="floating-fondo-btn"
-            onClick={() => bgRef.current?.click()}
-            className="w-12 h-12 rounded-full bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center text-lg active:scale-90 shadow-lg shadow-cyan-500/40 border border-cyan-300/40"
-            title="Cambiar fondo de la sala"
-          >
-            🖼
-          </button>
-          <input ref={bgRef} type="file" accept="image/*" onChange={uploadBackground} className="hidden" />
-          <button
-            data-testid="floating-privacy-btn"
-            onClick={async () => {
-              const currentlyPrivate = room.is_private || room.has_password;
-              if (currentlyPrivate) {
-                if (!window.confirm('¿Hacer PÚBLICA esta sala? Se eliminará la contraseña.')) return;
-                try {
-                  await axios.put(`${API}/rooms/${room.id}/privacy?user_id=${user.id}&is_private=false&password=`);
-                  alert('✅ Sala pública');
-                  loadRoom();
-                } catch (e) { alert(e.response?.data?.detail || 'Error'); }
-              } else {
-                const pwd = window.prompt('🔒 Define una contraseña (mín. 3 caracteres) para hacer esta sala PRIVADA:');
-                if (!pwd) return;
-                if (pwd.length < 3) { alert('Mínimo 3 caracteres'); return; }
-                try {
-                  await axios.put(`${API}/rooms/${room.id}/privacy?user_id=${user.id}&is_private=true&password=${encodeURIComponent(pwd)}`);
-                  alert('🔒 Sala privada activada. Guarda tu contraseña.');
-                  loadRoom();
-                } catch (e) { alert(e.response?.data?.detail || 'Error'); }
+        {/* ── PREMIUM SEATS GRID ─────────────────────── */}
+        <div className="mt-4 px-0">
+          <PremiumSeatsGrid
+            seats={room.seats || []}
+            maxSeats={room.max_seats || room.seats?.length || 9}
+            user={user}
+            speakingSeats={speakingSeats}
+            roomOwnerId={room.owner_id}
+            isHostMode={isHost}
+            onSeatPress={handleSeatPress}
+            onHostAction={(idx, seat) => {
+              const canLock = room.owner_id === user.id || user.role === 'dueño' || user.is_super_admin;
+              if (canLock) {
+                axios.post(`${API}/rooms/${roomId}/lock-seat?owner_id=${user.id}&seat_index=${idx}`).then(() => loadRoom());
               }
             }}
-            className={`w-12 h-12 rounded-full flex items-center justify-center text-lg active:scale-90 shadow-lg border ${
-              (room.is_private || room.has_password)
-                ? 'bg-gradient-to-br from-purple-500 to-fuchsia-700 shadow-purple-500/40 border-purple-300/40'
-                : 'bg-gradient-to-br from-gray-600 to-gray-800 shadow-gray-500/20 border-gray-500/30'
-            }`}
-            title={(room.is_private || room.has_password) ? 'Sala privada — click para volver pública' : 'Hacer sala privada'}
-          >
-            {(room.is_private || room.has_password) ? '🔒' : '🔓'}
-          </button>
-
-          {/* Selector de micros: 9 / 12 / 16 (libre) · 24 solo Dueño */}
-          <button
-            data-testid="floating-seats-btn"
-            onClick={async () => {
-              const current = room.max_seats || 10;
-              const isPlatformOwner = user.role === 'dueño';
-              const options = isPlatformOwner ? [9, 12, 16, 24] : [9, 12, 16];
-              const hint = isPlatformOwner
-                ? `🎤 Elige cantidad de micros (actual: ${current}). Opciones: 9, 12, 16, 24`
-                : `🎤 Elige cantidad de micros (actual: ${current}). Opciones: 9, 12, 16\n(La opción de 24 micros solo la asigna el Dueño desde su panel)`;
-              const pick = window.prompt(hint, String(current));
-              if (!pick) return;
-              const n = parseInt(pick, 10);
-              if (!options.includes(n)) {
-                alert(isPlatformOwner ? 'Solo 9, 12, 16 o 24' : 'Solo 9, 12 o 16 (24 está reservado al Dueño)');
-                return;
-              }
-              try {
-                await axios.post(`${API}/admin/console/expand-room?admin_id=${user.id}&room_id=${room.id}&max_seats=${n}`);
-                alert(`✅ Sala ajustada a ${n} micros`);
-                loadRoom();
-              } catch (e) { alert(e.response?.data?.detail || 'Error'); }
-            }}
-            className="w-12 h-12 rounded-full bg-gradient-to-br from-emerald-500 to-teal-700 flex items-center justify-center text-lg active:scale-90 shadow-lg shadow-emerald-500/40 border border-emerald-300/40"
-            title={user.role === 'dueño' ? 'Cambiar micros (9/12/16/24)' : 'Cambiar micros (9/12/16)'}
-          >
-            🎤
-          </button>
-        </div>
-      )}
-
-      {/* BOTTOM BAR - ALWAYS VISIBLE */}
-      <div className="flex-shrink-0 bg-black/90 border-t border-white/5 px-3" style={{paddingTop: '10px', paddingBottom: 'max(14px, env(safe-area-inset-bottom, 14px))'}}>
-        {/* Music Controls - visible when music exists */}
-        {room.music_url && (
-          <div className="flex items-center justify-center gap-2 mb-2">
-            <button onClick={toggleMusic} data-testid="music-play-pause"
-              className={`w-9 h-9 rounded-full flex items-center justify-center text-sm ${musicPlaying ? 'bg-green-500' : 'bg-white/10'}`}>
-              {musicPlaying ? '⏸' : '▶️'}
-            </button>
-            <div className="flex-1 bg-white/5 rounded-full h-1.5 mx-1 overflow-hidden">
-              <div className={`h-full bg-purple-400 rounded-full ${musicPlaying ? 'animate-pulse' : ''}`} style={{width: musicPlaying ? '60%' : '0%'}} />
-            </div>
-            <button onClick={stopMusic} data-testid="music-stop"
-              className="w-9 h-9 rounded-full bg-red-500/60 flex items-center justify-center text-sm">⏹</button>
-          </div>
-        )}
-        <div className="flex items-center justify-center gap-3">
-          {/* Events trigger - movido aquí desde el header */}
-          <button data-testid="events-room-btn" onClick={() => { setEventPanel(true); loadMyEvents(); loadPendingRequests(); }}
-            className="w-12 h-12 rounded-full bg-gradient-to-br from-yellow-500 to-orange-600 flex items-center justify-center text-lg active:scale-90 shadow-lg shadow-yellow-500/30 border border-yellow-300/30" title="Eventos (King / CP)">👑</button>
-
-          {/* Gift */}
-          <button data-testid="gift-bottom-btn" onClick={() => setPanel('gifts-all')}
-            className="w-14 h-14 rounded-full bg-pink-500 flex items-center justify-center text-2xl active:scale-90 shadow-lg shadow-pink-500/30">🎁</button>
-
-          {/* Music Upload */}
-          <button data-testid="music-btn" onClick={() => musicRef.current?.click()}
-            className="w-12 h-12 rounded-full bg-purple-600/80 flex items-center justify-center text-lg active:scale-90">🎵</button>
-          <input ref={musicRef} type="file" accept="audio/*" onChange={uploadMusic} className="hidden" />
-
-          {/* Mic - always visible */}
-          <button data-testid="toggle-mute-btn" onClick={mySeat !== null ? toggleMute : () => {}}
-            className={`w-16 h-16 rounded-full flex items-center justify-center text-2xl active:scale-90 shadow-lg ${
-              mySeat === null ? 'bg-gray-700 opacity-50' : isMuted ? 'bg-red-500 shadow-red-500/30' : 'bg-green-500 shadow-green-500/30'
-            }`}>{mySeat === null ? '🎤' : isMuted ? '🔇' : '🎤'}</button>
-
-          {/* Bajar del micro (la puerta) - visible SOLO si estás sentado */}
-          {mySeat !== null && (
-            <button data-testid="leave-seat-btn" onClick={leaveSeat}
-              title="Bajar del micrófono"
-              aria-label="Bajar del micrófono"
-              className="w-12 h-12 rounded-full bg-gradient-to-br from-amber-600 to-orange-700 flex items-center justify-center text-xl active:scale-90 shadow-lg shadow-amber-500/40 border border-amber-300/40">
-              🚪
-            </button>
-          )}
-
-          {/* Speaker */}
-          <button data-testid="toggle-deafen-btn" onClick={mySeat !== null ? toggleDeafen : () => {}}
-            className={`w-12 h-12 rounded-full flex items-center justify-center text-lg active:scale-90 ${
-              mySeat === null ? 'bg-gray-700 opacity-50' : isDeafened ? 'bg-orange-500' : 'bg-blue-500'
-            }`}>{isDeafened ? '🔕' : '🔊'}</button>
-
-          {/* Close/Leave - Desconecta audio Y sale de la sala */}
-          <button data-testid="leave-room-btn" onClick={async () => { await leaveRoom(); onBack(); }}
-            className="w-14 h-14 rounded-full bg-red-600 flex items-center justify-center text-2xl active:scale-90 border-2 border-red-400" title="Salir y desconectar">✕</button>
-
-          {/* 4-squares Tools button — opens premium ToolsPanel */}
-          <button data-testid="tools-panel-btn" onClick={() => setToolsOpen(true)}
-            className="w-12 h-12 rounded-full bg-white/10 border border-white/20 flex items-center justify-center active:scale-90 transition-transform" title="Herramientas">
-            <svg viewBox="0 0 24 24" className="w-6 h-6">
-              <rect x="3" y="3" width="7" height="7" rx="1.5" fill="#fff" />
-              <rect x="14" y="3" width="7" height="7" rx="1.5" fill="#fff" />
-              <rect x="3" y="14" width="7" height="7" rx="1.5" fill="#fff" />
-              <rect x="14" y="14" width="7" height="7" rx="1.5" fill="#fff" />
-            </svg>
-          </button>
-        </div>
-        {/* Hidden audio element - NO autoPlay, NO loop */}
-        {room.music_url && (
-          <audio
-            ref={audioElementRef}
-            src={room.music_url.startsWith('/api') ? `${process.env.REACT_APP_BACKEND_URL}${room.music_url}` : room.music_url}
-            onEnded={() => setMusicPlaying(false)}
-            className="hidden"
           />
-        )}
+        </div>
+
+        {/* ── LISTENERS STRIP ───────────────────────── */}
+        <div className="px-4 py-2 mt-2">
+          <div className="flex items-center gap-1.5">
+            <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', fontWeight: 600 }}>
+              👥 {room.active_users || 0}
+            </span>
+            <div className="flex items-center gap-1 overflow-hidden">
+              {(room.seats || []).filter(s => s?.user_id && s.user_id !== user.id).slice(0, 6).map((s, i) => (
+                <img key={i} src={s.avatar} alt="" onClick={() => setProfileTarget(s)}
+                  className="w-6 h-6 rounded-full border border-white/10 flex-shrink-0 cursor-pointer active:scale-90"
+                  style={{ objectFit: 'cover' }} />
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* ── FLOATING CHAT OVERLAY ─────────────────── */}
+        <div style={{ position: 'relative', minHeight: 80, paddingBottom: 4 }}>
+          <FloatingChat
+            messages={enrichedMessages}
+            maxVisible={5}
+          />
+        </div>
       </div>
+
+      {/* ────────────────────────────────────────────────────
+       *  RIGHT SIDE PANEL (quick buttons)
+       * ────────────────────────────────────────────────── */}
+      <RightSidePanel onAction={handleQuickAction} />
+
+      {/* ────────────────────────────────────────────────────
+       *  GIFT FAB — always visible
+       * ────────────────────────────────────────────────── */}
+      <GiftButton
+        onClick={() => { setGiftTarget(null); setPanel('gifts-all'); }}
+        coinsBalance={user.coins}
+      />
+
+      {/* ────────────────────────────────────────────────────
+       *  PREMIUM BOTTOM BAR
+       * ────────────────────────────────────────────────── */}
+      <BottomBar
+        chatInput={chatInput}
+        onChatChange={setChatInput}
+        onSendChat={sendChat}
+        showChatInput={showChatInput}
+        onToggleChat={() => setShowChatInput(v => !v)}
+        isMuted={isMuted}
+        audioStatus={audioStatus}
+        onToggleMic={mySeat !== null ? toggleMute : () => {}}
+        mySeat={mySeat}
+        onRequestSeat={() => {
+          const emptyIdx = (room.seats || []).findIndex(s => !s?.user_id && !s?.is_locked);
+          if (emptyIdx >= 0) joinSeat(emptyIdx);
+        }}
+        onOpenGifts={() => { setGiftTarget(null); setPanel('gifts-all'); }}
+        onOpenMusic={() => musicRef.current?.click()}
+        onOpenGames={() => setPanel('games')}
+        isHost={isHost}
+        onHostTools={() => setShowHostBar(v => !v)}
+        unreadCount={0}
+      />
+
+      {/* ── Hidden file inputs ─────────────────────── */}
+      <input ref={photoRef} type="file" accept="image/*" onChange={sendPhoto} className="hidden" data-testid="photo-upload" />
+      <input ref={musicRef} type="file" accept="audio/*" onChange={uploadMusic} className="hidden" />
+      <input ref={bgRef}    type="file" accept="image/*" onChange={uploadBackground} className="hidden" />
+
+      {/* ── Hidden audio element ───────────────────── */}
+      {room.music_url && (
+        <audio
+          ref={audioElementRef}
+          src={room.music_url.startsWith('/api')
+            ? `${process.env.REACT_APP_BACKEND_URL}${room.music_url}`
+            : room.music_url}
+          onEnded={() => setMusicPlaying(false)}
+          className="hidden"
+        />
+      )}
     </div>
   );
-
-  function openGiftPanel(seat) {
-    setGiftTarget(seat);
-    setPanel('gifts');
-  }
 };
 
 export default RoomView;

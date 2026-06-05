@@ -40,6 +40,11 @@ websockets==16.0
 # Imagenes (avatar/fondos)
 pillow==12.2.0
 
+# Integraciones v12.30
+twilio==9.4.1
+stripe>=13.0.0
+openai>=1.30.0
+
 # Testing
 pytest==9.0.3
 pytest-asyncio==1.3.0

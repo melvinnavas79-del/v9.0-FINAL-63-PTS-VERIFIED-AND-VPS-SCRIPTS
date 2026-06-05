@@ -51,6 +51,7 @@ const LoginPage = ({ onLogin }) => {
   useEffect(() => {
     const checkRedirect = async () => {
       try {
+        if (!auth) return;
         const result = await getRedirectResult(auth);
         if (result?.user) {
           setLoading('google');

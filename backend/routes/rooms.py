@@ -54,7 +54,9 @@ async def create_room(room_data: RoomCreate, owner_id: str):
     room_doc = {
         "id": str(uuid.uuid4()), "name": room_data.name,
         "owner_id": owner_id, "owner_name": owner['username'],
-        "active_users": 0, "max_seats": 9, "seats": [None] * 9,
+        "active_users": 0,
+        "max_seats": room_data.max_seats,
+        "seats": [None] * room_data.max_seats,
         "created_at": datetime.now(timezone.utc).isoformat()
     }
     await db.rooms.insert_one(room_doc)
@@ -746,8 +748,8 @@ async def expand_seats(room_id: str, admin_id: str, max_seats: int = 24):
     admin = await db.users.find_one({"id": admin_id})
     if not admin or admin.get('role') != 'dueño':
         raise HTTPException(status_code=403, detail="Solo el dueno de Lluvia Live puede activar Modo Evento")
-    if max_seats not in (10, 24):
-        raise HTTPException(status_code=400, detail="Solo 10 o 24 asientos permitidos")
+    if max_seats not in (6, 9, 12, 16, 20, 24, 30, 40):
+        raise HTTPException(status_code=400, detail="Opciones válidas: 6, 9, 12, 16, 20, 24")
     room = await db.rooms.find_one({"id": room_id})
     if not room:
         raise HTTPException(status_code=404, detail="Sala no encontrada")

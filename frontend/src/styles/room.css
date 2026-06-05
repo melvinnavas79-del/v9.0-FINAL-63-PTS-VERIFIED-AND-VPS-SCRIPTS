@@ -1,0 +1,184 @@
+/* =========================================================
+ * Lluvia Live — Room Animations
+ * Keyframes premium para la sala de audio.
+ * ========================================================= */
+
+/* ── Speaking Ring ───────────────────────────────────────── */
+@keyframes speaking-ring {
+  0%   { transform: scale(1);    opacity: 0.9; }
+  50%  { transform: scale(1.18); opacity: 0.4; }
+  100% { transform: scale(1);    opacity: 0.9; }
+}
+
+@keyframes speaking-ring-outer {
+  0%   { transform: scale(1.15); opacity: 0.5; }
+  50%  { transform: scale(1.35); opacity: 0;   }
+  100% { transform: scale(1.15); opacity: 0.5; }
+}
+
+@keyframes speaking-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(16,185,129,0.7); }
+  50%       { box-shadow: 0 0 0 8px rgba(16,185,129,0); }
+}
+
+/* ── VIP Frame shimmer ───────────────────────────────────── */
+@keyframes frame-shimmer {
+  0%   { filter: brightness(1);   }
+  50%  { filter: brightness(1.4); }
+  100% { filter: brightness(1);   }
+}
+
+@keyframes frame-rotate {
+  from { background-position: 0% 50%;   }
+  to   { background-position: 100% 50%; }
+}
+
+@keyframes legendary-glow {
+  0%, 100% { box-shadow: 0 0 20px rgba(239,68,68,0.6),  0 0 40px rgba(124,58,237,0.3); }
+  33%       { box-shadow: 0 0 30px rgba(245,158,11,0.8), 0 0 60px rgba(236,72,153,0.4); }
+  66%       { box-shadow: 0 0 25px rgba(124,58,237,0.7), 0 0 50px rgba(239,68,68,0.3); }
+}
+
+/* ── Chat messages ───────────────────────────────────────── */
+@keyframes chat-slide-up {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0);    }
+}
+
+@keyframes chat-gift-flash {
+  0%   { background: rgba(245,158,11,0); }
+  30%  { background: rgba(245,158,11,0.2); }
+  100% { background: rgba(245,158,11,0); }
+}
+
+/* ── Gift animation ──────────────────────────────────────── */
+@keyframes gift-pop {
+  0%   { transform: scale(0) rotate(-10deg); opacity: 0; }
+  60%  { transform: scale(1.15) rotate(3deg); opacity: 1; }
+  100% { transform: scale(1) rotate(0deg);   opacity: 1; }
+}
+
+@keyframes gift-float {
+  0%, 100% { transform: translateY(0);    }
+  50%       { transform: translateY(-8px); }
+}
+
+@keyframes particles-burst {
+  0%   { transform: translate(0,0) scale(1); opacity: 1; }
+  100% { transform: translate(var(--tx), var(--ty)) scale(0); opacity: 0; }
+}
+
+/* ── Entry animation ─────────────────────────────────────── */
+@keyframes entry-sweep {
+  from { transform: translateX(-100%); opacity: 0; }
+  to   { transform: translateX(0);     opacity: 1; }
+}
+
+@keyframes entry-vip {
+  0%   { transform: scale(0.5); opacity: 0; filter: blur(10px); }
+  60%  { transform: scale(1.05); opacity: 1; filter: blur(0);   }
+  100% { transform: scale(1);   opacity: 1; filter: blur(0);    }
+}
+
+/* ── Room background ─────────────────────────────────────── */
+@keyframes bg-breathe {
+  0%, 100% { opacity: 1;    }
+  50%       { opacity: 0.85; }
+}
+
+@keyframes bg-particle-float {
+  0%   { transform: translateY(100vh) translateX(0) scale(0);   opacity: 0; }
+  10%  { opacity: 0.6; }
+  90%  { opacity: 0.3; }
+  100% { transform: translateY(-20px) translateX(var(--dx)) scale(1); opacity: 0; }
+}
+
+/* ── Seat hover / press ──────────────────────────────────── */
+@keyframes seat-tap {
+  0%, 100% { transform: scale(1);    }
+  50%       { transform: scale(0.93); }
+}
+
+/* ── Bottom bar ──────────────────────────────────────────── */
+@keyframes mic-active {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(239,68,68,0.7); }
+  50%       { box-shadow: 0 0 0 10px rgba(239,68,68,0); }
+}
+
+@keyframes mic-speaking {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(16,185,129,0.8); }
+  50%       { box-shadow: 0 0 0 12px rgba(16,185,129,0); }
+}
+
+/* ── Panel slide-in ──────────────────────────────────────── */
+@keyframes slide-from-right {
+  from { transform: translateX(100%); opacity: 0; }
+  to   { transform: translateX(0);    opacity: 1; }
+}
+
+@keyframes slide-from-bottom {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0);    }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* ── Notification badge pulse ────────────────────────────── */
+@keyframes badge-pulse {
+  0%, 100% { transform: scale(1);    }
+  50%       { transform: scale(1.15); }
+}
+
+/* ── Level up ────────────────────────────────────────────── */
+@keyframes levelup-shine {
+  0%   { transform: translateX(-100%) rotate(25deg); }
+  100% { transform: translateX(400%)  rotate(25deg); }
+}
+
+/* ── Utility classes ─────────────────────────────────────── */
+.room-glass {
+  background: rgba(255,255,255,0.06);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255,255,255,0.1);
+}
+
+.room-glass-dark {
+  background: rgba(0,0,0,0.45);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255,255,255,0.08);
+}
+
+.speaking-active {
+  animation: speaking-pulse 1.2s ease-in-out infinite;
+}
+
+.frame-svip {
+  animation: frame-shimmer 2s ease-in-out infinite;
+}
+
+.frame-legendary {
+  animation: legendary-glow 2.5s ease-in-out infinite;
+}
+
+.chat-message-enter {
+  animation: chat-slide-up 0.25s ease-out forwards;
+}
+
+.seat-tap-anim {
+  animation: seat-tap 0.15s ease-in-out;
+}
+
+/* ── Safe area helpers ───────────────────────────────────── */
+.safe-top    { padding-top: env(safe-area-inset-top, 0px); }
+.safe-bottom { padding-bottom: env(safe-area-inset-bottom, 0px); }
+.safe-left   { padding-left: env(safe-area-inset-left, 0px); }
+.safe-right  { padding-right: env(safe-area-inset-right, 0px); }
+
+/* ── Scrollbar hide ──────────────────────────────────────── */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }

@@ -14,9 +14,17 @@ if (process.env.REACT_APP_FIREBASE_APP_ID && process.env.REACT_APP_FIREBASE_APP_
   firebaseConfig.appId = process.env.REACT_APP_FIREBASE_APP_ID;
 }
 
-const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
-const auth = getAuth(app);
-const googleProvider = new GoogleAuthProvider();
+let app = null;
+let auth = null;
+let googleProvider = null;
+
+try {
+  app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
+  auth = getAuth(app);
+  googleProvider = new GoogleAuthProvider();
+} catch (e) {
+  // Firebase not configured — username/password login still works
+}
 
 export { auth, googleProvider, RecaptchaVerifier, signInWithPhoneNumber, signInWithPopup, signInWithRedirect, getRedirectResult };
 export default app;

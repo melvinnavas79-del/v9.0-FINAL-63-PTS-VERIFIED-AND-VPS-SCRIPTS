@@ -53,6 +53,8 @@ class UserLogin(BaseModel):
 
 class RoomCreate(BaseModel):
     name: str
+    description: str = ""
+    max_seats: int = 9
 
 class ClanCreate(BaseModel):
     name: str
